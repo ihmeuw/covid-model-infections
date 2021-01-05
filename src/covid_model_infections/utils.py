@@ -1,0 +1,1 @@
+KNOT_DAYS = 21
