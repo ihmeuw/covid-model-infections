@@ -7,78 +7,44 @@ import functools
 import multiprocessing
 import sys
 import tqdm
+from loguru import logger
 
 import pandas as pd
 import numpy as np
 
-from covid_model_infections.model import processing, mr_spline
-from covid_model_infections.utils import KNOT_DAYS
+from covid_model_infections.model import support, mr_spline
+from covid_model_infections.utils import OMP_NUM_THREADS
 
-'''
-data = pd.read_csv('/ihme/covid-19/snapshot-data/best/covid_onedrive/Serological studies/global_serology_summary.csv',
-                   encoding='latin1')
-data = data.sort_values(['location_id', 'date']).reset_index(drop=True)
+MEASURE_KNOT_DAYS = 21
+INFECTION_KNOT_DAYS = 28
+SPLINE_OPTIONS = {'spline_knots_type':'domain',
+                  'spline_degree':3,
+                  'spline_l_linear':True,
+                  'spline_r_linear':True}
+LOG = True
+RMSE_WINDOW = 28
 
-data = data.loc[data['survey_series'].isin(['cdc_series', 'react2'])]
 
-# date formatting
-data['date'] = data['date'].str.replace('.202$|.2021$', '.2020')
-data.loc[data['date'] == '05.21.2020', 'date'] = '21.05.2020'
-data['date'] = pd.to_datetime(data['date'], format='%d.%m.%Y')
-data['start'] = data.groupby('location_id')['date'].transform(min)
-data = data.loc[(data['start'] < '2020-07-01') | (data['survey_series'] == 'react2')]
-
-for var in ['value', 'lower', 'upper']:
-    data[var] = data[var].astype(float)
-
-for location in data['location'].unique():
-    plt.errorbar(data.loc[(data['location'] == location) & (data['survey_series'] == 'cdc_series'), 'date'],
-                 data.loc[(data['location'] == location) & (data['survey_series'] == 'cdc_series'), 'value'],
-                 yerr=(data.loc[(data['location'] == location) & (data['survey_series'] == 'cdc_series'), 'value'] - data.loc[(data['location'] == location) & (data['survey_series'] == 'cdc_series'), 'lower'],
-                   data.loc[(data['location'] == location) & (data['survey_series'] == 'cdc_series'), 'upper'] - data.loc[(data['location'] == location) & (data['survey_series'] == 'cdc_series'), 'value']),
-                 fmt='o', color='black', ecolor='lightgray', elinewidth=3, capsize=0)
-    plt.title(location)
-    plt.xticks(rotation=60)
-    plt.show()
-
-'''
-
-def get_infected(location_id: int,
-                 n_draws: int,
-                 model_in_dir: str,
-                 model_out_dir: str):
-    model_data, population = load_inputs(location_id, Path(model_in_dir))
-    
-    measure = 'deaths'
-    
-    data = model_data[measure]['daily'].copy()
+def model_measure(measure: str, data: pd.Series, ratio: pd.Series, population: float, n_draws: int, lag: int) -> Dict:
+    logger.info(f'{measure.capitalize()}:')
     data = data.rename(measure)
-    ratio = model_data[measure]['ratio'].copy()
     
-    dep_trans_in = lambda x: np.log(x / population)
-    dep_se_trans_in = lambda x: 1. / (x / population) ** 0.23
-    dep_trans_out = lambda x: np.exp(x) * population - 1e-4
+    dep_trans_in, dep_se_trans_in, dep_trans_out = support.get_rate_transformations(LOG, population)
     
-    spline_options = {'spline_knots_type':'domain',
-                      'spline_degree':3,
-                      'spline_l_linear':True,
-                      'spline_r_linear':True}
+    n_knots = support.determine_n_knots(data, MEASURE_KNOT_DAYS)
     
-    n_days = (data.reset_index()['date'].max() - data.reset_index()['date'].min()).days
-    n_knots = int(np.ceil(n_days / KNOT_DAYS))
-    
+    logger.info('Generating smooth past curve.')
     data = data.clip(0, np.inf)
     data += 0.1
     data, smooth_data, mr_model = mr_spline.estimate_time_series(
         data=data.reset_index(),
         dep_var=measure,
-        spline_options=spline_options,
+        spline_options=SPLINE_OPTIONS,
         n_knots=n_knots,
         dep_trans_in=dep_trans_in,
         dep_var_se=measure,
         dep_se_trans_in=dep_se_trans_in,
     )
-    
     # fig, ax = plt.subplots(1, 2, figsize=(12, 6))
     # ax[0].plot(dep_trans_out(data['y']), label='observed')
     # ax[0].plot(dep_trans_out(smooth_data), label='smoothed')
@@ -88,48 +54,89 @@ def get_infected(location_id: int,
     # ax[1].legend()
     # fig.show()
     
-    def weighted_avg(x: pd.Series, w: pd.Series):
-        _w = w[x.index]
-        return (x * (_w / _w.sum())).sum()
+    logger.info('Getting weighted RMSE.')
+    wrmse = support.get_wrmse(data['y'], smooth_data, data['se'], RMSE_WINDOW)
     
-    rmse_window = 28
-    residuals = (data['y'] - smooth_data).rename('residuals')
-    if residuals.isnull().any():
-        raise ValueError('NAs in residual dataset.')
-    wrmse = residuals ** 2
-    wrmse = wrmse.rolling(window=rmse_window, min_periods=rmse_window, center=True).apply(lambda x: weighted_avg(x, 1 / (data['se'] ** 2)))
-    wrmse = wrmse.fillna(method='bfill')
-    wrmse_tail_scaler = (wrmse.isnull().cumsum() + 1)
-    wrmse = wrmse.fillna(method='ffill')
-    wrmse *= wrmse_tail_scaler
-    wrmse = np.sqrt(wrmse)
-    wrmse = wrmse.rename('wrmse')
-    
-    noisy_draws = np.random.normal(smooth_data.values, wrmse.values, (n_draws, smooth_data.size))
-    noisy_draws = dep_trans_out(noisy_draws.T)
-    noisy_draws /= ratio[smooth_data.index].to_frame().values
+    logger.info('Sampling residuals.')
+    draws = np.random.normal(smooth_data.values, wrmse.values, (n_draws, smooth_data.size))
     # plt.scatter(data.index, data['y'], alpha=0.25)
-    # plt.plot(smooth_data.index, smooth_draws.mean(axis=0), color='red')
-    # plt.fill_between(smooth_data.index, np.percentile(smooth_draws, 2.5, axis=0), np.percentile(smooth_draws, 97.5, axis=0),
+    # plt.plot(smooth_data.index, draws.mean(axis=0), color='red')
+    # plt.fill_between(smooth_data.index, np.percentile(draws, 2.5, axis=0), np.percentile(draws, 97.5, axis=0),
     #                  color='red', alpha=0.5)
-    noisy_draws = [pd.DataFrame({'date':smooth_data.index, 'infections':noisy_draw}) for noisy_draw in noisy_draws.T]
+    
+    logger.info('Converting draws to infections.')
+    smooth_data = dep_trans_out(smooth_data)
+    smooth_data -= 0.1
+    smooth_data = smooth_data.clip(1e-4, np.inf)
+    if LOG:
+        draws -= np.var(draws, axis=0, keepdims=True) / 2
+    draws = dep_trans_out(draws.T)
+    draws -= 0.1
+    draws = draws.clip(1e-4, np.inf)
+    infections = (smooth_data / ratio[smooth_data.index]).rename('infections')
+    draws /= ratio[infections.index].to_frame().values
+    infections.index = infections.index - pd.Timedelta(days=lag)
+    draws = pd.DataFrame(draws,
+                         columns=[f'draw_{d}' for d in range(n_draws)],
+                         index=infections.index)
 
-    return {measure: noisy_draws}
+    return {'cumul':smooth_data.cumsum(), 'daily':smooth_data, 'infections_mean':infections, 'infections_draws':draws}
 
-"""
-    _estimator = functools.partial(
-        mr_spline.estimate_time_series,
-        dep_var=measure,
-        spline_options=spline_options,
+
+def model_infection_draw(input_draw: pd.Series, population: float) -> pd.Series:
+    n_knots = support.determine_n_knots(input_draw, INFECTION_KNOT_DAYS)
+    
+    dep_trans_in, dep_se_trans_in, dep_trans_out = support.get_rate_transformations(LOG, population)
+    
+    input_draw, output_draw, mr_model = mr_spline.estimate_time_series(
+        data=input_draw.reset_index(),
+        dep_var=input_draw.name,
+        spline_options=SPLINE_OPTIONS,
         n_knots=n_knots,
-        dep_var_se=measure,
+        dep_trans_in=dep_trans_in,
+        #dep_var_se=input_draw.name,
+        #dep_se_trans_in=dep_se_trans_in,
+        num_submodels=10,
+    )
+    
+    return output_draw
+
+
+def get_infected(location_id: int,
+                 n_draws: int,
+                 model_in_dir: str,
+                 model_out_dir: str):
+    logger.info('Loading data.')
+    input_data, population = load_inputs(location_id, Path(model_in_dir))
+    
+    logger.info('Running measure-specific models.')
+    output_data = {measure: model_measure(measure,
+                                          measure_data['daily'].copy(), measure_data['ratio'].copy(),
+                                          population, n_draws, measure_data['lag']) 
+                   for measure, measure_data in input_data.items()}
+    
+    logger.info('Fitting infection curves to draws of all available input measures.')
+    input_draws = pd.concat([v['infections_draws'] for k, v in output_data.items()]).sort_index()
+    input_draws = [input_draws[draw] for draw in input_draws.columns]
+    _estimator = functools.partial(
+        model_infection_draw,
+        population=population,
     )
     with multiprocessing.Pool(25) as p:
-        smooth_draws = list(tqdm.tqdm(p.imap(_estimator, noisy_draws), total=n_draws, file=sys.stdout))
-    smooth_draws = np.vstack([sd[1] for sd in smooth_draws]).T
-"""
+        output_draws = list(tqdm.tqdm(p.imap(_estimator, input_draws), total=n_draws, file=sys.stdout))
+    output_draws = pd.concat(output_draws, axis=1)
+    _, _, dep_trans_out = support.get_rate_transformations(LOG, population)
+    if LOG:
+        output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
+    output_draws = dep_trans_out(output_draws)
+    
 
 def load_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float]:
+    hierarchy_path = model_in_dir / 'hierarchy.h5'
+    hierarchy = pd.read_hdf(hierarchy_path)
+    location_name = hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item()
+    logger.info(f'Model location: {location_name}')
+    
     data_path = model_in_dir / 'model_data.pkl'
     with data_path.open('rb') as file:
         model_data = pickle.load(file)
@@ -162,5 +169,5 @@ def main():
 
 
 if __name__ == '__main__':
-    os.environ['OMP_NUM_THREADS'] = '6'
+    os.environ['OMP_NUM_THREADS'] = OMP_NUM_THREADS
     main()

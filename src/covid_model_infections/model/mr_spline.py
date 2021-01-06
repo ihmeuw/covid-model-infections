@@ -76,7 +76,7 @@ def get_ensemble_knots(n_knots: int, min_interval: float, num_samples: int):
 
     
 def predict_time_series(dep_var: str, 
-                        mr_model: MRBeRT,
+                        mr_model: MRBRT,
                         dep_trans_out: Callable[[pd.Series], pd.Series]) -> pd.DataFrame:
     data = mr_model.data.to_df()
     day0 = data['study_id'].min()

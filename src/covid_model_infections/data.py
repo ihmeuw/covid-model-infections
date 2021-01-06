@@ -5,8 +5,8 @@ import pandas as pd
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.Series:
-    ifr_path = infection_fatality_root / '20201222_allage_ifr_by_loctime_predbyranef.csv'
-    data = pd.read_csv(ifr_path)
+    data_path = infection_fatality_root / '20201222_allage_ifr_by_loctime_predbyranef.csv'
+    data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_ifr':'ifr'})
     data = (data
@@ -18,8 +18,8 @@ def load_ifr(infection_fatality_root: Path) -> pd.Series:
 
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
-    ihr_path = infection_hospitalization_root / '20201116_v52_allage_hir_by_loctime_v1.csv'
-    data = pd.read_csv(ihr_path)
+    data_path = infection_hospitalization_root / '20201116_v52_allage_hir_by_loctime_v1.csv'
+    data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_hir':'ihr'})
     data = (data
@@ -31,8 +31,9 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
 
 
 def load_idr(infection_detection_root: Path) -> pd.Series:
-    idr_path = infection_detection_root / 'pred_idr.csv'
-    data = pd.read_csv(idr_path)
+    data_path = infection_detection_root / 'pred_idr.csv'
+    data = pd.read_csv(data_path)
+    data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -41,8 +42,28 @@ def load_idr(infection_detection_root: Path) -> pd.Series:
     return data
 
 
+def load_sero_data(infection_detection_root: Path):
+    data_path = infection_detection_root / 'sero_data.csv'
+    data = pd.read_csv(data_path)
+    data['date'] = pd.to_datetime(data['date'])
+    
+    return data
+
+
+def load_testing_data(infection_detection_root: Path):
+    data_path = infection_detection_root / 'test_data.csv'
+    data = pd.read_csv(data_path)
+    data['date'] = pd.to_datetime(data['date'])
+    data = (data
+            .set_index(['location_id', 'date'])
+            .sort_index())
+    
+    return data
+
+
 def load_model_inputs(model_inputs_root:Path, input_measure: str) -> Tuple[pd.Series, pd.Series]:
-    data = pd.read_csv(model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv')
+    data_path = model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv'
+    data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     is_all_ages = data['age_group_id'] == 22
     is_both_sexes = data['sex_id'] == 3
@@ -77,14 +98,16 @@ def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
 
 
 def load_hierarchy(model_inputs_root:Path) -> pd.DataFrame:
-    data = pd.read_csv(model_inputs_root / 'locations' / 'modeling_hierarchy.csv')
+    data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+    data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
     
     return data
 
 
 def load_population(model_inputs_root: Path) -> pd.Series:
-    data = pd.read_csv(model_inputs_root / 'output_measures' / 'population' / 'all_populations.csv')
+    data_path = model_inputs_root / 'output_measures' / 'population' / 'all_populations.csv'
+    data = pd.read_csv(data_path)
     is_2019 = data['year_id'] == 2019
     is_bothsex = data['sex_id'] == 3
     is_alllage = data['age_group_id'] == 22
@@ -94,5 +117,3 @@ def load_population(model_inputs_root: Path) -> pd.Series:
             .loc[:, 'population'])
 
     return data
-
-    
