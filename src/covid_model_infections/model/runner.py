@@ -12,7 +12,7 @@ from loguru import logger
 import pandas as pd
 import numpy as np
 
-from covid_model_infections.model import support, mr_spline
+from covid_model_infections.model import support, mr_spline, plotter
 from covid_model_infections.utils import OMP_NUM_THREADS
 
 MEASURE_KNOT_DAYS = 21
@@ -68,8 +68,8 @@ def model_measure(measure: str, data: pd.Series, ratio: pd.Series, population: f
     smooth_data = dep_trans_out(smooth_data)
     smooth_data -= 0.1
     smooth_data = smooth_data.clip(1e-4, np.inf)
-    if LOG:
-        draws -= np.var(draws, axis=0, keepdims=True) / 2
+    # if LOG:
+    #     draws -= np.var(draws, axis=0, keepdims=True) / 2
     draws = dep_trans_out(draws.T)
     draws -= 0.1
     draws = draws.clip(1e-4, np.inf)
@@ -80,7 +80,9 @@ def model_measure(measure: str, data: pd.Series, ratio: pd.Series, population: f
                          columns=[f'draw_{d}' for d in range(n_draws)],
                          index=infections.index)
 
-    return {'cumul':smooth_data.cumsum(), 'daily':smooth_data, 'infections_mean':infections, 'infections_draws':draws}
+    return {'cumul':smooth_data.cumsum(), 'daily':smooth_data,
+            'infections_cumul':infections.cumsum(), 'infections_daily':infections,
+            'infections_draws':draws}
 
 
 def model_infection_draw(input_draw: pd.Series, population: float) -> pd.Series:
@@ -102,12 +104,43 @@ def model_infection_draw(input_draw: pd.Series, population: float) -> pd.Series:
     return output_draw
 
 
+def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float]:
+    hierarchy_path = model_in_dir / 'hierarchy.h5'
+    hierarchy = pd.read_hdf(hierarchy_path)
+    location_name = hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item()
+    logger.info(f'Model location: {location_name}')
+    
+    data_path = model_in_dir / 'model_data.pkl'
+    with data_path.open('rb') as file:
+        model_data = pickle.load(file)
+    model_data = model_data[location_id]
+    
+    pop_path = model_in_dir / 'pop_data.h5'
+    population = pd.read_hdf(pop_path)
+    population = population[location_id]
+    
+    return model_data, population, location_name
+
+
+def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
+    sero_path = model_in_dir / 'sero_data.h5'
+    sero_data = pd.read_hdf(sero_path)
+    sero_data = sero_data.loc[location_id]
+
+    test_path = model_in_dir / 'test_data.h5'
+    test_data = pd.read_hdf(test_path)
+    test_data = test_data.loc[location_id]
+    
+    return sero_data, test_data
+
+
 def get_infected(location_id: int,
                  n_draws: int,
                  model_in_dir: str,
-                 model_out_dir: str):
+                 model_out_dir: str,
+                 plot_dir: str):
     logger.info('Loading data.')
-    input_data, population = load_inputs(location_id, Path(model_in_dir))
+    input_data, population, location_name = load_model_inputs(location_id, Path(model_in_dir))
     
     logger.info('Running measure-specific models.')
     output_data = {measure: model_measure(measure,
@@ -130,23 +163,21 @@ def get_infected(location_id: int,
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
     
-
-def load_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float]:
-    hierarchy_path = model_in_dir / 'hierarchy.h5'
-    hierarchy = pd.read_hdf(hierarchy_path)
-    location_name = hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item()
-    logger.info(f'Model location: {location_name}')
+    logger.info('Plot data.')
+    sero_data, test_data = load_extra_plot_inputs(location_id, Path(model_in_dir))
+    test_data = (test_data['daily_tests'] / population).rename('testing_rate')
+    plotter.plotter(
+        Path(plot_dir), location_id, location_name,
+        input_data, test_data, sero_data,
+        output_data, output_draws, population
+    )
     
-    data_path = model_in_dir / 'model_data.pkl'
-    with data_path.open('rb') as file:
-        model_data = pickle.load(file)
-    model_data = model_data[location_id]
-    
-    pop_path = model_in_dir / 'pop_data.h5'
-    population = pd.read_hdf(pop_path)
-    population = population[location_id]
-    
-    return model_data, population
+    logger.info('Writing outputs.')
+    data_path = Path(model_out_dir) / f'{location_id}_data.pkl'
+    with data_path.open('wb') as file:
+        pickle.dump(output_data, file, -1)
+    draw_path = Path(model_out_dir) / f'{location_id}_draws.h5'
+    output_draws.to_hdf(draw_path, key='data', mode='w')
 
 
 def main():
@@ -162,6 +193,9 @@ def main():
     )
     parser.add_argument(
         '--model_out_dir', help='Directory to which model outputs are written.', type=str
+    )
+    parser.add_argument(
+        '--plot_dir', help='Directory to which plots are written.', type=str
     )
     args = parser.parse_args()
     

@@ -32,8 +32,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
+    plot_dir = output_root / 'plots'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
+    shell_tools.mkdir(plot_dir)
     
     logger.info('Loading epi report data.')
     cumul_deaths, daily_deaths = data.load_model_inputs(model_inputs_root, 'deaths')

@@ -30,7 +30,7 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
     return data
 
 
-def load_idr(infection_detection_root: Path) -> pd.Series:
+def load_idr(infection_detection_root: Path, limits: Tuple[float, float] = (0.03, 0.7)) -> pd.Series:
     data_path = infection_detection_root / 'pred_idr.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
@@ -38,6 +38,7 @@ def load_idr(infection_detection_root: Path) -> pd.Series:
             .set_index(['location_id', 'date'])
             .sort_index()
             .loc[:, 'idr'])
+    data = data.clip(*limits)
     
     return data
 
@@ -46,6 +47,9 @@ def load_sero_data(infection_detection_root: Path):
     data_path = infection_detection_root / 'sero_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
+    data = (data
+            .set_index(['location_id', 'date'])
+            .sort_index())
     
     return data
 
