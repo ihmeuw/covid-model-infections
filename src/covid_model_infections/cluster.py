@@ -13,8 +13,8 @@ from loguru import logger
 PROJECT = 'proj_dq'
 QUEUE = 'all.q'
 F_MEM = '5.0G'
-F_THREAD = '20'
-OMP_NUM_THREADS = '4'
+F_THREAD = '27'
+OMP_NUM_THREADS = '6'
 H_RUNTIME = '03:00:00'
 SLEEP_TIME = 10
 

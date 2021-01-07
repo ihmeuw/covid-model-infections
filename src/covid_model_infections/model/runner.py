@@ -1,7 +1,7 @@
+import sys
 import os
 from typing import Tuple, Dict
 from pathlib import Path
-import argparse
 import dill as pickle
 import functools
 import multiprocessing
@@ -125,7 +125,10 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
 def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
     sero_path = model_in_dir / 'sero_data.h5'
     sero_data = pd.read_hdf(sero_path)
-    sero_data = sero_data.loc[location_id]
+    sero_data = (sero_data
+                 .loc[sero_data['location_id'] == location_id]
+                 .set_index('date'))
+    del sero_data['location_id']
 
     test_path = model_in_dir / 'test_data.h5'
     test_data = pd.read_hdf(test_path)
@@ -180,28 +183,10 @@ def get_infected(location_id: int,
     output_draws.to_hdf(draw_path, key='data', mode='w')
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--location_id', help='Location being modeled.', type=int
-    )
-    parser.add_argument(
-        '--n_draws', help='How many samples to take.', type=int
-    )
-    parser.add_argument(
-        '--model_in_dir', help='Directory from which model inputs are read.', type=str
-    )
-    parser.add_argument(
-        '--model_out_dir', help='Directory to which model outputs are written.', type=str
-    )
-    parser.add_argument(
-        '--plot_dir', help='Directory to which plots are written.', type=str
-    )
-    args = parser.parse_args()
-    
-    get_infected(**args)
-
-
 if __name__ == '__main__':
     os.environ['OMP_NUM_THREADS'] = OMP_NUM_THREADS
-    main()
+    get_infected(location_id=int(sys.argv[1]),
+                 n_draws=int(sys.argv[2]),
+                 model_in_dir=sys.argv[3],
+                 model_out_dir=sys.argv[4],
+                 plot_dir=sys.argv[5],)

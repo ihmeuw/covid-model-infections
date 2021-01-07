@@ -47,9 +47,6 @@ def load_sero_data(infection_detection_root: Path):
     data_path = infection_detection_root / 'sero_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
-    data = (data
-            .set_index(['location_id', 'date'])
-            .sort_index())
     
     return data
 

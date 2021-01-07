@@ -6,7 +6,7 @@ import pandas as pd
 
 from covid_shared import shell_tools, cli_tools
 
-from covid_model_infections import data, model
+from covid_model_infections import data, cluster, model
 from covid_model_infections.utils import TIMELINE
 
 ## TODO:
@@ -90,5 +90,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     sero_data.to_hdf(model_in_dir / 'sero_data.h5', key='data', mode='w')
     test_data.to_hdf(model_in_dir / 'test_data.h5', key='data', mode='w')
     
-    logger.info('TBD')
-    model.runner.__file__
+    logger.info('Launching models.')
+    job_args_map = {
+        location_id: [model.runner.__file__,
+                      location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir)]
+        for location_id in location_ids[:5]
+    }
+    cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
