@@ -94,6 +94,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     job_args_map = {
         location_id: [model.runner.__file__,
                       location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir)]
-        for location_id in location_ids[:5]
+        for location_id in location_ids
     }
     cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)

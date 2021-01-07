@@ -26,8 +26,8 @@ def plotter(plot_dir, location_id, location_name,
     fig = plt.figure(figsize=(16, 9), constrained_layout=True)
     gs = fig.add_gridspec(n_rows, n_cols, width_ratios=widths, height_ratios=heights)
     
-    line1 = plt.Line2D((0.4125, 0.4125),(0.03, 0.97), color='darkgrey', linewidth=2)
-    line2 = plt.Line2D((0.6525, 0.6525),(0.03, 0.97), color='darkgrey', linewidth=2)
+    line1 = plt.Line2D((0.41, 0.41),(0., 0.975), color='darkgrey', linewidth=2)
+    line2 = plt.Line2D((0.65, 0.65),(0., 0.975), color='darkgrey', linewidth=2)
     fig.add_artist(line1)
     fig.add_artist(line2)
     
