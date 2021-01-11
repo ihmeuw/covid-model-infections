@@ -63,13 +63,20 @@ def load_testing_data(infection_detection_root: Path):
 
 
 def load_model_inputs(model_inputs_root:Path, input_measure: str) -> Tuple[pd.Series, pd.Series]:
-    data_path = model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv'
+    #data_path = model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv'
+    data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
-    data['date'] = pd.to_datetime(data['date'])
-    is_all_ages = data['age_group_id'] == 22
-    is_both_sexes = data['sex_id'] == 3
-    data = data.loc[is_all_ages & is_both_sexes]
-    data = data.rename(columns={'value': f'cumulative_{input_measure}'})
+    data = data.rename(columns={'Deaths':'cumulative_deaths',
+                                'Confirmed':'cumulative_cases',
+                                'Hospitalizations':'cumulative_hospitalizations',})
+    data['date'] = pd.to_datetime(data['Date'])
+    #is_all_ages = data['age_group_id'] == 22
+    #is_both_sexes = data['sex_id'] == 3
+    #data = data.loc[is_all_ages & is_both_sexes]
+    #data = data.rename(columns={'value': f'cumulative_{input_measure}'})
+    keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
+    data = data.loc[:, keep_cols].dropna()
+    data['location_id'] = data['location_id'].astype(int)
     
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))

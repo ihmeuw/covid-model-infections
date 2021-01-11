@@ -46,7 +46,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_data = data.load_ifr(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     idr_data = data.load_idr(infection_detection_root)
-    
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)
