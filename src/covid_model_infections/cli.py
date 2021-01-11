@@ -31,7 +31,7 @@ warnings.simplefilter('ignore')
               help=('Which version of the infection-detection-rate (IDR) data to use.'))
 @click.option('-o', '--output-root',
               type=click.Path(file_okay=False),
-              default=paths.INFECTIONS_OUTPUT_ROOT,
+              #default=paths.INFECTIONS_OUTPUT_ROOT,
               show_default=True)
 @click.option('--n-holdout-days',
               type=click.INT,
@@ -58,12 +58,15 @@ def run_infections(run_metadata,
     cli_tools.configure_logging_to_terminal(verbose)
     model_inputs_root = cli_tools.get_last_stage_directory(model_inputs_version,
                                                            last_stage_root=paths.MODEL_INPUTS_ROOT)
-    infection_fatality_root = cli_tools.get_last_stage_directory(infection_fatality_version,
-                                                                 last_stage_root=paths.INECTION_FATALITY_ROOT)
-    infection_hospitalization_root = cli_tools.get_last_stage_directory(infection_hospitalization_version,
-                                                                        last_stage_root=paths.INECTION_HOSPITALIZATION_ROOT)
-    infection_detection_root = cli_tools.get_last_stage_directory(infection_detection_version,
-                                                                  last_stage_root=paths.INECTION_DETECTION_ROOT)
+    infection_fatality_root = Path(infection_fatality_version)
+    # infection_fatality_root = cli_tools.get_last_stage_directory(infection_fatality_version,
+    #                                                              last_stage_root=paths.INFECTION_FATALITY_ROOT)
+    infection_hospitalization_root = Path(infection_hospitalization_version)
+    # infection_hospitalization_root = cli_tools.get_last_stage_directory(infection_hospitalization_version,
+    #                                                                     last_stage_root=paths.INECTION_HOSPITALIZATION_ROOT)
+    infection_detection_root = Path(infection_detection_version)
+    # infection_detection_root = cli_tools.get_last_stage_directory(infection_detection_version,
+    #                                                               last_stage_root=paths.INECTION_DETECTION_ROOT)
     run_metadata.update_from_path('model_inputs_metadata', model_inputs_root / paths.METADATA_FILE_NAME)
 
     output_root = Path(output_root).resolve()
@@ -73,7 +76,11 @@ def run_infections(run_metadata,
     cli_tools.configure_logging_to_files(run_directory)
 
     main = cli_tools.monitor_application(runner.make_infections, logger, with_debugger)
-    app_metadata, _ = main(model_inputs_root, run_directory, n_holdout_days, dow_holdouts, n_draws)
+    app_metadata, _ = main(model_inputs_root,
+                           infection_fatality_root,
+                           infection_hospitalization_root,
+                           infection_detection_root,
+                           run_directory, n_holdout_days, n_draws)
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
                                  mark_dir_as_best, production_tag)

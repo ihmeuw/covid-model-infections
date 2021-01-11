@@ -97,3 +97,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
         for location_id in location_ids
     }
     cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
+    
+    logger.info(f'Model run exists in {str(output_root)}.')
+    

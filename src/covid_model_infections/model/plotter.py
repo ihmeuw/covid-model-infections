@@ -20,16 +20,16 @@ def plotter(plot_dir, location_id, location_name,
     
     n_cols = 4
     n_rows = 6
-    widths = [1, 1, 1, 2]
+    widths = [2, 1, 1, 3]
     heights = [1] * n_rows
     
     fig = plt.figure(figsize=(16, 9), constrained_layout=True)
     gs = fig.add_gridspec(n_rows, n_cols, width_ratios=widths, height_ratios=heights)
     
-    line1 = plt.Line2D((0.41, 0.41),(0., 0.975), color='darkgrey', linewidth=2)
-    line2 = plt.Line2D((0.65, 0.65),(0., 0.975), color='darkgrey', linewidth=2)
-    fig.add_artist(line1)
-    fig.add_artist(line2)
+    # line1 = plt.Line2D((0.41, 0.41),(0., 0.975), color='darkgrey', linewidth=2)
+    # line2 = plt.Line2D((0.65, 0.65),(0., 0.975), color='darkgrey', linewidth=2)
+    # fig.add_artist(line1)
+    # fig.add_artist(line2)
     
     for i, measure in enumerate(measures):
         daily_ax = fig.add_subplot(gs[i*2:i*2+2, 0])
@@ -78,8 +78,12 @@ def plotter(plot_dir, location_id, location_name,
                (output_draws.cumsum() / population) * 100)
     
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
-    fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
-    plt.close(fig)
+    if plot_dir is not None:
+        fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
+        plt.close(fig)
+    else:
+        plt.show()
+    
 
 
 def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark):
@@ -130,7 +134,7 @@ def model_plot(ax, title, measure_data, sero_data, output_draws):
                     np.percentile(output_draws, 97.5, axis=1),
                     color='black', alpha=0.2)
     for m, md in measure_data.items():
-        ax.plot(md, color=MEASURE_COLORS[m]['light'], linestyle='--', alpha=0.6)
+        ax.plot(md, color=MEASURE_COLORS[m]['dark'], linestyle='--', alpha=0.6)
     if title:
         ax.set_title(title)
     ax.set_ylabel('Infections')
