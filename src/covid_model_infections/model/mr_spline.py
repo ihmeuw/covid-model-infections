@@ -46,12 +46,12 @@ def estimate_time_series(data: pd.DataFrame,
     if dep_var_se:
         data['se'] = dep_se_trans_in(data[dep_var_se])
     else:
-        data['se'] = 1.  # np.abs(data['y'].mean())
+        data['se'] = 1.
     col_args = {
         'col_obs':'y',
         'col_obs_se':'se',
         'col_covs':['t'],
-        'col_study_id':'date',
+        #'col_study_id':'date',
     }
     
     if verbose: logger.info('Creating model data.')
@@ -85,6 +85,7 @@ def estimate_time_series(data: pd.DataFrame,
     
     if verbose: logger.info('Making prediction.')
     smooth_data = predict_time_series(
+        day0=day0,
         dep_var=dep_var,
         mr_model=mr_model,
         dep_trans_out=dep_trans_out,
@@ -153,12 +154,12 @@ def get_ensemble_knots(n_knots: int, min_interval: float, num_samples: int):
     return ensemble_knots
 
     
-def predict_time_series(dep_var: str, 
+def predict_time_series(day0: pd.Timestamp,
+                        dep_var: str, 
                         mr_model: MRBRT,
                         dep_trans_out: Callable[[pd.Series], pd.Series],
                         diff: bool,) -> pd.DataFrame:
     data = mr_model.data.to_df()
-    day0 = data['study_id'].min()
     
     pred_data = MRData()
     t = np.arange(data['t'].min(), data['t'].max() + 1)

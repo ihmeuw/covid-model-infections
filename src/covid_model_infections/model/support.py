@@ -37,7 +37,7 @@ def determine_n_knots(data: pd.Series, knot_days: int, min_k: int = 4) -> int:
 def get_rate_transformations(log: bool):
     if log:
         dep_trans_in = lambda x: np.log(x)
-        dep_se_trans_in = lambda x: 1.
+        dep_se_trans_in = lambda x: 1. / np.exp(x)
         dep_trans_out = lambda x: np.exp(x)
     else:
         dep_trans_in = lambda x: x
