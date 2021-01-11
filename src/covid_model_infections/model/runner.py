@@ -22,15 +22,15 @@ NUM_SUBMODELS = 50
 
 
 def model_measure(measure: str, model_type: str,
-                  data: pd.Series, ratio: pd.Series, population: float,
+                  input_data: pd.Series, ratio: pd.Series, population: float,
                   n_draws: int, lag: int,
                   log: bool, knot_days: int,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
-    data = data.rename(measure)
+    input_data = input_data.rename(measure)
     
     dep_trans_in, dep_se_trans_in, dep_trans_out = support.get_rate_transformations(log)
     
-    n_knots = support.determine_n_knots(data, knot_days)
+    n_knots = support.determine_n_knots(input_data, knot_days)
     
     spline_options = {'spline_knots_type':'domain',
                       'spline_degree':3,}
@@ -48,11 +48,11 @@ def model_measure(measure: str, model_type: str,
         spline_options.update({'prior_spline_num_constraint_points':CONSTRAINT_POINTS,})
         
     logger.info('Generating smooth past curve.')
-    data = data.clip(FLOOR, np.inf)
+    input_data = input_data.clip(FLOOR, np.inf)
     if log:
-        data += LOG_OFFSET
+        input_data += LOG_OFFSET
     model_data, smooth_data, mr_model = mr_spline.estimate_time_series(
-        data=data.reset_index(),
+        data=input_data.reset_index(),
         dep_var=measure,
         spline_options=spline_options,
         n_knots=n_knots,
@@ -65,15 +65,15 @@ def model_measure(measure: str, model_type: str,
     
     logger.info('Converting to infections.')
     if log:
-        data -= LOG_OFFSET
+        input_data -= LOG_OFFSET
         smooth_data -= LOG_OFFSET
-    data = data.clip(FLOOR, np.inf)
+    input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
     
     if model_type == 'cumul':
-        data = data.diff().fillna(data)
+        input_data = input_data.diff().fillna(input_data)
         smooth_data = smooth_data.diff().fillna(smooth_data)
-    raw_infections = (data / ratio[smooth_data.index]).rename('infections')
+    raw_infections = (input_data / ratio[input_data.index]).rename('infections')
     raw_infections.index -= pd.Timedelta(days=lag)
     smooth_infections = (smooth_data / ratio[smooth_data.index]).rename('infections')
     smooth_infections.index -= pd.Timedelta(days=lag)
@@ -157,9 +157,8 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     logger.info('Sampling residuals.')
     draws = np.random.normal(smooth_infections['infections'].values, smooth_infections['sigma'].values,
                              (n_draws, len(smooth_infections)))
-    draws = [pd.DataFrame({f'draw_{d}':dep_trans_out(draw)}, index=smooth_infections.index) for d, draw in enumerate(draws)]
-    draws -= LOG_OFFSET
-    data = data.clip(FLOOR, np.inf)
+    draws = [pd.DataFrame({f'draw_{d}':(dep_trans_out(draw) - LOG_OFFSET).clip(FLOOR, np.inf)},
+                          index=smooth_infections.index) for d, draw in enumerate(draws)]
     
     return draws
 
@@ -171,7 +170,7 @@ def get_infected(location_id: int,
                  plot_dir: str,
                  measure_type: str = 'cumul',
                  measure_log: bool = False, measure_knot_days: int = 21,
-                 infection_log: bool = True, infection_knot_days: int = 28,):
+                 infection_log: bool = True, infection_knot_days: int = 21,):
     logger.info('Loading data.')
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
     
@@ -183,12 +182,13 @@ def get_infected(location_id: int,
                                           measure_log, measure_knot_days,)
                    for measure, measure_data in input_data.items()}
     
-    logger.info('Fitting infection curves to draws of all available input measures.')
+    logger.info('Fitting infection curve based on all available input measures.')
     smooth_infections = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
     smooth_infections = model_infections(smooth_infections, infection_log, infection_knot_days, diff=True)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
+    logger.info('Fitting infection curves to draws of all available input measures.')
     _estimator = functools.partial(
         model_infections,
         log=infection_log, knot_days=infection_knot_days,
