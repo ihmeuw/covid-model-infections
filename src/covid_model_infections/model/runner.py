@@ -204,7 +204,7 @@ def get_infected(location_id: int,
         log=infection_log, knot_days=infection_knot_days, num_submodels=10,
         diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
     )
-    with multiprocessing.Pool(F_THREAD - 2) as p:
+    with multiprocessing.Pool(int(F_THREAD) - 2) as p:
         output_draws = list(tqdm.tqdm(p.imap(_estimator, input_draws), total=n_draws, file=sys.stdout))
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = support.get_rate_transformations(infection_log)
