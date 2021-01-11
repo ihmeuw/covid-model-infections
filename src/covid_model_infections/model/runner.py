@@ -17,8 +17,8 @@ from covid_model_infections.utils import OMP_NUM_THREADS
 
 LOG_OFFSET = 1
 FLOOR = 1e-4
-CONSTRAINT_POINTS = 50
-NUM_SUBMODELS = 50
+CONSTRAINT_POINTS = 80
+NUM_SUBMODELS = 40
 
 
 def model_measure(measure: str, model_type: str,

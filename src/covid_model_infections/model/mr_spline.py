@@ -46,7 +46,7 @@ def estimate_time_series(data: pd.DataFrame,
     if dep_var_se:
         data['se'] = dep_se_trans_in(data[dep_var_se])
     else:
-        data['se'] = 1e-4  # np.abs(data['y'].mean())
+        data['se'] = 1.  # np.abs(data['y'].mean())
     col_args = {
         'col_obs':'y',
         'col_obs_se':'se',
