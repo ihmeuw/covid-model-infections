@@ -19,7 +19,7 @@ def estimate_time_series(data: pd.DataFrame,
                          num_submodels: int = 25,
                          min_interval_days: int = 7,
                          dep_trans_out: Callable[[pd.Series], pd.Series] = lambda x: x,
-                         verbose: bool = True) -> Tuple[pd.DataFrame, pd.Series, MRBeRT]:
+                         verbose: bool = False) -> Tuple[pd.DataFrame, pd.Series, MRBeRT]:
     if verbose: logger.info('Formatting data.')
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
@@ -122,7 +122,7 @@ def model_intercept(data: pd.DataFrame,
     
     prediction += intercept
     prediction = pd.concat([
-        pd.Series(intercept, index=[prediction.index.min() - pd.Timedelta(days=1)]),
+        pd.Series(intercept, index=pd.Index([prediction.index.min() - pd.Timedelta(days=1)], name='date')),
         prediction
     ]).rename(dep_var)
     prediction = dep_trans_out(prediction)
