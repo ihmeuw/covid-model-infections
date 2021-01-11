@@ -41,8 +41,6 @@ def model_measure(measure: str, model_type: str,
         if 'log':
             prior_spline_maxder_gaussian = np.array([[0, 0.005]] * (n_knots - 1))
             prior_spline_maxder_gaussian[0] = [0, 0.001]
-            prior_spline_maxder_gaussian[1] = [0, 0.0025]
-            prior_spline_maxder_gaussian[-2] = [0, 0.0025]
             prior_spline_maxder_gaussian[-1] = [0, 0.001]
             spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
@@ -108,8 +106,8 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[0] = [0, 0.1]
-        prior_spline_maxder_gaussian[-1] = [0, 0.1]
+        prior_spline_maxder_gaussian[0] = [0, 0.01]
+        prior_spline_maxder_gaussian[-1] = [0, 0.01]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     elif not diff:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),
@@ -186,8 +184,8 @@ def get_infected(location_id: int,
                  model_out_dir: str,
                  plot_dir: str,
                  measure_type: str = 'cumul',
-                 measure_log: bool = True, measure_knot_days: int = 7,
-                 infection_log: bool = True, infection_knot_days: int = 21,):
+                 measure_log: bool = True, measure_knot_days: int = 14,
+                 infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
     logger.info('Loading data.')
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
