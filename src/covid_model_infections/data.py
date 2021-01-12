@@ -125,3 +125,12 @@ def load_population(model_inputs_root: Path) -> pd.Series:
             .loc[:, 'population'])
 
     return data
+
+
+def write_infections(data: pd.DataFrame,
+                     out_dir: Path,):
+    draw = np.array([c for c in data.columns if c.startswith('draw_')]).item()
+    draw = int(draw.split('_')[-1])
+    
+    out_path = out_root / f'draw_{draw}.csv'
+    data.reset_index().to_csv(out_path, index=False)

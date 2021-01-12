@@ -49,7 +49,7 @@ def estimate_time_series(data: pd.DataFrame,
         data['se'] = 1.
     col_args = {
         'col_obs':'y',
-        'col_obs_se':'se',
+        #'col_obs_se':'se',
         'col_covs':['t'],
         #'col_study_id':'date',
     }

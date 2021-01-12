@@ -38,11 +38,8 @@ def model_measure(measure: str, model_type: str,
 
     if model_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
-        if 'log':
-            prior_spline_maxder_gaussian = np.array([[0, 0.005]] * (n_knots - 1))
-            prior_spline_maxder_gaussian[0] = [0, 0.001]
-            prior_spline_maxder_gaussian[-1] = [0, 0.001]
-            spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
+        prior_spline_maxder_gaussian = np.array([[0, 1e-3]] * (n_knots - 1))
+        spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
         spline_options = {'spline_l_linear':True,
                           'spline_r_linear':True,}
@@ -106,9 +103,11 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[0] = [0, 0.001]
-        prior_spline_maxder_gaussian[-1] = [0, 0.001]
+        prior_spline_maxder_gaussian[0] = [0, 1e-3]
+        prior_spline_maxder_gaussian[-1] = [0, 1e-3]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
+        # spline_options.update({'spline_l_linear':True,
+        #                        'spline_r_linear':True,})
     elif not diff:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),
                                'prior_spline_num_constraint_points':CONSTRAINT_POINTS,})

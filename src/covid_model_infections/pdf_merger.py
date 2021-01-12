@@ -13,7 +13,10 @@ def pdf_merger(pdfs: List, location_names: List, parent_names: List, outfile: st
     merger = PdfFileMerger()
     for i, (pdf, location_name, parent_name) in enumerate(zip(pdfs, location_names, parent_names)):
         merger.append(pdf)
-        merger.addBookmark(location_name, i+1) # , parent_name
+        if parent_name in location_names:
+            merger.addBookmark(location_name, i+1, parent_name)
+        else:
+            merger.addBookmark(location_name, i+1)
 
     # get output file (if already exists, delete before writing new file)
     if outfile is None:

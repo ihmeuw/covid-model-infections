@@ -88,7 +88,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
         pickle.dump(model_data, file, -1)
     hierarchy_path = model_in_dir / 'hierarchy.h5'
     hierarchy.to_hdf(hierarchy_path, key='data', mode='w')
-    pop_path = model_in_dir / 'hierarchy.h5'
+    pop_path = model_in_dir / 'pop_data.h5'
     pop_data.to_hdf(pop_path, key='data', mode='w')
     sero_path = model_in_dir / 'sero_data.h5'
     sero_data.to_hdf(sero_path, key='data', mode='w')
@@ -103,33 +103,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     }
     cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
     
-    logger.debug('Compiling infection draws.')
-    draws = []
-    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('draws.h5')]:
-        draws.append(pd.read_hdf(draws_path))
-    draws = pd.concat(draws)
-    draw_path = output_root / 'infection_draws.h5'
-    draws.to_hdf(draw_path, key='data', mode='w')
-    draws = [draws[c].rename('infections_draw') for c in draws.columns]
-    
-    logger.debug('Compiling other model outputs.')
-    outputs = {}
-    for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]:
-        with outputs_path.open('rb') as outputs_file:
-            outputs.update(pickle.load(outputs_file))
-    output_path = output_root / 'output_data.pkl'
-    with output_path.open('wb') as file:
-        pickle.dump(output_data, file, -1)
-    deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
-    deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
-    deaths = pd.concat(deaths)
-    deaths = (deaths
-              .set_index(['location_id', 'date'])
-              .sort_index()
-              .rename(columns={'deaths':'deaths_draw'}))
-    draws = [pd.concat([draw, deaths], axis=1) for draw in draws]
-    
-    logger.debug('Merging.')
+    logger.debug('Merging PDFs.')
     possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
     existing_pdfs = [str(x).split('/')[-1] for x in plot_dir.iterdir() if x.is_file()]
     pdf_paths = [pdf for pdf in possible_pdfs if pdf in existing_pdfs]
@@ -141,5 +115,34 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
     pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
     
+    logger.debug('Compiling infection draws.')
+    draws = []
+    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('draws.h5')]:
+        draws.append(pd.read_hdf(draws_path))
+    draws = pd.concat(draws)
+    draw_path = output_root / 'infection_draws.h5'
+    draws.to_hdf(draw_path, key='data', mode='w')
+    draws = [draws[c] for c in draws.columns]
+    
+    logger.debug('Compiling other model outputs.')
+    outputs = {}
+    for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]:
+        with outputs_path.open('rb') as outputs_file:
+            outputs.update(pickle.load(outputs_file))
+    output_path = output_root / 'output_data.pkl'
+    with output_path.open('wb') as file:
+        pickle.dump(output_path, file, -1)
+    deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
+    deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
+    deaths = pd.concat(deaths)
+    deaths = (deaths
+              .set_index(['location_id', 'date'])
+              .sort_index()
+              .rename(columns={'deaths':'deaths_draw'}))
+    draws = [pd.concat([draw, deaths], axis=1) for draw in draws]
+    
+    logger.debug('Saving draws.')
+    
+        
     logger.info(f'Model run complete -- {str(output_root)}.')
     
