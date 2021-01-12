@@ -8,14 +8,13 @@ from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model
 from covid_model_infections.utils import TIMELINE
+from covid_model_infections.pdf_merger import pdf_merger
 
 ## TODO:
 ##     - holdout
 ##     - ratio draws
-##     - other hospital data (lowest hanging fruit is "admissions", maybe population as well)
-##     - 
+##     - hospital census?
 ##     - logging!
-##     - do we need to use cumulative? see if we are biased downward
 ##     - throw error if we have case/death/admission data but not ratio (should use parent)
 ##     - modularize data object creation
 ##     - make consistent timeline with IDR, IFR, IHR models
@@ -29,6 +28,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     output_root: Path,
                     holdout_days: int,
                     n_draws: int):
+    if holdout_days > 0:
+        raise ValueError('Holdout not yet implemented.')
+    
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
@@ -84,10 +86,14 @@ def make_infections(app_metadata: cli_tools.Metadata,
     data_path = model_in_dir / 'model_data.pkl'
     with data_path.open('wb') as file:
         pickle.dump(model_data, file, -1)
-    hierarchy.to_hdf(model_in_dir / 'hierarchy.h5', key='data', mode='w')
-    pop_data.to_hdf(model_in_dir / 'pop_data.h5', key='data', mode='w')
-    sero_data.to_hdf(model_in_dir / 'sero_data.h5', key='data', mode='w')
-    test_data.to_hdf(model_in_dir / 'test_data.h5', key='data', mode='w')
+    hierarchy_path = model_in_dir / 'hierarchy.h5'
+    hierarchy.to_hdf(hierarchy_path, key='data', mode='w')
+    pop_path = model_in_dir / 'hierarchy.h5'
+    pop_data.to_hdf(pop_path, key='data', mode='w')
+    sero_path = model_in_dir / 'sero_data.h5'
+    sero_data.to_hdf(sero_path, key='data', mode='w')
+    test_path = model_in_dir / 'test_data.h5'
+    test_data.to_hdf(test_path, key='data', mode='w')
     
     logger.info('Launching models.')
     job_args_map = {
@@ -97,5 +103,43 @@ def make_infections(app_metadata: cli_tools.Metadata,
     }
     cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
     
-    logger.info(f'Model run exists in {str(output_root)}.')
+    logger.debug('Compiling infection draws.')
+    draws = []
+    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('draws.h5')]:
+        draws.append(pd.read_hdf(draws_path))
+    draws = pd.concat(draws)
+    draw_path = output_root / 'infection_draws.h5'
+    draws.to_hdf(draw_path, key='data', mode='w')
+    draws = [draws[c].rename('infections_draw') for c in draws.columns]
+    
+    logger.debug('Compiling other model outputs.')
+    outputs = {}
+    for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]:
+        with outputs_path.open('rb') as outputs_file:
+            outputs.update(pickle.load(outputs_file))
+    output_path = output_root / 'output_data.pkl'
+    with output_path.open('wb') as file:
+        pickle.dump(output_data, file, -1)
+    deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
+    deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
+    deaths = pd.concat(deaths)
+    deaths = (deaths
+              .set_index(['location_id', 'date'])
+              .sort_index()
+              .rename(columns={'deaths':'deaths_draw'}))
+    draws = [pd.concat([draw, deaths], axis=1) for draw in draws]
+    
+    logger.debug('Merging.')
+    possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
+    existing_pdfs = [str(x).split('/')[-1] for x in plot_dir.iterdir() if x.is_file()]
+    pdf_paths = [pdf for pdf in possible_pdfs if pdf in existing_pdfs]
+    pdf_location_ids = [int(pdf_path[:-4]) for pdf_path in pdf_paths]
+    pdf_location_names = [hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item() for location_id in pdf_location_ids]
+    pdf_parent_ids = [hierarchy.loc[hierarchy['location_id'] == location_id, 'parent_id'].item() for location_id in pdf_location_ids]
+    pdf_parent_names = [hierarchy.loc[hierarchy['location_id'] == parent_id, 'location_name'].item() for parent_id in pdf_parent_ids]
+    pdf_paths = [str(plot_dir / pdf_path) for pdf_path in pdf_paths]
+    pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
+    pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
+    
+    logger.info(f'Model run complete -- {str(output_root)}.')
     

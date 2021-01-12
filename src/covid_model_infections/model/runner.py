@@ -106,8 +106,8 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[0] = [0, 0.01]
-        prior_spline_maxder_gaussian[-1] = [0, 0.01]
+        prior_spline_maxder_gaussian[0] = [0, 0.001]
+        prior_spline_maxder_gaussian[-1] = [0, 0.001]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     elif not diff:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),
@@ -207,7 +207,7 @@ def get_infected(location_id: int,
     logger.info('Fitting infection curves to draws of all available input measures.')
     _estimator = functools.partial(
         model_infections,
-        log=infection_log, knot_days=infection_knot_days, num_submodels=10,
+        log=infection_log, knot_days=infection_knot_days, num_submodels=5,
         diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
     )
     with multiprocessing.Pool(int(F_THREAD) - 2) as p:
@@ -230,7 +230,12 @@ def get_infected(location_id: int,
     logger.info('Writing outputs.')
     data_path = Path(model_out_dir) / f'{location_id}_data.pkl'
     with data_path.open('wb') as file:
-        pickle.dump(output_data, file, -1)
+        pickle.dump({location_id:output_data}, file, -1)
+    output_draws['location_id'] = location_id
+    output_draws = (output_draws
+                    .reset_index()
+                    .set_index(['location_id', 'date'])
+                    .sort_index())
     draw_path = Path(model_out_dir) / f'{location_id}_draws.h5'
     output_draws.to_hdf(draw_path, key='data', mode='w')
 
