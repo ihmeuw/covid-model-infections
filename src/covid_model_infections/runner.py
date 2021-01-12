@@ -33,6 +33,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
+    seir_in_dir = output_root / 'seir_inputs'
     plot_dir = output_root / 'plots'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
@@ -158,7 +159,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     draws = [pd.concat([draw, deaths], axis=1) for draw in draws]
     
     logger.debug('Saving draws.')
-    
+    _writer = functools.partial(
+        data.write_seir_inputs,
+        out_dir=seir_in_dir
+    )
+    with multiprocessing.Pool(int(F_THREAD) - 2) as p:
+        seir_in_paths = list(tqdm.tqdm(p.imap(_writer, draws), total=n_draws, file=sys.stdout))
         
     logger.info(f'Model run complete -- {str(output_root)}.')
     
