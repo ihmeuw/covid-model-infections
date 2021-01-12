@@ -17,9 +17,10 @@ def estimate_time_series(data: pd.DataFrame,
                          dep_var_se: str = None,
                          dep_se_trans_in: Callable[[pd.Series], pd.Series] = lambda x: x,
                          num_submodels: int = 25,
+                         single_random_knot: bool = False,
                          min_interval_days: int = 7,
                          dep_trans_out: Callable[[pd.Series], pd.Series] = lambda x: x,
-                         verbose: bool = False) -> Tuple[pd.DataFrame, pd.Series, MRBeRT]:
+                         verbose: bool = False,) -> Tuple[pd.DataFrame, pd.Series, MRBeRT]:
     if verbose: logger.info('Formatting data.')
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
@@ -53,6 +54,12 @@ def estimate_time_series(data: pd.DataFrame,
         'col_covs':['t'],
         #'col_study_id':'date',
     }
+    if verbose: logger.info('Getting base knots.')
+    min_interval = min_interval_days / data['t'].max()
+    if num_submodels == 1 and single_random_knot:
+        spline_knots = get_ensemble_knots(n_knots, min_interval, 1)[0]
+    else:
+        spline_knots = np.linspace(0., 1., n_knots)
     
     if verbose: logger.info('Creating model data.')
     mr_data = MRData()
@@ -61,11 +68,10 @@ def estimate_time_series(data: pd.DataFrame,
                                   use_re=False,
                                   use_spline=True,
                                   use_spline_intercept=True,
-                                  spline_knots=np.linspace(0., 1., n_knots),
+                                  spline_knots=spline_knots,
                                   **spline_options)
     if num_submodels > 1:
         if verbose: logger.info('Sampling knots.')
-        min_interval = min_interval_days / data['t'].max()
         ensemble_knots = get_ensemble_knots(n_knots, min_interval, num_submodels)
         
         if verbose: logger.info('Initializing model.')

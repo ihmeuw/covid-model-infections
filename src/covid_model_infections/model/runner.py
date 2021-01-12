@@ -12,7 +12,7 @@ from loguru import logger
 import pandas as pd
 import numpy as np
 
-from covid_model_infections.model import data, support, mr_spline, plotter
+from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import OMP_NUM_THREADS
 from covid_model_infections.cluster import F_THREAD
 
@@ -29,9 +29,9 @@ def model_measure(measure: str, model_type: str,
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
-    dep_trans_in, dep_se_trans_in, dep_trans_out = support.get_rate_transformations(log)
+    dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
     
-    n_knots = support.determine_n_knots(input_data, knot_days)
+    n_knots = determine_n_knots(input_data, knot_days)
     
     spline_options = {'spline_knots_type':'domain',
                       'spline_degree':3,}
@@ -89,16 +89,20 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
                      refit: bool, num_submodels: int,
                      **spline_kwargs) -> pd.Series:
     if refit:
-        np.random.seed(inputs.name.split('_')[-1])
+        if isinstance(inputs, pd.DataFrame):
+            draw = int(inputs.columns.unique().item().split('_')[-1])
+        else:
+            draw = int(inputs.name.split('_')[-1])
+        np.random.seed(draw)
     
-    n_knots = support.determine_n_knots(inputs, knot_days)
+    n_knots = determine_n_knots(inputs, knot_days)
     
     if diff and not log:
         raise ValueError('Must do ln(diff) to prevent from going negative.')
     
-    dep_trans_in, dep_se_trans_in, dep_trans_out = support.get_rate_transformations(log)
+    dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
     if log and refit:
-        _, _, dep_trans_out = support.get_rate_transformations(log=False)
+        _, _, dep_trans_out = get_rate_transformations(log=False)
     
     inputs = inputs.clip(FLOOR, np.inf)
     spline_options = {'spline_knots_type':'domain',
@@ -127,6 +131,7 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
         #dep_se_trans_in=dep_se_trans_in,
         dep_trans_out=dep_trans_out,
         num_submodels=num_submodels,
+        single_random_knot=refit,
     )
     if diff:
         outputs = mr_spline.model_intercept(data=inputs.reset_index(),
@@ -145,7 +150,7 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
 
 def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd.DataFrame,
                                 n_draws: int, rmse_radius: int = 60):
-    dep_trans_in, _, dep_trans_out = support.get_rate_transformations(log=True)
+    dep_trans_in, _, dep_trans_out = get_rate_transformations(log=True)
     
     logger.info('Calculating residuals.')
     smooth_infections = dep_trans_in(smooth_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)    
@@ -180,6 +185,43 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     return draws
 
 
+def splice_ratios(ratio_data: pd.Series,
+                  smooth_data: pd.Series,
+                  infections: pd.Series,
+                  lag: int,) -> pd.Series:    
+    infections.index += pd.Timedelta(days=lag)
+    new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
+    start_date = new_ratio.index.min()
+    end_date = new_ratio.index.max()
+    new_ratio = pd.concat([ratio_data, new_ratio], axis=1)
+    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=30), 'new_ratio'] = new_ratio[ratio_data.name]
+    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=60), 'new_ratio'] = new_ratio[ratio_data.name]
+    new_ratio = new_ratio['new_ratio'].rename(ratio_data.name)
+    new_ratio = new_ratio.interpolate()
+    
+    return new_ratio
+
+    
+def determine_n_knots(data: pd.Series, knot_days: int, min_k: int = 4) -> int:
+    n_days = (data.reset_index()['date'].max() - data.reset_index()['date'].min()).days
+    n_knots = int(np.ceil(n_days / knot_days))
+    
+    return max(min_k, n_knots)
+
+
+def get_rate_transformations(log: bool):
+    if log:
+        dep_trans_in = lambda x: np.log(x)
+        dep_se_trans_in = lambda x: 1. / np.exp(x)
+        dep_trans_out = lambda x: np.exp(x)
+    else:
+        dep_trans_in = lambda x: x
+        dep_se_trans_in = lambda x: 1.
+        dep_trans_out = lambda x: x
+        
+    return dep_trans_in, dep_se_trans_in, dep_trans_out
+
+
 def get_infected(location_id: int,
                  n_draws: int,
                  model_in_dir: str,
@@ -203,7 +245,7 @@ def get_infected(location_id: int,
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     smooth_infections = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
     smooth_infections = model_infections(smooth_infections, infection_log, infection_knot_days,
-                                         diff=True, refit=False, num_submodels=100)
+                                         diff=True, refit=False, num_submodels=50)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
@@ -216,7 +258,7 @@ def get_infected(location_id: int,
     with multiprocessing.Pool(int(F_THREAD) - 2) as p:
         output_draws = list(tqdm.tqdm(p.imap(_estimator, input_draws), total=n_draws, file=sys.stdout))
     output_draws = pd.concat(output_draws, axis=1)
-    _, _, dep_trans_out = support.get_rate_transformations(infection_log)
+    _, _, dep_trans_out = get_rate_transformations(infection_log)
     if infection_log:
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
@@ -229,6 +271,15 @@ def get_infected(location_id: int,
         input_data, test_data, sero_data,
         output_data, output_draws, population
     )
+    
+    if 'deaths' in input_data.keys():
+        logger.info('Create and storint new ratios (should do w/ draws!!!).')
+        ifr = splice_ratios(input_data['deaths']['ratio'].copy(),
+                            output_data['deaths']['daily'].copy(),
+                            output_draws.mean(axis=1).rename('infections'),
+                            input_data['deaths']['lag'],)
+        ifr_path = Path(model_out_dir) / f'{location_id}_ifr.h5'
+        ifr.to_hdf(ifr_path, key='data', mode='w')
     
     logger.info('Writing outputs.')
     data_path = Path(model_out_dir) / f'{location_id}_data.pkl'
