@@ -88,6 +88,9 @@ def model_measure(measure: str, model_type: str,
 def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
                      refit: bool, num_submodels: int,
                      **spline_kwargs) -> pd.Series:
+    if refit:
+        np.random.seed(inputs.name.split('_')[-1])
+    
     n_knots = support.determine_n_knots(inputs, knot_days)
     
     if diff and not log:
@@ -199,7 +202,8 @@ def get_infected(location_id: int,
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     smooth_infections = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
-    smooth_infections = model_infections(smooth_infections, infection_log, infection_knot_days, diff=True, refit=False, num_submodels=50)
+    smooth_infections = model_infections(smooth_infections, infection_log, infection_knot_days,
+                                         diff=True, refit=False, num_submodels=100)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
