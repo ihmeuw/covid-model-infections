@@ -18,7 +18,7 @@ def load_ifr(infection_fatality_root: Path) -> pd.Series:
 
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
-    data_path = infection_hospitalization_root / '20210110_v57_allage_hir_by_loctime_v4.csv'
+    data_path = infection_hospitalization_root / '20210110_v57_allage_hir_by_loctime_v5.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_hir':'ihr'})

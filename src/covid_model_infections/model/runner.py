@@ -241,6 +241,8 @@ def get_infected(location_id: int,
 
 if __name__ == '__main__':
     os.environ['OMP_NUM_THREADS'] = OMP_NUM_THREADS
+    configure_logging_to_terminal(verbose=2)
+
     get_infected(location_id=int(sys.argv[1]),
                  n_draws=int(sys.argv[2]),
                  model_in_dir=sys.argv[3],

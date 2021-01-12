@@ -14,7 +14,6 @@ from covid_model_infections.pdf_merger import pdf_merger
 ##     - holdout
 ##     - ratio draws
 ##     - hospital census?
-##     - logging!
 ##     - throw error if we have case/death/admission data but not ratio (should use parent)
 ##     - modularize data object creation
 ##     - make consistent timeline with IDR, IFR, IHR models
@@ -60,23 +59,40 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating model input data structure.')
     most_detailed = hierarchy['most_detailed'] == 1
     location_ids = hierarchy.loc[most_detailed, 'location_id'].to_list()
+    parent_ids = hierarchy.loc[most_detailed, 'parent_id'].to_list()
+    location_names = hierarchy.loc[most_detailed, 'location_name'].to_list()
     model_data = {}
-    for location_id in location_ids:
+    for location_id, parent_id, location_name in zip(location_ids, parent_ids, location_names):
         location_model_data = {}
-        if location_id in daily_deaths.reset_index()['location_id'].values and location_id in ifr_data.reset_index()['location_id'].values:
+        if location_id in daily_deaths.reset_index()['location_id'].values:
+            if location_id in ifr_data.reset_index()['location_id'].values:
+                ratio_location_id = location_id
+            else:
+                logger.info(f'Using parent IFR for {location_name}.')
+                ratio_location_id = parent_id
             location_model_data.update({'deaths':{'daily':daily_deaths.loc[location_id],
                                                   'cumul':cumul_deaths.loc[location_id],
-                                                  'ratio':ifr_data.loc[location_id],
+                                                  'ratio':ifr_data.loc[ratio_location_id],
                                                   'lag': TIMELINE['deaths'],},})
-        if location_id in daily_hospital.reset_index()['location_id'].values and location_id in ihr_data.reset_index()['location_id'].values:
+        if location_id in daily_hospital.reset_index()['location_id'].values:
+            if location_id in ihr_data.reset_index()['location_id'].values:
+                ratio_location_id = location_id
+            else:
+                logger.info(f'Using parent IHR for {location_name}.')
+                ratio_location_id = parent_id
             location_model_data.update({'hospitalizations':{'daily':daily_hospital.loc[location_id],
                                                             'cumul':cumul_hospital.loc[location_id],
-                                                            'ratio':ihr_data.loc[location_id],
+                                                            'ratio':ihr_data.loc[ratio_location_id],
                                                             'lag': TIMELINE['hospitalizations'],},})
-        if location_id in daily_cases.reset_index()['location_id'].values and location_id in idr_data.reset_index()['location_id'].values:
+        if location_id in daily_cases.reset_index()['location_id'].values:
+            if location_id in idr_data.reset_index()['location_id'].values:
+                ratio_location_id = location_id
+            else:
+                logger.info(f'Using parent IDR for {location_name}.')
+                ratio_location_id = parent_id
             location_model_data.update({'cases':{'daily':daily_cases.loc[location_id],
                                                  'cumul':cumul_cases.loc[location_id],
-                                                 'ratio':idr_data.loc[location_id],
+                                                 'ratio':idr_data.loc[ratio_location_id],
                                                  'lag': TIMELINE['cases'],},})
         model_data.update({
             location_id:location_model_data
