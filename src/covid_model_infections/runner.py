@@ -9,7 +9,7 @@ import pandas as pd
 from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model
-from covid_model_infections.utils import TIMELINE
+from covid_model_infections.utils import TIMELINE, IDR_LIMITS
 from covid_model_infections.pdf_merger import pdf_merger
 
 ## TODO:
@@ -49,7 +49,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Loading estimated ratios.')
     ifr_data = data.load_ifr(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
-    idr_data = data.load_idr(infection_detection_root)
+    idr_data = data.load_idr(infection_detection_root, IDR_LIMITS)
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)

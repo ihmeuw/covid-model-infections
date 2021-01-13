@@ -30,7 +30,7 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
     return data
 
 
-def load_idr(infection_detection_root: Path, limits: Tuple[float, float] = (0.03, 0.7)) -> pd.Series:
+def load_idr(infection_detection_root: Path, limits: Tuple[float, float]) -> pd.Series:
     data_path = infection_detection_root / 'pred_idr.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
