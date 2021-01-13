@@ -20,7 +20,7 @@ from covid_model_infections.cluster import F_THREAD
 
 LOG_OFFSET = 1
 FLOOR = 1e-4
-CONSTRAINT_POINTS = 50
+CONSTRAINT_POINTS = 40
 
 
 def model_measure(measure: str, model_type: str,
@@ -41,6 +41,8 @@ def model_measure(measure: str, model_type: str,
     if model_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
         prior_spline_maxder_gaussian = np.array([[0, 5e-3]] * (n_knots - 1))
+        prior_spline_maxder_gaussian[:4] = [0, 1e-2]
+        prior_spline_maxder_gaussian[-4:] = [0, 1e-2]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
         spline_options = {'spline_l_linear':True,
@@ -152,7 +154,7 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
 
 
 def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd.DataFrame,
-                                n_draws: int, rmse_radius: int = 60):
+                                n_draws: int, rmse_radius: int = 90):
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log=True)
     
     logger.info('Calculating residuals.')
