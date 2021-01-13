@@ -12,6 +12,8 @@ from loguru import logger
 import pandas as pd
 import numpy as np
 
+from covid_shared.cli_tools.logging import configure_logging_to_terminal
+
 from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import OMP_NUM_THREADS
 from covid_model_infections.cluster import F_THREAD
@@ -38,7 +40,7 @@ def model_measure(measure: str, model_type: str,
 
     if model_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
-        prior_spline_maxder_gaussian = np.array([[0, 1e-3]] * (n_knots - 1))
+        prior_spline_maxder_gaussian = np.array([[0, 5e-3]] * (n_knots - 1))
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
         spline_options = {'spline_l_linear':True,
@@ -134,9 +136,10 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
         single_random_knot=refit,
     )
     if diff:
-        outputs = mr_spline.model_intercept(data=inputs.reset_index(),
+        int_inputs = inputs[inputs.diff().notnull()]
+        outputs = mr_spline.model_intercept(data=int_inputs.reset_index(),
                                             prediction=outputs,
-                                            dep_var=inputs.columns.unique().item(),
+                                            dep_var=int_inputs.columns.unique().item(),
                                             dep_trans_in=dep_trans_in,
                                             dep_trans_out=dep_trans_out,)
     
@@ -255,7 +258,7 @@ def get_infected(location_id: int,
         log=infection_log, knot_days=infection_knot_days, num_submodels=5,
         diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
     )
-    with multiprocessing.Pool(int(F_THREAD) - 2) as p:
+    with multiprocessing.Pool(int(F_THREAD) - 1) as p:
         output_draws = list(tqdm.tqdm(p.imap(_estimator, input_draws), total=n_draws, file=sys.stdout))
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = get_rate_transformations(infection_log)

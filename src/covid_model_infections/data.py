@@ -5,7 +5,7 @@ import pandas as pd
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.Series:
-    data_path = infection_fatality_root / '20210110_allage_ifr_by_loctime_v3_predbyranef.csv'
+    data_path = infection_fatality_root / '20210112_v57_allage_ifr_by_loctime_v6_predbyranef.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_ifr':'ifr'})
