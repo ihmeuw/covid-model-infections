@@ -231,7 +231,7 @@ def get_infected(location_id: int,
                  model_out_dir: str,
                  plot_dir: str,
                  measure_type: str = 'cumul',
-                 measure_log: bool = True, measure_knot_days: int = 14,
+                 measure_log: bool = True, measure_knot_days: int = 7,
                  infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
     logger.info('Loading data.')
