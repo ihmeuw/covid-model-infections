@@ -82,9 +82,9 @@ def model_measure(measure: str, model_type: str,
     smooth_infections = (smooth_data / ratio[smooth_data.index]).rename('infections')
     smooth_infections.index -= pd.Timedelta(days=lag)
 
-    return {'cumul':smooth_data.cumsum(), 'daily':smooth_data,
-            'infections_cumul_raw':raw_infections.cumsum(), 'infections_daily_raw':raw_infections,
-            'infections_cumul':smooth_infections.cumsum(), 'infections_daily':smooth_infections}
+    return {'daily':smooth_data, 'cumul':smooth_data.cumsum(),
+            'infections_daily_raw':raw_infections, 'infections_cumul_raw':raw_infections.cumsum(),
+            'infections_daily':smooth_infections, 'infections_cumul':smooth_infections.cumsum(),}
 
 
 def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
