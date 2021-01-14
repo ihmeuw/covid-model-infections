@@ -2,10 +2,11 @@ from typing import List, Tuple
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.Series:
-    data_path = infection_fatality_root / '20201222_allage_ifr_by_loctime_predbyranef.csv'
+    data_path = infection_fatality_root / '20210113_v57_allage_ifr_by_loctime_v7_predbyranef.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_ifr':'ifr'})
@@ -18,7 +19,7 @@ def load_ifr(infection_fatality_root: Path) -> pd.Series:
 
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
-    data_path = infection_hospitalization_root / '20201116_v52_allage_hir_by_loctime_v1.csv'
+    data_path = infection_hospitalization_root / '20210110_v57_allage_hir_by_loctime_v7.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_hir':'ihr'})
@@ -30,7 +31,7 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
     return data
 
 
-def load_idr(infection_detection_root: Path, limits: Tuple[float, float] = (0.03, 0.7)) -> pd.Series:
+def load_idr(infection_detection_root: Path, limits: Tuple[float, float]) -> pd.Series:
     data_path = infection_detection_root / 'pred_idr.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
@@ -63,13 +64,20 @@ def load_testing_data(infection_detection_root: Path):
 
 
 def load_model_inputs(model_inputs_root:Path, input_measure: str) -> Tuple[pd.Series, pd.Series]:
-    data_path = model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv'
+    #data_path = model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv'
+    data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
-    data['date'] = pd.to_datetime(data['date'])
-    is_all_ages = data['age_group_id'] == 22
-    is_both_sexes = data['sex_id'] == 3
-    data = data.loc[is_all_ages & is_both_sexes]
-    data = data.rename(columns={'value': f'cumulative_{input_measure}'})
+    data = data.rename(columns={'Deaths':'cumulative_deaths',
+                                'Confirmed':'cumulative_cases',
+                                'Hospitalizations':'cumulative_hospitalizations',})
+    data['date'] = pd.to_datetime(data['Date'])
+    #is_all_ages = data['age_group_id'] == 22
+    #is_both_sexes = data['sex_id'] == 3
+    #data = data.loc[is_all_ages & is_both_sexes]
+    #data = data.rename(columns={'value': f'cumulative_{input_measure}'})
+    keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
+    data = data.loc[:, keep_cols].dropna()
+    data['location_id'] = data['location_id'].astype(int)
     
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
@@ -91,7 +99,7 @@ def load_model_inputs(model_inputs_root:Path, input_measure: str) -> Tuple[pd.Se
 def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     data = data.set_index('date').sort_index()
     data = data.asfreq('D').reset_index()
-    data[interp_vars] = data[interp_vars].interpolate(axis=0)
+    data[interp_vars] = data[interp_vars].interpolate(axis=0, limit_area='inside')
     data['location_id'] = data['location_id'].fillna(method='pad')
     data['location_id'] = data['location_id'].astype(int)
 
@@ -118,3 +126,33 @@ def load_population(model_inputs_root: Path) -> pd.Series:
             .loc[:, 'population'])
 
     return data
+
+
+def write_infections_draws(data: pd.DataFrame,
+                           infections_draws_dir: Path,
+                           inf_to_death: int,):
+    draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
+    draw = int(draw_col.split('_')[-1])
+    data = data.rename(columns={draw_col:'infections_draw'})
+    data['draw'] = draw
+    data['observed_infections'] = data['infections_mean'].notnull().astype(int)
+    data['observed_deaths'] = data['deaths'].notnull().astype(int)
+    data['duration'] = inf_to_death
+    
+    out_path = infections_draws_dir / f'{draw_col}.csv'
+    data.reset_index().to_csv(out_path, index=False)
+    
+    return out_path
+
+
+def write_ratio_draws(data: pd.DataFrame,
+                      ratio_draws_dir: Path,):
+    draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
+    draw = int(draw_col.split('_')[-1])
+    data = data.rename(columns={draw_col:'ifr_draw'})
+    data['draw'] = draw
+
+    out_path = ratio_draws_dir / f'{draw_col}.csv'
+    data.reset_index().to_csv(out_path, index=False)
+    
+    return out_path
