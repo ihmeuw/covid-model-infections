@@ -193,7 +193,7 @@ def splice_ratios(ratio_data: pd.Series,
                   infections: pd.Series,
                   lag: int,
                   trans_period_past: int = 30,
-                  trans_period_future: int = 60,) -> pd.Series:    
+                  trans_period_future: int = 60,) -> pd.Series:
     col_name = infections.name
     infections.index += pd.Timedelta(days=lag)
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
@@ -279,7 +279,7 @@ def get_infected(location_id: int,
     )
     
     if 'deaths' in input_data.keys():
-        logger.info('Create and writing IFR (should do w/ IHR/IDR!!!).')
+        logger.info('Create and writing IFR (should do w/ IHR & IDR!!!).')
         output_draws_list = [output_draws[c] for c in output_draws.columns]
         ifr_draws = [splice_ratios(input_data['deaths']['ratio'].copy(),
                                    output_data['deaths']['daily'].copy(),

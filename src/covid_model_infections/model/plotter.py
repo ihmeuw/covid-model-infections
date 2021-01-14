@@ -13,8 +13,8 @@ MEASURE_COLORS = {
 
 
 def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Timestamp]:
-    input_dates = [v['daily'].reset_index()['date'] for k, v in input_data.items()]
-    output_dates = [v['daily'].reset_index()['date'] for k, v in output_data.items()]
+    input_dates = [v['cumul'].reset_index()['date'] for k, v in input_data.items()]
+    output_dates = [v['infections_cumul'].reset_index()['date'] for k, v in output_data.items()]
     dates = pd.concat(input_dates + output_dates)
     start_date = dates.min() - pd.Timedelta(days=7)
     end_date = dates.max() + pd.Timedelta(days=7)
