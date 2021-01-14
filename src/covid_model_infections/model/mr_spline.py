@@ -25,7 +25,7 @@ def estimate_time_series(data: pd.DataFrame,
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
     if diff:
-        if verbose: logger.info('Diff model, setting day0 to 0 (i.e., removing intercept).')
+        if verbose: logger.info('Diff model, setting day0 to 0 (i.e., if day0 is >0, day0->day1 diff would be hugely negative).')
         for i in range(data.shape[1]):
             if data.columns[i] == dep_var:
                 day0_bool = data.iloc[:,i].notnull().cumsum() == 1
