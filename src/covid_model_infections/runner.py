@@ -1,8 +1,10 @@
+import sys
 from pathlib import Path
 import dill as pickle
 from loguru import logger
 import functools
 import multiprocessing
+from tqdm import tqdm
 
 import pandas as pd
 
@@ -35,12 +37,14 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
+    plot_dir = output_root / 'plots'
     infections_draws_dir = output_root / 'infections_draws'
     ratio_draws_dir = output_root / 'ratio_draws'
-    plot_dir = output_root / 'plots'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
     shell_tools.mkdir(plot_dir)
+    shell_tools.mkdir(infections_draws_dir)
+    shell_tools.mkdir(ratio_draws_dir)
     
     logger.info('Loading epi report data.')
     cumul_deaths, daily_deaths = data.load_model_inputs(model_inputs_root, 'deaths')
@@ -168,8 +172,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     deaths = pd.concat(deaths)
     deaths = (deaths
               .set_index(['location_id', 'date'])
-              .sort_index()
-              .rename('deaths_mean'))
+              .sort_index())
     infections_draws = [pd.concat([draw, infections_mean, deaths], axis=1) for draw in infections_draws]
     
     logger.debug('Writing SEIR inputs - infections draw files.')
@@ -179,15 +182,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
         inf_to_death=TIMELINE['deaths'],
     )
     with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
-        infections_draws_paths = list(tqdm.tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
+        infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
     
     logger.debug('Writing SEIR inputs - IFR.')
     _ifr_writer = functools.partial(
-        data.write_ifr_draws,
+        data.write_ratio_draws,
         ratio_draws_dir=ratio_draws_dir,
     )
     with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
-        ratio_draws_paths = list(tqdm.tqdm(p.imap(_ifr_writer, ifr_draws), total=n_draws, file=sys.stdout))
+        ratio_draws_paths = list(tqdm(p.imap(_ifr_writer, ifr_draws), total=n_draws, file=sys.stdout))
         
     logger.info(f'Model run complete -- {str(output_root)}.')
     

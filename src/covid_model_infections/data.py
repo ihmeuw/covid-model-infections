@@ -2,6 +2,7 @@ from typing import List, Tuple
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.Series:
@@ -151,7 +152,7 @@ def write_ratio_draws(data: pd.DataFrame,
     data = data.rename(columns={draw_col:'ifr_draw'})
     data['draw'] = draw
 
-    out_path = infections_draws_dir / f'{draw_col}.csv'
+    out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)
     
     return out_path
