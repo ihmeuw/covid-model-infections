@@ -3,10 +3,8 @@ import os
 from typing import Dict
 from pathlib import Path
 import dill as pickle
-import functools
-import multiprocessing
 import sys
-import tqdm
+from tqdm import tqdm
 from loguru import logger
 
 import pandas as pd
@@ -248,20 +246,20 @@ def get_infected(location_id: int,
                    for measure, measure_data in input_data.items()}
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
-    smooth_infections = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
-    smooth_infections = model_infections(smooth_infections, infection_log, infection_knot_days,
-                                         diff=True, refit=False, num_submodels=50)
+    infections_inputs = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
+    smooth_infections = model_infections(infections_inputs, infection_log, infection_knot_days,
+                                         diff=True, refit=False, num_submodels=100)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
     logger.info('Fitting infection curves to draws of all available input measures.')
-    _estimator = functools.partial(
-        model_infections,
-        log=infection_log, knot_days=infection_knot_days, num_submodels=5,
-        diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
-    )
-    with multiprocessing.Pool(int(F_THREAD) - 1) as p:
-        output_draws = list(tqdm.tqdm(p.imap(_estimator, input_draws), total=n_draws, file=sys.stdout))
+    output_draws = []
+    for input_draw in tqdm(input_draws, total=n_draws, file=sys.stdout):
+        output_draws.append(model_infections(
+            input_draw,
+            log=infection_log, knot_days=infection_knot_days, num_submodels=1,
+            diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
+        ))
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = get_rate_transformations(infection_log)
     if infection_log:

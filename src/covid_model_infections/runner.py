@@ -165,7 +165,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
         data.write_seir_inputs,
         out_dir=seir_in_dir
     )
-    with multiprocessing.Pool(int(F_THREAD) - 2) as p:
+    with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
         seir_in_paths = list(tqdm.tqdm(p.imap(_writer, draws), total=n_draws, file=sys.stdout))
         
     logger.debug('Writing SEIR inputs - IFR.')

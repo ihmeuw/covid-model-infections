@@ -25,13 +25,9 @@ def estimate_time_series(data: pd.DataFrame,
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
     if diff:
-        if verbose: logger.info('Diff model, setting day0 to 0 (i.e., if day0 is >0, day0->day1 diff would be hugely negative).')
-        for i in range(data.shape[1]):
-            if data.columns[i] == dep_var:
-                day0_bool = data.iloc[:,i].notnull().cumsum() == 1
-                day0_idx = day0_bool[day0_bool].index
-                data.iloc[day0_idx, i] = 0
+        if verbose: logger.info('For diff model, drop day1 (i.e., if day0 is > 0, day0->day1 diff would be hugely negative).')
         data[dep_var] = data[dep_var].diff()
+        data[dep_var] = data[dep_var][data[dep_var].diff().notnull()]
     if data[[dep_var]].shape[1] > 1:
         reshape = True
         data = reshape_data_long(data, dep_var, dep_var_se)
@@ -134,10 +130,6 @@ def model_intercept(data: pd.DataFrame,
     intercept = mr_model.beta_soln
     
     prediction += intercept
-    prediction = pd.concat([
-        pd.Series(intercept, index=pd.Index([prediction.index.min() - pd.Timedelta(days=1)], name='date')),
-        prediction
-    ]).rename(dep_var)
     prediction = dep_trans_out(prediction)
     
     return prediction
@@ -174,7 +166,7 @@ def predict_time_series(day0: pd.Timestamp,
     data = mr_model.data.to_df()
     
     pred_data = MRData()
-    t = np.arange(data['t'].min(), data['t'].max() + 1)
+    t = np.arange(0, data['t'].max() + 1)
     pred_data.load_df(pd.DataFrame({'t':t}), col_covs='t')
     pred_data_value = mr_model.predict(pred_data)
     if diff:
@@ -182,7 +174,6 @@ def predict_time_series(day0: pd.Timestamp,
     pred_data_value = dep_trans_out(pred_data_value)
     pred_data = pd.DataFrame({'t':t,
                               dep_var:pred_data_value,})
-    pred_data['t'] -= data['t'].min()
     pred_data['date'] = pred_data['t'].apply(lambda x: day0 + pd.Timedelta(days=x))
     pred_data = pred_data.set_index('date')[dep_var]
 
