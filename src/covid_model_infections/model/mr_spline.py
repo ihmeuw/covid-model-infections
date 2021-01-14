@@ -25,6 +25,12 @@ def estimate_time_series(data: pd.DataFrame,
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
     if diff:
+        if verbose: logger.info('Diff model, setting day0 to 0 (i.e., removing intercept).')
+        for i in range(data.shape[1]):
+            if data.columns[i] == dep_var:
+                day0_bool = data.iloc[:,i].notnull().cumsum() == 1
+                day0_idx = day0_bool[day0_bool].index
+                data.iloc[day0_idx, i] = 0
         data[dep_var] = data[dep_var].diff()
     if data[[dep_var]].shape[1] > 1:
         reshape = True
