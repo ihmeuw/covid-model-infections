@@ -194,6 +194,7 @@ def splice_ratios(ratio_data: pd.Series,
                   lag: int,
                   trans_period_past: int = 30,
                   trans_period_future: int = 60,) -> pd.Series:    
+    col_name = infections.name
     infections.index += pd.Timedelta(days=lag)
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
     start_date = new_ratio.index.min()
@@ -202,7 +203,7 @@ def splice_ratios(ratio_data: pd.Series,
     new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = new_ratio[ratio_data.name]
     new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = new_ratio[ratio_data.name]
     new_ratio = new_ratio['new_ratio'].rename(ratio_data.name)
-    new_ratio = new_ratio.interpolate()
+    new_ratio = new_ratio.interpolate(limit_area='inside').rename(col_name)
     
     return new_ratio
 
@@ -279,11 +280,12 @@ def get_infected(location_id: int,
     
     if 'deaths' in input_data.keys():
         logger.info('Create and writing IFR (should do w/ IHR/IDR!!!).')
-        output_draws = [output_draws[c] for c in output_draws.columns]
+        output_draws_list = [output_draws[c] for c in output_draws.columns]
         ifr_draws = [splice_ratios(input_data['deaths']['ratio'].copy(),
                                    output_data['deaths']['daily'].copy(),
                                    output_draw,
-                                   input_data['deaths']['lag'],) for output_draw in output_draws]
+                                   input_data['deaths']['lag'],) for output_draw in output_draws_list]
+        ifr_draws = pd.concat(ifr_draws, axis=1)
         ifr_path = Path(model_out_dir) / f'{location_id}_ifr_draws.h5'
         ifr_draws.to_hdf(ifr_path, key='data', mode='w')
     
