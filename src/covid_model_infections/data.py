@@ -98,7 +98,7 @@ def load_model_inputs(model_inputs_root:Path, input_measure: str) -> Tuple[pd.Se
 def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     data = data.set_index('date').sort_index()
     data = data.asfreq('D').reset_index()
-    data[interp_vars] = data[interp_vars].interpolate(axis=0)
+    data[interp_vars] = data[interp_vars].interpolate(axis=0, limit_area='inside')
     data['location_id'] = data['location_id'].fillna(method='pad')
     data['location_id'] = data['location_id'].astype(int)
 
@@ -127,12 +127,31 @@ def load_population(model_inputs_root: Path) -> pd.Series:
     return data
 
 
-def write_seir_inputs(data: pd.DataFrame,
-                      out_dir: Path,):
+def write_infections_draws(data: pd.DataFrame,
+                           infections_draws_dir: Path,
+                           inf_to_death: int,):
     draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
     draw = int(draw_col.split('_')[-1])
+    data = data.rename(columns={draw_col:'infections_draw'})
+    data['draw'] = draw
+    data['observed_infections'] = data['infections_mean'].notnull().astype(int)
+    data['observed_deaths'] = data['deaths'].notnull().astype(int)
+    data['duration'] = inf_to_death
     
-    out_path = out_root / f'draw_{draw}.csv'
-    data.rename(columns={draw_col:'infections_draw',}).reset_index().to_csv(out_path, index=False)
+    out_path = infections_draws_dir / f'{draw_col}.csv'
+    data.reset_index().to_csv(out_path, index=False)
+    
+    return out_path
+
+
+def write_ratio_draws(data: pd.DataFrame,
+                      ratio_draws_dir: Path,):
+    draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
+    draw = int(draw_col.split('_')[-1])
+    data = data.rename(columns={draw_col:'ifr_draw'})
+    data['draw'] = draw
+
+    out_path = infections_draws_dir / f'{draw_col}.csv'
+    data.reset_index().to_csv(out_path, index=False)
     
     return out_path

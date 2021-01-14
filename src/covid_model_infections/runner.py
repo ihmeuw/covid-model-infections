@@ -35,7 +35,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
-    seir_in_dir = output_root / 'seir_inputs'
+    infections_draws_dir = output_root / 'infections_draws'
+    ratio_draws_dir = output_root / 'ratio_draws'
     plot_dir = output_root / 'plots'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
@@ -135,13 +136,24 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
     
     logger.debug('Compiling infection draws.')
-    draws = []
-    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('draws.h5')]:
-        draws.append(pd.read_hdf(draws_path))
-    draws = pd.concat(draws)
-    draw_path = output_root / 'infection_draws.h5'
-    draws.to_hdf(draw_path, key='data', mode='w')
-    draws = [draws[c] for c in draws.columns]
+    infections_draws = []
+    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.h5')]:
+        infections_draws.append(pd.read_hdf(draws_path))
+    infections_draws = pd.concat(infections_draws)
+    draw_path = output_root / 'infections_draws.h5'
+    infections_draws.to_hdf(draw_path, key='data', mode='w')
+    infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
+    infections_draws = [infections_draws[c] for c in infections_draws.columns]
+    
+    logger.debug('Compiling IFR draws.')
+    ifr_draws = []
+    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_ifr_draws.h5')]:
+        ifr_draws.append(pd.read_hdf(draws_path))
+    ifr_draws = pd.concat(ifr_draws)
+    draw_path = output_root / 'ifr_draws.h5'
+    ifr_draws.to_hdf(draw_path, key='data', mode='w')
+    ifr_mean = infections_draws.mean(axis=1).rename('infections_mean')
+    ifr_draws = [pd.concat([ifr_draws[c], ifr_mean], axis=1) for c in ifr_draws.columns]
     
     logger.debug('Compiling other model outputs.')
     outputs = {}
@@ -157,19 +169,25 @@ def make_infections(app_metadata: cli_tools.Metadata,
     deaths = (deaths
               .set_index(['location_id', 'date'])
               .sort_index()
-              .rename(columns={'deaths':'deaths_draw'}))
-    draws = [pd.concat([draw, deaths], axis=1) for draw in draws]
+              .rename('deaths_mean'))
+    infections_draws = [pd.concat([draw, infections_mean, deaths], axis=1) for draw in infections_draws]
     
-    logger.debug('Writing SEIR inputs - draw files.')
-    _writer = functools.partial(
-        data.write_seir_inputs,
-        out_dir=seir_in_dir
+    logger.debug('Writing SEIR inputs - infections draw files.')
+    _inf_writer = functools.partial(
+        data.write_infections_draws,
+        infections_draws_dir=infections_draws_dir,
+        inf_to_death=TIMELINE['deaths'],
     )
     with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
-        seir_in_paths = list(tqdm.tqdm(p.imap(_writer, draws), total=n_draws, file=sys.stdout))
-        
+        infections_draws_paths = list(tqdm.tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
+    
     logger.debug('Writing SEIR inputs - IFR.')
-    raise ValueError('Need to add IFR storage.')
+    _ifr_writer = functools.partial(
+        data.write_ifr_draws,
+        ratio_draws_dir=ratio_draws_dir,
+    )
+    with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
+        ratio_draws_paths = list(tqdm.tqdm(p.imap(_ifr_writer, ifr_draws), total=n_draws, file=sys.stdout))
         
     logger.info(f'Model run complete -- {str(output_root)}.')
     

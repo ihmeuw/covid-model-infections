@@ -191,14 +191,16 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
 def splice_ratios(ratio_data: pd.Series,
                   smooth_data: pd.Series,
                   infections: pd.Series,
-                  lag: int,) -> pd.Series:    
+                  lag: int,
+                  trans_period_past: int = 30,
+                  trans_period_future: int = 60,) -> pd.Series:    
     infections.index += pd.Timedelta(days=lag)
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
     start_date = new_ratio.index.min()
     end_date = new_ratio.index.max()
     new_ratio = pd.concat([ratio_data, new_ratio], axis=1)
-    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=30), 'new_ratio'] = new_ratio[ratio_data.name]
-    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=60), 'new_ratio'] = new_ratio[ratio_data.name]
+    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = new_ratio[ratio_data.name]
+    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = new_ratio[ratio_data.name]
     new_ratio = new_ratio['new_ratio'].rename(ratio_data.name)
     new_ratio = new_ratio.interpolate()
     
@@ -276,16 +278,17 @@ def get_infected(location_id: int,
     )
     
     if 'deaths' in input_data.keys():
-        logger.info('Create and storint new ratios (should do w/ draws!!!).')
-        ifr = splice_ratios(input_data['deaths']['ratio'].copy(),
-                            output_data['deaths']['daily'].copy(),
-                            output_draws.mean(axis=1).rename('infections'),
-                            input_data['deaths']['lag'],)
-        ifr_path = Path(model_out_dir) / f'{location_id}_ifr.h5'
-        ifr.to_hdf(ifr_path, key='data', mode='w')
+        logger.info('Create and writing IFR (should do w/ IHR/IDR!!!).')
+        output_draws = [output_draws[c] for c in output_draws.columns]
+        ifr_draws = [splice_ratios(input_data['deaths']['ratio'].copy(),
+                                   output_data['deaths']['daily'].copy(),
+                                   output_draw,
+                                   input_data['deaths']['lag'],) for output_draw in output_draws]
+        ifr_path = Path(model_out_dir) / f'{location_id}_ifr_draws.h5'
+        ifr_draws.to_hdf(ifr_path, key='data', mode='w')
     
     logger.info('Writing outputs.')
-    data_path = Path(model_out_dir) / f'{location_id}_data.pkl'
+    data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
     with data_path.open('wb') as file:
         pickle.dump({location_id:output_data}, file, -1)
     output_draws['location_id'] = location_id
@@ -293,7 +296,7 @@ def get_infected(location_id: int,
                     .reset_index()
                     .set_index(['location_id', 'date'])
                     .sort_index())
-    draw_path = Path(model_out_dir) / f'{location_id}_draws.h5'
+    draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.h5'
     output_draws.to_hdf(draw_path, key='data', mode='w')
 
 

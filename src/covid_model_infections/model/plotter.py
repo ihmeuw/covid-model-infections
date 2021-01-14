@@ -106,8 +106,8 @@ def plotter(plot_dir, location_id, location_name,
 
 def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_date, end_date, include_xticks=False):
     ax.scatter(raw_data.index, raw_data,
-               c=clight, edgecolors=cdark, alpha=0.2)
-    ax.plot(raw_data, color=cdark, alpha=0.2)
+               c=clight, edgecolors=cdark, alpha=0.4)
+    ax.plot(raw_data, color=clight, alpha=0.2)
     ax.plot(smooth_data, color=cdark, alpha=1.)
 
     if title:
