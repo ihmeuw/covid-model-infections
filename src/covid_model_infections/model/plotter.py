@@ -61,7 +61,7 @@ def plotter(plot_dir, location_id, location_name,
                       start_date, end_date, measure==measures[-1])
 
             data_plot(cumul_ax, cumul_title, measure.capitalize(),
-                      input_data[measure]['cumul'] / 1000, output_data[measure]['cumul'] / 1000,
+                      input_data[measure]['cumul'], output_data[measure]['cumul'],
                       MEASURE_COLORS[measure]['light'], MEASURE_COLORS[measure]['dark'],
                       start_date, end_date)
         else:
