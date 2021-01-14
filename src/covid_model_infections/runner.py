@@ -152,7 +152,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_draws = pd.concat(ifr_draws)
     draw_path = output_root / 'ifr_draws.h5'
     ifr_draws.to_hdf(draw_path, key='data', mode='w')
-    ifr_mean = infections_draws.mean(axis=1).rename('infections_mean')
+    ifr_mean = ifr_draws.mean(axis=1).rename('infections_mean')
     ifr_draws = [pd.concat([ifr_draws[c], ifr_mean], axis=1) for c in ifr_draws.columns]
     
     logger.debug('Compiling other model outputs.')
