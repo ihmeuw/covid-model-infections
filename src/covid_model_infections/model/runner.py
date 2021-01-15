@@ -25,7 +25,9 @@ def model_measure(measure: str, model_type: str,
                   input_data: pd.Series, ratio: pd.Series, population: float,
                   n_draws: int, lag: int,
                   log: bool, knot_days: int,
-                  num_submodels: int,) -> Dict:
+                  num_submodels: int,
+                  split_l_interval: bool,
+                  split_r_interval: bool,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
@@ -38,9 +40,8 @@ def model_measure(measure: str, model_type: str,
 
     if model_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
-        prior_spline_maxder_gaussian = np.array([[0, 5e-3]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[:4] = [0, 1e-2]
-        prior_spline_maxder_gaussian[-4:] = [0, 1e-2]
+        prior_spline_maxder_gaussian = np.array([[0, 1e-2]] * (n_knots + split_l_interval + split_r_interval - 1))
+        prior_spline_maxder_gaussian[-1] = [0, 1e-3]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
         spline_options = {'spline_l_linear':True,
@@ -66,6 +67,8 @@ def model_measure(measure: str, model_type: str,
         #dep_se_trans_in=dep_se_trans_in,
         dep_trans_out=dep_trans_out,
         num_submodels=num_submodels,
+        split_l_interval=split_l_interval,
+        split_r_interval=split_r_interval,
     )
     
     logger.info('Converting to infections.')
@@ -245,7 +248,8 @@ def get_infected(location_id: int,
                                           measure_type,
                                           measure_data[measure_type].copy(), measure_data['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
-                                          measure_log, measure_knot_days, num_submodels=1,)
+                                          measure_log, measure_knot_days, num_submodels=1,
+                                          split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
