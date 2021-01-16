@@ -152,10 +152,10 @@ def model_plot(ax, title, measure_data, sero_data, output_draws, start_date, end
     if sero_data is not None:
         sero_date = sero_data.index
         sero_mean = sero_data['seroprev_mean']
-        sero_var = (sero_mean * (1 - sero_mean)) / sero_data['sample_size']
-        sero_size = (1 / sero_var) / 1e4
-        sero_size = sero_size.clip(25, 250)
-        ax.scatter(sero_date, sero_mean * 100, s=sero_size,
+        # sero_var = (sero_mean * (1 - sero_mean)) / sero_data['sample_size']
+        # sero_size = (1 / sero_var) / 1e4
+        # sero_size = sero_size.clip(25, 250)
+        ax.scatter(sero_date, sero_mean * 100, s=100,
                    c='mediumorchid', edgecolors='darkmagenta', alpha=0.6)
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)
     ax.fill_between(output_draws.index,
