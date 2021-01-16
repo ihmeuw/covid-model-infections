@@ -114,7 +114,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                 location_id:location_model_data
             })
         else:
-            unmodeled_location_ids.append(unmodeled_location_ids)
+            unmodeled_location_ids.append(location_id)
             
     logger.info('Identifying unmodeled locations.')
     app_metadata.update({'unmodeled_location_ids': unmodeled_location_ids})
