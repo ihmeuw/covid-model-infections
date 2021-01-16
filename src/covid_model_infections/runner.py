@@ -119,7 +119,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Identifying unmodeled locations.')
     app_metadata.update({'unmodeled_location_ids': unmodeled_location_ids})
     if unmodeled_location_ids:
-        logger.debug(f'Insufficent data exists for the following location_ids: {", ".join(unmodeled_location_ids)}')
+        logger.debug(f'Insufficent data exists for the following location_ids: {", ".join([str(l) for l in unmodeled_location_ids])}')
     
     logger.info('Writing intermediate files.')
     data_path = model_in_dir / 'model_data.pkl'
@@ -169,7 +169,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     failed_model_location_ids = set(modeled_location_ids) - set(completed_modeled_location_ids)
     app_metadata.update({'failed_model_location_ids': failed_model_location_ids})
     if failed_model_location_ids:
-        logger.debug(f'Models failed for the following location_ids: {", ".join(failed_model_location_ids)}')
+        logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
     
     logger.info('Compiling IFR draws.')
     ifr_draws = []
