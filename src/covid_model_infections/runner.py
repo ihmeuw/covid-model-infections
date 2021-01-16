@@ -159,7 +159,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.h5')]:
         infections_draws.append(pd.read_hdf(draws_path))
     infections_draws = pd.concat(infections_draws)
-    completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().to_list()
+    completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
     draw_path = output_root / 'infections_draws.h5'
     infections_draws.to_hdf(draw_path, key='data', mode='w')
     infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
