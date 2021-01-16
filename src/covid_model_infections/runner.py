@@ -53,6 +53,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Loading estimated ratios.')
     ifr_data = data.load_ifr(infection_fatality_root)
+    ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     idr_data = data.load_idr(infection_detection_root, IDR_LIMITS)
 
@@ -179,7 +180,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     draw_path = output_root / 'ifr_draws.h5'
     ifr_draws.to_hdf(draw_path, key='data', mode='w')
     ifr_mean = ifr_draws.mean(axis=1).rename('infections_mean')
-    ifr_draws = [pd.concat([ifr_draws[c], ifr_mean], axis=1) for c in ifr_draws.columns]
+    ifr_draws = [pd.concat([ifr_draws[c], ifr_mean, ifr_risk_data.reset_index()], axis=1) for c in ifr_draws.columns]
     
     logger.info('Compiling other model outputs.')
     outputs = {}
