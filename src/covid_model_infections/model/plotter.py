@@ -90,7 +90,7 @@ def plotter(plot_dir, location_id, location_name,
     model_measures = [m for m in measures if m in list(output_data.keys())]
     dailymodel_ax = fig.add_subplot(gs[0:6, 2])
     infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
-    model_plot(dailymodel_ax, 'Daily', infection_daily_data, None,
+    model_plot(dailymodel_ax, 'Daily infections', infection_daily_data, None,
                output_draws, start_date, end_date, False)
     cumulmodel_ax = fig.add_subplot(gs[6:12, 2])
     infection_cumul_data = {mm: (output_data[mm]['infections_cumul'] / population) * 100 for mm in model_measures}
@@ -164,9 +164,9 @@ def model_plot(ax, title, measure_data, sero_data, output_draws, start_date, end
                     color='black', alpha=0.2)
     for m, md in measure_data.items():
         ax.plot(md, color=MEASURE_COLORS[m]['dark'], linestyle='--', alpha=0.6)
-    if title:
-        ax.set_title(title)
-    ax.set_ylabel(f'{title} infections')
+    # if title:
+    #     ax.set_title(title)
+    ax.set_ylabel(title)
     ax.set_xlim(start_date, end_date)
     if include_xticks:
         ax.tick_params('x', labelrotation=60)
