@@ -72,9 +72,11 @@ def plotter(plot_dir, location_id, location_name,
         ratio_ax = fig.add_subplot(gs[i*4+2:i*4+4, 1])
         if measure in list(input_data.keys()):
             if measure == 'cases':
-                alt_data = test_data.copy() * 1e5
-                alt_data = alt_data[input_data[measure]['daily'].index]
-                alt_measure = 'Tests per 100K'
+                # alt_data = test_data.copy() * 1e5
+                # alt_data = alt_data[input_data[measure]['daily'].index]
+                # alt_measure = 'Tests per 100K'
+                alt_data = None
+                alt_measure = None
             else:
                 alt_data = None
                 alt_measure = None
