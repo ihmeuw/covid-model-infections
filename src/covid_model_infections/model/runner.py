@@ -248,9 +248,12 @@ def get_infected(location_id: int,
     logger.info(f'Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
                                           measure_type,
-                                          measure_data[measure_type].rolling(window=measure_preroll_min_periods,
-                                                                             min_periods=measure_preroll_min_periods,
-                                                                             center=True).mean().dropna(),
+                                          (measure_data[measure_type]
+                                           .clip(0, np.inf)
+                                           .rolling(window=measure_preroll_min_periods,
+                                                    min_periods=measure_preroll_min_periods,
+                                                    center=True).mean()
+                                           .dropna()),
                                           measure_data['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
                                           measure_log, measure_knot_days, num_submodels=1,
