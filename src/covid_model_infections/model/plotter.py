@@ -56,7 +56,7 @@ def plotter(plot_dir, location_id, location_name,
             daily_title = None
             cumul_title = None
             data_plot(daily_ax, daily_title, measure.capitalize(),
-                      input_data[measure]['daily'], output_data[measure]['daily'],
+                      input_data[measure]['daily'][1:], output_data[measure]['daily'][1:],
                       MEASURE_COLORS[measure]['light'], MEASURE_COLORS[measure]['dark'],
                       start_date, end_date, measure==measures[-1])
 
@@ -87,7 +87,7 @@ def plotter(plot_dir, location_id, location_name,
     
     model_measures = [m for m in measures if m in list(output_data.keys())]
     dailymodel_ax = fig.add_subplot(gs[0:6, 2])
-    infection_daily_data = {mm: output_data[mm]['infections_daily'] for mm in model_measures}
+    infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
     model_plot(dailymodel_ax, 'Daily', infection_daily_data, None,
                output_draws, start_date, end_date, False)
     cumulmodel_ax = fig.add_subplot(gs[6:12, 2])

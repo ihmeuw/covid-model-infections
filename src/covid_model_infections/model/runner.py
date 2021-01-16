@@ -21,7 +21,7 @@ FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 
 
-def model_measure(measure: str, model_type: str,
+def model_measure(measure: str, measure_type: str,
                   input_data: pd.Series, ratio: pd.Series, population: float,
                   n_draws: int, lag: int,
                   log: bool, knot_days: int,
@@ -31,17 +31,19 @@ def model_measure(measure: str, model_type: str,
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
+    if measure_type not in ['cumul', 'daily']:
+        raise ValueError(f'Invalid measure_type (must be `cumul` or `daily`): {measure_type}')
+    
     dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
     
     n_knots = determine_n_knots(input_data, knot_days)
     
     spline_options = {'spline_knots_type':'domain',
-                      'spline_degree':3,}
-
-    if model_type == 'cumul':
+                      'spline_degree':3 + (measure_type=='cumul'),}
+    
+    if measure_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
-        prior_spline_maxder_gaussian = np.array([[0, 1e-2]] * (n_knots + split_l_interval + split_r_interval - 1))
-        prior_spline_maxder_gaussian[-1] = [0, 1e-3]
+        prior_spline_maxder_gaussian = np.array([[0, 1e-3]] * (n_knots + split_l_interval + split_r_interval - 1))
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
         spline_options = {'spline_l_linear':True,
@@ -50,7 +52,7 @@ def model_measure(measure: str, model_type: str,
     if not log:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),})
         
-    if model_type == 'cumul' or not log:
+    if measure_type == 'cumul' or not log:
         spline_options.update({'prior_spline_num_constraint_points':CONSTRAINT_POINTS,})
         
     logger.info('Generating smooth past curve.')
@@ -75,7 +77,7 @@ def model_measure(measure: str, model_type: str,
     if log:
         input_data -= LOG_OFFSET
         smooth_data -= LOG_OFFSET
-    if model_type == 'cumul':
+    if measure_type == 'cumul':
         input_data = input_data.diff().fillna(input_data)
         smooth_data = smooth_data.diff().fillna(smooth_data)
     input_data = input_data.clip(FLOOR, np.inf)
@@ -111,7 +113,7 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     
     inputs = inputs.clip(FLOOR, np.inf)
     spline_options = {'spline_knots_type':'domain',
-                      'spline_degree':3,}
+                      'spline_degree':3 - diff,}
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
@@ -236,8 +238,8 @@ def get_infected(location_id: int,
                  model_in_dir: str,
                  model_out_dir: str,
                  plot_dir: str,
-                 measure_type: str = 'cumul',
-                 measure_log: bool = True, measure_knot_days: int = 7,
+                 measure_type: str = 'daily',
+                 measure_log: bool = True, measure_knot_days: int = 7, measure_preroll_min_periods: int = 7,
                  infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
     logger.info('Loading data.')
@@ -246,7 +248,10 @@ def get_infected(location_id: int,
     logger.info(f'Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
                                           measure_type,
-                                          measure_data[measure_type].copy(), measure_data['ratio'].copy(),
+                                          measure_data[measure_type].rolling(window=measure_preroll_min_periods,
+                                                                             min_periods=measure_preroll_min_periods,
+                                                                             center=True).mean().dropna(),
+                                          measure_data['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
                                           measure_log, measure_knot_days, num_submodels=1,
                                           split_l_interval=False, split_r_interval=False,)
