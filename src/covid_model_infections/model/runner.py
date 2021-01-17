@@ -45,7 +45,7 @@ def model_measure(measure: str, measure_type: str,
                            center=True).mean()
                   .dropna())
     
-    dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
+    dep_trans_in, _, dep_trans_out = get_rate_transformations(log)
     
     n_knots = determine_n_knots(input_data, knot_days)
     
@@ -76,8 +76,6 @@ def model_measure(measure: str, measure_type: str,
         spline_options=spline_options,
         n_knots=n_knots,
         dep_trans_in=dep_trans_in,
-        #dep_var_se='y',
-        #dep_se_trans_in=dep_se_trans_in,
         dep_trans_out=dep_trans_out,
         num_submodels=num_submodels,
         split_l_interval=split_l_interval,
@@ -106,7 +104,8 @@ def model_measure(measure: str, measure_type: str,
             'infections_daily':smooth_infections, 'infections_cumul':smooth_infections.cumsum(),}
 
 
-def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
+def model_infections(inputs: pd.DataFrame, weights: pd.DataFrame,
+                     log: bool, knot_days: int, diff: bool,
                      refit: bool, num_submodels: int,
                      **spline_kwargs) -> pd.Series:
     if refit:
@@ -121,7 +120,7 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     if diff and not log:
         raise ValueError('Must do ln(diff) to prevent from going negative.')
     
-    dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
+    dep_trans_in, _, dep_trans_out = get_rate_transformations(log)
     if log and refit:
         _, _, dep_trans_out = get_rate_transformations(log=False)
     
@@ -148,8 +147,8 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
         n_knots=n_knots,
         dep_trans_in=dep_trans_in,
         diff=diff,
-        #dep_var_se='y',
-        #dep_se_trans_in=dep_se_trans_in,
+        weight_data=weights.reset_index(),
+        dep_var_se=weights.columns.unique().item(),
         dep_trans_out=dep_trans_out,
         num_submodels=num_submodels,
         single_random_knot=refit,
@@ -157,8 +156,10 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     if diff:
         int_inputs = inputs[inputs.diff().notnull()]
         outputs = mr_spline.model_intercept(data=int_inputs.reset_index(),
-                                            prediction=outputs,
                                             dep_var=int_inputs.columns.unique().item(),
+                                            prediction=outputs,
+                                            weight_data=weights.reset_index(),
+                                            dep_var_se=weights.columns.unique().item(),
                                             dep_trans_in=dep_trans_in,
                                             dep_trans_out=dep_trans_out,)
     
@@ -179,7 +180,7 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     residuals = dep_trans_in(raw_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)
     
     residuals['infections'] = smooth_infections.to_frame().values - residuals.values
-    residuals = mr_spline.reshape_data_long(residuals.reset_index(), 'infections', None)
+    residuals = mr_spline.reshape_data_long(residuals.reset_index(), 'infections')
     residuals = residuals.dropna().sort_values('date').rename(columns={'infections':'residuals'})
     
     dates = smooth_infections.index
@@ -271,7 +272,8 @@ def get_infected(location_id: int,
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
-    smooth_infections = model_infections(infections_inputs, infection_log, infection_knot_days,
+    infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()], axis=1).sort_index()
+    smooth_infections = model_infections(infections_inputs, infections_weights, infection_log, infection_knot_days,
                                          diff=True, refit=False, num_submodels=100)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
