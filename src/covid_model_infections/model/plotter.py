@@ -25,13 +25,13 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 def plotter(plot_dir, location_id, location_name,
             input_data,
             test_data, sero_data,
-            output_data, output_draws, population,
+            output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)
     
     n_cols = 3
     n_rows = 12
-    widths = [2, 1, 3]
+    widths = [2, 1, 2]
     heights = [1] * n_rows
     
     sns.set_style('whitegrid')
@@ -88,14 +88,22 @@ def plotter(plot_dir, location_id, location_name,
             ratio_ax.axis('off')
     
     model_measures = [m for m in measures if m in list(output_data.keys())]
-    dailymodel_ax = fig.add_subplot(gs[0:6, 2])
+    whitespace_top = fig.add_subplot(gs[0:1, 2])
+    whitespace_top.axis('off')
+    dailymodel_ax = fig.add_subplot(gs[1:5, 2])
     infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
     model_plot(dailymodel_ax, 'Daily infections', infection_daily_data, None,
+               smooth_infections,
                output_draws, start_date, end_date, False)
-    cumulmodel_ax = fig.add_subplot(gs[6:12, 2])
+    whitespace_mid = fig.add_subplot(gs[5:7, 2])
+    whitespace_mid.axis('off')
+    cumulmodel_ax = fig.add_subplot(gs[7:11, 2])
     infection_cumul_data = {mm: (output_data[mm]['infections_cumul'] / population) * 100 for mm in model_measures}
     model_plot(cumulmodel_ax, 'Cumulative infections (%)', infection_cumul_data, sero_data,
+               (smooth_infections.cumsum() / population) * 100,
                (output_draws.cumsum() / population) * 100, start_date, end_date, True)
+    whitespace_bottom = fig.add_subplot(gs[11:12, 2])
+    whitespace_bottom.axis('off')
     
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     if plot_dir is not None:
@@ -148,7 +156,7 @@ def ratio_plot(ax, ylabel, alt_ylabel, ratio_data, alt_data, cdark, start_date, 
     ax.spines['bottom'].set_visible(False)
 
 
-def model_plot(ax, title, measure_data, sero_data, output_draws, start_date, end_date, include_xticks=False):
+def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_draws, start_date, end_date, include_xticks=False):
     if sero_data is not None:
         sero_date = sero_data.index
         sero_mean = sero_data['seroprev_mean']
@@ -158,6 +166,7 @@ def model_plot(ax, title, measure_data, sero_data, output_draws, start_date, end
         ax.scatter(sero_date, sero_mean * 100, s=100,
                    c='mediumorchid', edgecolors='darkmagenta', alpha=0.6)
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)
+    ax.plot(smooth_infections, color='black', linestyle=':', alpha=0.6)
     ax.fill_between(output_draws.index,
                     np.percentile(output_draws, 2.5, axis=1),
                     np.percentile(output_draws, 97.5, axis=1),

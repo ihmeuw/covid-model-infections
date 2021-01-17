@@ -16,7 +16,8 @@ from covid_model_infections.pdf_merger import pdf_merger
 
 ## TODO:
 ##     - holdout
-##     - ratio draws
+##     - predict IDR draws
+##     - save other ratio draws
 ##     - hospital census?
 ##     - throw error if we have case/death/admission data but not ratio (should use parent)
 ##     - modularize data object creation
@@ -164,7 +165,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     draw_path = output_root / 'infections_draws.h5'
     infections_draws.to_hdf(draw_path, key='data', mode='w')
     infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
-    infections_draws = [infections_draws[c] for c in infections_draws.columns]
     
     logger.info('Identifying failed models.')
     failed_model_location_ids = set(modeled_location_ids) - set(completed_modeled_location_ids)
@@ -179,8 +179,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_draws = pd.concat(ifr_draws)
     draw_path = output_root / 'ifr_draws.h5'
     ifr_draws.to_hdf(draw_path, key='data', mode='w')
-    ifr_mean = ifr_draws.mean(axis=1).rename('infections_mean')
-    ifr_draws = [pd.concat([ifr_draws[c], ifr_mean, ifr_risk_data.reset_index()], axis=1) for c in ifr_draws.columns]
+    ifr_mean = ifr_draws.mean(axis=1).rename('ifr_mean')
     
     logger.info('Compiling other model outputs.')
     outputs = {}
@@ -189,16 +188,22 @@ def make_infections(app_metadata: cli_tools.Metadata,
             outputs.update(pickle.load(outputs_file))
     output_path = output_root / 'output_data.pkl'
     with output_path.open('wb') as file:
-        pickle.dump(output_path, file, -1)
+        pickle.dump(outputs, file, -1)
     deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
     deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
     deaths = pd.concat(deaths)
     deaths = (deaths
               .set_index(['location_id', 'date'])
-              .sort_index())
-    infections_draws = [pd.concat([draw, infections_mean, deaths], axis=1) for draw in infections_draws]
+              .sort_index()
+              .loc[:, 'deaths'])
     
     logger.info('Writing SEIR inputs - infections draw files.')
+    infections_draws_cols = infections_draws.columns
+    infections_draws = pd.concat([infections_draws, infections_mean, deaths], axis=1)
+    infections_mean = infections_draws['infections_mean'].copy()
+    deaths = infections_draws['deaths'].copy()
+    infections_draws = [infections_draws[infections_draws_col].copy() for infections_draws_col in infections_draws_cols]
+    infections_draws = [pd.concat([infections_draw, infections_mean, deaths], axis=1) for infections_draw in infections_draws]
     _inf_writer = functools.partial(
         data.write_infections_draws,
         infections_draws_dir=infections_draws_dir,
@@ -208,6 +213,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
     
     logger.info('Writing SEIR inputs - IFR.')
+    ifr_draws_cols = ifr_draws.columns
+    ifr_draws = pd.concat([ifr_draws, ifr_mean], axis=1).join(ifr_risk_data, on='location_id')
+    ifr_mean = ifr_draws['ifr_mean'].copy()
+    ifr_risk_data = ifr_draws[['lr_adj', 'hr_adj']].copy()
+    ifr_draws = [ifr_draws[ifr_draws_col].copy() for ifr_draws_col in ifr_draws_cols]
+    ifr_draws = [pd.concat([ifr_draw, ifr_mean, ifr_risk_data], axis=1) for ifr_draw in ifr_draws]
     _ifr_writer = functools.partial(
         data.write_ratio_draws,
         ratio_draws_dir=ratio_draws_dir,

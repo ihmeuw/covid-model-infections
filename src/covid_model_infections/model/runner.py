@@ -34,6 +34,17 @@ def model_measure(measure: str, measure_type: str,
     if measure_type not in ['cumul', 'daily']:
         raise ValueError(f'Invalid measure_type (must be `cumul` or `daily`): {measure_type}')
     
+    logger.info('Doing 7-day rolling average to help eliminate day-of-week reporting bias.')
+    if measure_type == 'daily':
+        day0_value = max(0, input_data[0])
+        input_data = input_data[1:]
+    input_data = (input_data
+                  .clip(0, np.inf)
+                  .rolling(window=7,
+                           min_periods=7,
+                           center=True).mean()
+                  .dropna())
+    
     dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
     
     n_knots = determine_n_knots(input_data, knot_days)
@@ -43,10 +54,10 @@ def model_measure(measure: str, measure_type: str,
     
     if measure_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
-        prior_spline_maxder_gaussian = np.array([[0, 1e-3]] * (n_knots + split_l_interval + split_r_interval - 1))
+        prior_spline_maxder_gaussian = np.array([[0, 1.]] * (n_knots + split_l_interval + split_r_interval - 1))
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
-        spline_options = {'spline_l_linear':True,
+        spline_options = {'spline_l_linear':False,
                           'spline_r_linear':True,}
 
     if not log:
@@ -80,6 +91,9 @@ def model_measure(measure: str, measure_type: str,
     if measure_type == 'cumul':
         input_data = input_data.diff().fillna(input_data)
         smooth_data = smooth_data.diff().fillna(smooth_data)
+    else:
+        input_data[0] += day0_value
+        smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
     raw_infections = (input_data / ratio[input_data.index]).rename('infections')
@@ -239,7 +253,7 @@ def get_infected(location_id: int,
                  model_out_dir: str,
                  plot_dir: str,
                  measure_type: str = 'daily',
-                 measure_log: bool = True, measure_knot_days: int = 7, measure_preroll_min_periods: int = 7,
+                 measure_log: bool = True, measure_knot_days: int = 7,
                  infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
     logger.info('Loading data.')
@@ -248,12 +262,7 @@ def get_infected(location_id: int,
     logger.info(f'Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
                                           measure_type,
-                                          (measure_data[measure_type]
-                                           .clip(0, np.inf)
-                                           .rolling(window=measure_preroll_min_periods,
-                                                    min_periods=measure_preroll_min_periods,
-                                                    center=True).mean()
-                                           .dropna()),
+                                          measure_data[measure_type].copy(),
                                           measure_data['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
                                           measure_log, measure_knot_days, num_submodels=1,
@@ -287,7 +296,7 @@ def get_infected(location_id: int,
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
         input_data, test_data, sero_data,
-        output_data, output_draws, population
+        output_data, smooth_infections, output_draws, population
     )
     
     if 'deaths' in input_data.keys():
@@ -298,6 +307,11 @@ def get_infected(location_id: int,
                                    output_draw,
                                    input_data['deaths']['lag'],) for output_draw in output_draws_list]
         ifr_draws = pd.concat(ifr_draws, axis=1)
+        ifr_draws['location_id'] = location_id
+        ifr_draws = (ifr_draws
+                     .reset_index()
+                     .set_index(['location_id', 'date'])
+                     .sort_index())
         ifr_path = Path(model_out_dir) / f'{location_id}_ifr_draws.h5'
         ifr_draws.to_hdf(ifr_path, key='data', mode='w')
     
