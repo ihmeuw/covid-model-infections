@@ -104,9 +104,10 @@ def model_measure(measure: str, measure_type: str,
             'infections_daily':smooth_infections, 'infections_cumul':smooth_infections.cumsum(),}
 
 
-def model_infections(inputs: pd.DataFrame, weights: pd.DataFrame,
+def model_infections(inputs: pd.DataFrame,
                      log: bool, knot_days: int, diff: bool,
                      refit: bool, num_submodels: int,
+                     weights: pd.DataFrame = None,
                      **spline_kwargs) -> pd.Series:
     if refit:
         if isinstance(inputs, pd.DataFrame):
@@ -130,7 +131,6 @@ def model_infections(inputs: pd.DataFrame, weights: pd.DataFrame,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[0] = [0, 1e-3]
         prior_spline_maxder_gaussian[-1] = [0, 1e-3]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
         # spline_options.update({'spline_l_linear':True,
@@ -140,6 +140,14 @@ def model_infections(inputs: pd.DataFrame, weights: pd.DataFrame,
                                'prior_spline_num_constraint_points':CONSTRAINT_POINTS,})
     spline_options.update(spline_kwargs)
     
+    if not refit:
+        dep_trans_se = {
+            'weight_data':weights.reset_index(),
+            'dep_var_se':weights.columns.unique().item(),
+        }
+    else:
+        dep_trans_se = {}
+    
     _, outputs, _ = mr_spline.estimate_time_series(
         data=inputs.reset_index(),
         dep_var=inputs.columns.unique().item(),
@@ -147,11 +155,10 @@ def model_infections(inputs: pd.DataFrame, weights: pd.DataFrame,
         n_knots=n_knots,
         dep_trans_in=dep_trans_in,
         diff=diff,
-        weight_data=weights.reset_index(),
-        dep_var_se=weights.columns.unique().item(),
         dep_trans_out=dep_trans_out,
         num_submodels=num_submodels,
         single_random_knot=refit,
+        **dep_trans_se
     )
     if diff:
         int_inputs = inputs[inputs.diff().notnull()]
@@ -271,9 +278,12 @@ def get_infected(location_id: int,
                    for measure, measure_data in input_data.items()}
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
-    infections_inputs = pd.concat([v['infections_daily'] for k, v in output_data.items()], axis=1).sort_index()
-    infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()], axis=1).sort_index()
-    smooth_infections = model_infections(infections_inputs, infections_weights, infection_log, infection_knot_days,
+    infections_inputs = pd.concat([v['infections_daily'] for k, v in output_data.items()],
+                                  axis=1).sort_index()
+    infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()],
+                                   axis=1).sort_index()
+    smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
+                                         log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=100)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
