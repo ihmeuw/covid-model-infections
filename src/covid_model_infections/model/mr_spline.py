@@ -20,6 +20,8 @@ def estimate_time_series(data: pd.DataFrame,
                          single_random_knot: bool = False,
                          min_interval_days: int = 7,
                          dep_trans_out: Callable[[pd.Series], pd.Series] = lambda x: x,
+                         split_l_interval: bool = False,
+                         split_r_interval: bool = False,
                          verbose: bool = False,) -> Tuple[pd.DataFrame, pd.Series, MRBeRT]:
     if verbose: logger.info('Formatting data.')
     data = data.copy()
@@ -62,6 +64,16 @@ def estimate_time_series(data: pd.DataFrame,
         spline_knots = get_ensemble_knots(n_knots, min_interval, 1)[0]
     else:
         spline_knots = np.linspace(0., 1., n_knots)
+        
+    if split_l_interval or split_r_interval:
+        if num_submodels > 1:
+            raise ValueError('Would need to set up functionality to split segments for ensemble.')
+        if split_l_interval:
+            n_knots += 1
+            spline_knots = np.insert(spline_knots, 0, spline_knots[:2].mean())
+        if split_r_interval:
+            n_knots += 1
+            spline_knots = np.insert(spline_knots, -1, spline_knots[-2:].mean())
     
     if verbose: logger.info('Creating model data.')
     mr_data = MRData()

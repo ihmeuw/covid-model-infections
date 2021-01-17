@@ -6,7 +6,7 @@ import numpy as np
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.Series:
-    data_path = infection_fatality_root / '20210113_v57_allage_ifr_by_loctime_v7_predbyranef.csv'
+    data_path = infection_fatality_root / '20210115_v57_allage_ifr_by_loctime_v10_predbyranef_covidlocs.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_ifr':'ifr'})
@@ -18,8 +18,20 @@ def load_ifr(infection_fatality_root: Path) -> pd.Series:
     return data
 
 
+def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
+    data_path = infection_fatality_root / '20210115_v57_allage_ifr_by_loctime_v10_predbyranef_covidlocs_agegtlt65.csv'
+    data = pd.read_csv(data_path)
+    data['lr_adj'] = data['ifr_lr'] / data['ifr']
+    data['hr_adj'] = data['ifr_hr'] / data['ifr']
+    data = (data
+            .set_index('location_id')
+            .loc[:, ['lr_adj', 'hr_adj']])
+    
+    return data
+    
+
 def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
-    data_path = infection_hospitalization_root / '20210110_v57_allage_hir_by_loctime_v7.csv'
+    data_path = infection_hospitalization_root / '20210110_v57_allage_hir_by_loctime_v10.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_hir':'ihr'})
@@ -150,7 +162,11 @@ def write_ratio_draws(data: pd.DataFrame,
     draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
     draw = int(draw_col.split('_')[-1])
     data = data.rename(columns={draw_col:'ifr_draw'})
+    data['ifr_lr_draw'] = data['ifr_draw'] * data['lr_adj']
+    data['ifr_hr_draw'] = data['ifr_draw'] * data['hr_adj']
     data['draw'] = draw
+    del data['lr_adj']
+    del data['hr_adj']
 
     out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)

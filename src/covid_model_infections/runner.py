@@ -16,7 +16,8 @@ from covid_model_infections.pdf_merger import pdf_merger
 
 ## TODO:
 ##     - holdout
-##     - ratio draws
+##     - predict IDR draws
+##     - save other ratio draws
 ##     - hospital census?
 ##     - throw error if we have case/death/admission data but not ratio (should use parent)
 ##     - modularize data object creation
@@ -53,6 +54,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Loading estimated ratios.')
     ifr_data = data.load_ifr(infection_fatality_root)
+    ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     idr_data = data.load_idr(infection_detection_root, IDR_LIMITS)
 
@@ -70,14 +72,18 @@ def make_infections(app_metadata: cli_tools.Metadata,
     parent_ids = hierarchy.loc[most_detailed, 'parent_id'].to_list()
     location_names = hierarchy.loc[most_detailed, 'location_name'].to_list()
     model_data = {}
+    unmodeled_location_ids = []
+    modeled_location_ids = []
     for location_id, parent_id, location_name in zip(location_ids, parent_ids, location_names):
         location_model_data = {}
+        modeled_location = False
         if location_id in daily_deaths.reset_index()['location_id'].values:
             if location_id in ifr_data.reset_index()['location_id'].values:
                 ratio_location_id = location_id
             else:
                 logger.info(f'Using parent IFR for {location_name}.')
                 ratio_location_id = parent_id
+            modeled_location = True
             location_model_data.update({'deaths':{'daily':daily_deaths.loc[location_id],
                                                   'cumul':cumul_deaths.loc[location_id],
                                                   'ratio':ifr_data.loc[ratio_location_id],
@@ -88,6 +94,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
             else:
                 logger.info(f'Using parent IHR for {location_name}.')
                 ratio_location_id = parent_id
+            modeled_location = True
             location_model_data.update({'hospitalizations':{'daily':daily_hospital.loc[location_id],
                                                             'cumul':cumul_hospital.loc[location_id],
                                                             'ratio':ihr_data.loc[ratio_location_id],
@@ -98,13 +105,23 @@ def make_infections(app_metadata: cli_tools.Metadata,
             else:
                 logger.info(f'Using parent IDR for {location_name}.')
                 ratio_location_id = parent_id
+            modeled_location = True
             location_model_data.update({'cases':{'daily':daily_cases.loc[location_id],
                                                  'cumul':cumul_cases.loc[location_id],
                                                  'ratio':idr_data.loc[ratio_location_id],
                                                  'lag': TIMELINE['cases'],},})
-        model_data.update({
-            location_id:location_model_data
-        })
+        if modeled_location:
+            modeled_location_ids.append(location_id)
+            model_data.update({
+                location_id:location_model_data
+            })
+        else:
+            unmodeled_location_ids.append(location_id)
+            
+    logger.info('Identifying unmodeled locations.')
+    app_metadata.update({'unmodeled_location_ids': unmodeled_location_ids})
+    if unmodeled_location_ids:
+        logger.debug(f'Insufficent data exists for the following location_ids: {", ".join([str(l) for l in unmodeled_location_ids])}')
     
     logger.info('Writing intermediate files.')
     data_path = model_in_dir / 'model_data.pkl'
@@ -123,11 +140,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
     job_args_map = {
         location_id: [model.runner.__file__,
                       location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir)]
-        for location_id in location_ids
+        for location_id in modeled_location_ids
     }
     cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
     
-    logger.debug('Merging PDFs.')
+    logger.info('Merging PDFs.')
     possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
     existing_pdfs = [str(x).split('/')[-1] for x in plot_dir.iterdir() if x.is_file()]
     pdf_paths = [pdf for pdf in possible_pdfs if pdf in existing_pdfs]
@@ -139,43 +156,54 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
     pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
     
-    logger.debug('Compiling infection draws.')
+    logger.info('Compiling infection draws.')
     infections_draws = []
     for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.h5')]:
         infections_draws.append(pd.read_hdf(draws_path))
     infections_draws = pd.concat(infections_draws)
+    completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
     draw_path = output_root / 'infections_draws.h5'
     infections_draws.to_hdf(draw_path, key='data', mode='w')
     infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
-    infections_draws = [infections_draws[c] for c in infections_draws.columns]
     
-    logger.debug('Compiling IFR draws.')
+    logger.info('Identifying failed models.')
+    failed_model_location_ids = set(modeled_location_ids) - set(completed_modeled_location_ids)
+    app_metadata.update({'failed_model_location_ids': failed_model_location_ids})
+    if failed_model_location_ids:
+        logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
+    
+    logger.info('Compiling IFR draws.')
     ifr_draws = []
     for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_ifr_draws.h5')]:
         ifr_draws.append(pd.read_hdf(draws_path))
     ifr_draws = pd.concat(ifr_draws)
     draw_path = output_root / 'ifr_draws.h5'
     ifr_draws.to_hdf(draw_path, key='data', mode='w')
-    ifr_mean = ifr_draws.mean(axis=1).rename('infections_mean')
-    ifr_draws = [pd.concat([ifr_draws[c], ifr_mean], axis=1) for c in ifr_draws.columns]
+    ifr_mean = ifr_draws.mean(axis=1).rename('ifr_mean')
     
-    logger.debug('Compiling other model outputs.')
+    logger.info('Compiling other model outputs.')
     outputs = {}
     for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]:
         with outputs_path.open('rb') as outputs_file:
             outputs.update(pickle.load(outputs_file))
     output_path = output_root / 'output_data.pkl'
     with output_path.open('wb') as file:
-        pickle.dump(output_path, file, -1)
+        pickle.dump(outputs, file, -1)
     deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
     deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
     deaths = pd.concat(deaths)
     deaths = (deaths
               .set_index(['location_id', 'date'])
-              .sort_index())
-    infections_draws = [pd.concat([draw, infections_mean, deaths], axis=1) for draw in infections_draws]
+              .sort_index()
+              .loc[:, 'deaths'])
     
-    logger.debug('Writing SEIR inputs - infections draw files.')
+    logger.info('Writing SEIR inputs - infections draw files.')
+    infections_draws_cols = infections_draws.columns
+    infections_draws = pd.concat([infections_draws, infections_mean, deaths], axis=1)
+    infections_mean = infections_draws['infections_mean'].copy()
+    deaths = infections_draws['deaths'].copy()
+    infections_draws = [infections_draws[infections_draws_col].copy() for infections_draws_col in infections_draws_cols]
+    infections_draws = [pd.concat([infections_draw, infections_mean, deaths], axis=1) for infections_draw in infections_draws]
     _inf_writer = functools.partial(
         data.write_infections_draws,
         infections_draws_dir=infections_draws_dir,
@@ -184,7 +212,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
     with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
     
-    logger.debug('Writing SEIR inputs - IFR.')
+    logger.info('Writing SEIR inputs - IFR.')
+    ifr_draws_cols = ifr_draws.columns
+    ifr_draws = pd.concat([ifr_draws, ifr_mean], axis=1).join(ifr_risk_data, on='location_id')
+    ifr_mean = ifr_draws['ifr_mean'].copy()
+    ifr_risk_data = ifr_draws[['lr_adj', 'hr_adj']].copy()
+    ifr_draws = [ifr_draws[ifr_draws_col].copy() for ifr_draws_col in ifr_draws_cols]
+    ifr_draws = [pd.concat([ifr_draw, ifr_mean, ifr_risk_data], axis=1) for ifr_draw in ifr_draws]
     _ifr_writer = functools.partial(
         data.write_ratio_draws,
         ratio_draws_dir=ratio_draws_dir,

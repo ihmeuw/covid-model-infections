@@ -21,35 +21,49 @@ FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 
 
-def model_measure(measure: str, model_type: str,
+def model_measure(measure: str, measure_type: str,
                   input_data: pd.Series, ratio: pd.Series, population: float,
                   n_draws: int, lag: int,
                   log: bool, knot_days: int,
-                  num_submodels: int,) -> Dict:
+                  num_submodels: int,
+                  split_l_interval: bool,
+                  split_r_interval: bool,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
+    
+    if measure_type not in ['cumul', 'daily']:
+        raise ValueError(f'Invalid measure_type (must be `cumul` or `daily`): {measure_type}')
+    
+    logger.info('Doing 7-day rolling average to help eliminate day-of-week reporting bias.')
+    if measure_type == 'daily':
+        day0_value = max(0, input_data[0])
+        input_data = input_data[1:]
+    input_data = (input_data
+                  .clip(0, np.inf)
+                  .rolling(window=7,
+                           min_periods=7,
+                           center=True).mean()
+                  .dropna())
     
     dep_trans_in, dep_se_trans_in, dep_trans_out = get_rate_transformations(log)
     
     n_knots = determine_n_knots(input_data, knot_days)
     
     spline_options = {'spline_knots_type':'domain',
-                      'spline_degree':3,}
-
-    if model_type == 'cumul':
+                      'spline_degree':3 + (measure_type=='cumul'),}
+    
+    if measure_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})
-        prior_spline_maxder_gaussian = np.array([[0, 5e-3]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[:4] = [0, 1e-2]
-        prior_spline_maxder_gaussian[-4:] = [0, 1e-2]
+        prior_spline_maxder_gaussian = np.array([[0, 1.]] * (n_knots + split_l_interval + split_r_interval - 1))
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
     else:
-        spline_options = {'spline_l_linear':True,
+        spline_options = {'spline_l_linear':False,
                           'spline_r_linear':True,}
 
     if not log:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),})
         
-    if model_type == 'cumul' or not log:
+    if measure_type == 'cumul' or not log:
         spline_options.update({'prior_spline_num_constraint_points':CONSTRAINT_POINTS,})
         
     logger.info('Generating smooth past curve.')
@@ -66,15 +80,20 @@ def model_measure(measure: str, model_type: str,
         #dep_se_trans_in=dep_se_trans_in,
         dep_trans_out=dep_trans_out,
         num_submodels=num_submodels,
+        split_l_interval=split_l_interval,
+        split_r_interval=split_r_interval,
     )
     
     logger.info('Converting to infections.')
     if log:
         input_data -= LOG_OFFSET
         smooth_data -= LOG_OFFSET
-    if model_type == 'cumul':
+    if measure_type == 'cumul':
         input_data = input_data.diff().fillna(input_data)
         smooth_data = smooth_data.diff().fillna(smooth_data)
+    else:
+        input_data[0] += day0_value
+        smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
     raw_infections = (input_data / ratio[input_data.index]).rename('infections')
@@ -108,7 +127,7 @@ def model_infections(inputs: pd.Series, log: bool, knot_days: int, diff: bool,
     
     inputs = inputs.clip(FLOOR, np.inf)
     spline_options = {'spline_knots_type':'domain',
-                      'spline_degree':3,}
+                      'spline_degree':3 - diff,}
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
@@ -193,7 +212,7 @@ def splice_ratios(ratio_data: pd.Series,
                   infections: pd.Series,
                   lag: int,
                   trans_period_past: int = 30,
-                  trans_period_future: int = 60,) -> pd.Series:    
+                  trans_period_future: int = 60,) -> pd.Series:
     col_name = infections.name
     infections.index += pd.Timedelta(days=lag)
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
@@ -233,7 +252,7 @@ def get_infected(location_id: int,
                  model_in_dir: str,
                  model_out_dir: str,
                  plot_dir: str,
-                 measure_type: str = 'cumul',
+                 measure_type: str = 'daily',
                  measure_log: bool = True, measure_knot_days: int = 7,
                  infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
@@ -243,9 +262,11 @@ def get_infected(location_id: int,
     logger.info(f'Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
                                           measure_type,
-                                          measure_data[measure_type].copy(), measure_data['ratio'].copy(),
+                                          measure_data[measure_type].copy(),
+                                          measure_data['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
-                                          measure_log, measure_knot_days, num_submodels=1,)
+                                          measure_log, measure_knot_days, num_submodels=1,
+                                          split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
@@ -275,17 +296,22 @@ def get_infected(location_id: int,
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
         input_data, test_data, sero_data,
-        output_data, output_draws, population
+        output_data, smooth_infections, output_draws, population
     )
     
     if 'deaths' in input_data.keys():
-        logger.info('Create and writing IFR (should do w/ IHR/IDR!!!).')
+        logger.info('Create and writing IFR (should do w/ IHR & IDR!!!).')
         output_draws_list = [output_draws[c] for c in output_draws.columns]
         ifr_draws = [splice_ratios(input_data['deaths']['ratio'].copy(),
                                    output_data['deaths']['daily'].copy(),
                                    output_draw,
                                    input_data['deaths']['lag'],) for output_draw in output_draws_list]
         ifr_draws = pd.concat(ifr_draws, axis=1)
+        ifr_draws['location_id'] = location_id
+        ifr_draws = (ifr_draws
+                     .reset_index()
+                     .set_index(['location_id', 'date'])
+                     .sort_index())
         ifr_path = Path(model_out_dir) / f'{location_id}_ifr_draws.h5'
         ifr_draws.to_hdf(ifr_path, key='data', mode='w')
     
