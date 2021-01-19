@@ -54,9 +54,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Loading estimated ratios.')
     ifr_data = data.load_ifr(infection_fatality_root)
+    ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
     ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
+    ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
     idr_data = data.load_idr(infection_detection_root, IDR_LIMITS)
+    idr_model_data = data.load_idr_data(infection_detection_root)
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)
@@ -135,6 +138,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
     sero_data.to_hdf(sero_path, key='data', mode='w')
     test_path = model_in_dir / 'test_data.h5'
     test_data.to_hdf(test_path, key='data', mode='w')
+    ifr_data_path = model_in_dir / 'ifr_model_data.h5'
+    ifr_model_data.to_hdf(ifr_data_path, key='data', mode='w')
+    ihr_data_path = model_in_dir / 'ihr_model_data.h5'
+    ihr_model_data.to_hdf(ihr_data_path, key='data', mode='w')
+    idr_data_path = model_in_dir / 'idr_model_data.h5'
+    idr_model_data.to_hdf(idr_data_path, key='data', mode='w')
+
     
     logger.info('Launching models.')
     job_args_map = {

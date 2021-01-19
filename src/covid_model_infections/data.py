@@ -28,6 +28,10 @@ def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
             .loc[:, ['lr_adj', 'hr_adj']])
     
     return data
+
+
+def load_ifr_data(infection_fatality_root: Path) -> pd.Series:
+    pass
     
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
@@ -43,15 +47,34 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.Series:
     return data
 
 
-def load_idr(infection_detection_root: Path, limits: Tuple[float, float]) -> pd.Series:
+def load_ihr_data(infection_hospitalization_root: Path) -> pd.Series:
+    pass
+
+
+def load_idr(infection_detection_root: Path, limits: Tuple[float, float]) -> pd.DataFrame:
     data_path = infection_detection_root / 'pred_idr.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
-            .loc[:, 'idr'])
+            .loc[:, ['idr', 'idr_fe']])
     data = data.clip(*limits)
+    
+    return data
+
+
+def load_idr_data(infection_detection_root: Path) -> pd.DataFrame:
+    data_path = infection_detection_root / 'all_data.csv'
+    data = pd.read_csv(data_path)
+    
+    has_data = data['idr'].notnull()
+    data = data.loc[has_data]
+    data['is_outlier'] = np.abs(data['in_model'] - 1)
+    data = (data
+            .loc[:, ['location_id', 'avg_date_of_test', 'idr', 'is_outlier']])
+    data = data.rename(columns={'avg_date_of_test':'date'})
+    data['date'] = pd.to_datetime(data['date'])
     
     return data
 
