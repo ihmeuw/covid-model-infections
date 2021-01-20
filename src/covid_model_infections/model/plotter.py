@@ -176,13 +176,13 @@ def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_dra
                    sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
                    c='mediumorchid', edgecolors='darkmagenta', alpha=0.6)
         ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0)].index,
-                   sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0,) 'seroprev_mean'] * 100, s=100,
+                   sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0), 'seroprev_mean'] * 100, s=100,
                    c='orange', edgecolors='darkorange', alpha=0.6, marker='^')
         ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 1)].index,
                    sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
                    c='darkmagenta', edgecolors='darkmagenta', alpha=0.6, marker='x')
         ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0)].index,
-                   sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0,) 'seroprev_mean'] * 100, s=100,
+                   sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0), 'seroprev_mean'] * 100, s=100,
                    c='darkorange', edgecolors='darkorange', alpha=0.6, marker='x')
 
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)
