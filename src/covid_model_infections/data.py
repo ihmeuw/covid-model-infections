@@ -47,7 +47,7 @@ def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
     
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / '20210118_v57_allage_ihr_by_loctime_v12.csv'
+    data_path = infection_hospitalization_root / '20210118_v57_allage_ihr_by_loctime_v14.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_hir':'ratio',
@@ -61,7 +61,7 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
 
 
 def load_ihr_data(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ihr_v12.csv'
+    data_path = infection_hospitalization_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ihr_v14.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ihr'].notnull()]
