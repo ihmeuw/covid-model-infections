@@ -137,10 +137,10 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
     else:
         ax.set_xticklabels([])
     
-    ax.spines['left'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
 
 
 def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data, clight, cdark, start_date, end_date, include_xticks=True):
@@ -164,20 +164,26 @@ def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_dat
     else:
         ax.set_xticklabels([])
     
-    ax.spines['left'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)
 
 
 def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_draws, start_date, end_date, include_xticks=False):
     if sero_data is not None:
-        ax.scatter(sero_data.loc[sero_data['geo_accordance'] == 1].index,
-                   sero_data.loc[sero_data['geo_accordance'] == 1, 'seroprev_mean'] * 100, s=100,
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
                    c='mediumorchid', edgecolors='darkmagenta', alpha=0.6)
-        ax.scatter(sero_data.loc[sero_data['geo_accordance'] == 0].index,
-                   sero_data.loc[sero_data['geo_accordance'] == 0, 'seroprev_mean'] * 100, s=100,
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0,) 'seroprev_mean'] * 100, s=100,
                    c='orange', edgecolors='darkorange', alpha=0.6, marker='^')
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 1)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
+                   c='darkmagenta', edgecolors='darkmagenta', alpha=0.6, marker='x')
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0,) 'seroprev_mean'] * 100, s=100,
+                   c='darkorange', edgecolors='darkorange', alpha=0.6, marker='x')
 
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)
     ax.plot(smooth_infections, color='black', linestyle=':', alpha=0.6)
@@ -196,7 +202,7 @@ def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_dra
     else:
         ax.set_xticklabels([])
     
-    ax.spines['left'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    #ax.spines['left'].set_visible(False)
+    #ax.spines['right'].set_visible(False)
+    #ax.spines['top'].set_visible(False)
+    #ax.spines['bottom'].set_visible(False)

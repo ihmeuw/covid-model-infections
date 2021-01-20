@@ -107,13 +107,13 @@ def load_sero_data(infection_detection_root: Path) -> pd.DataFrame:
     data_path = infection_detection_root / 'sero_data.csv'
     data = pd.read_csv(data_path)
     data = (data
-            .loc[:, ['location_id', 'infection_date', 'seroprev_mean', 'geo_accordance']])
+            .loc[:, ['location_id', 'infection_date', 'seroprev_mean', 'geo_accordance', 'manual_outlier']])
     data = data.rename(columns={'infection_date':'date'})
     data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
-            .loc[:, ['seroprev_mean', 'geo_accordance']])
+            .loc[:, ['seroprev_mean', 'geo_accordance', 'manual_outlier']])
     
     return data
 

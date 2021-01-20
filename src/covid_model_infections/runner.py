@@ -11,7 +11,7 @@ import pandas as pd
 from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model
-from covid_model_infections.utils import TIMELINE, IDR_LIMITS
+from covid_model_infections.utils import TIMELINE, IDR_UPPER_LIMIT  # , IDR_LIMITS
 from covid_model_infections.pdf_merger import pdf_merger
 
 ## TODO:
@@ -58,7 +58,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
-    idr_data = data.load_idr(infection_detection_root, IDR_LIMITS)
+    # Assumes IDR has estimated floor already applied
+    idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))  # , IDR_LIMITS
     idr_model_data = data.load_idr_data(infection_detection_root)
 
     logger.info('Loading extra data for plotting.')
