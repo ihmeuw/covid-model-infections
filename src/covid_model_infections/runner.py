@@ -54,7 +54,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Loading estimated ratios.')
     ifr_data = data.load_ifr(infection_fatality_root)
-    ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
+    ifr_model_data = data.load_ifr_data(infection_fatality_root)
     ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
@@ -144,7 +144,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ihr_model_data.to_hdf(ihr_data_path, key='data', mode='w')
     idr_data_path = model_in_dir / 'idr_model_data.h5'
     idr_model_data.to_hdf(idr_data_path, key='data', mode='w')
-
     
     logger.info('Launching models.')
     job_args_map = {
