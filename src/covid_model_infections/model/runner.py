@@ -345,7 +345,6 @@ def get_infected(location_id: int,
         'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
     }
     for measure in input_data.keys():
-        
         output_draws_list = [output_draws[c] for c in output_draws.columns]
         ratio_draws = [splice_ratios(input_data[measure]['ratio']['ratio'].copy(),
                                    output_data[measure]['daily'].copy(),
@@ -361,8 +360,8 @@ def get_infected(location_id: int,
         ratio_draws.to_hdf(ratio_path, key='data', mode='w')
     
     logger.info('Writing outputs.')
-    data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
-    with data_path.open('wb') as file:
+    output_data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
+    with output_data_path.open('wb') as file:
         pickle.dump({location_id:output_data}, file, -1)
     output_draws['location_id'] = location_id
     output_draws = (output_draws

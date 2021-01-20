@@ -76,6 +76,14 @@ def plotter(plot_dir, location_id, location_name,
             adj_ratio.index += pd.Timedelta(days=input_data[measure]['lag'])
             adj_ratio = output_data[measure]['daily'] / adj_ratio
             adj_ratio = adj_ratio.dropna()
+            if ratio_names[measure] == 'IFR':
+                adj_ratio = adj_ratio.clip(0, 0.1)
+            elif ratio_names[measure] == 'IHR':
+                adj_ratio = adj_ratio.clip(0, 0.2)
+            elif ratio_names[measure] == 'IDR':
+                adj_ratio = adj_ratio.clip(0, 1.)
+            else:
+                raise ValueError('Unexpected ratio present in plotting.')
             ratio_plot(ratio_ax, ratio_names[measure],
                        pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio'].dropna(),
                        pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio_fe'].dropna(),
