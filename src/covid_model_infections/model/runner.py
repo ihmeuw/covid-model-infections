@@ -94,9 +94,11 @@ def model_measure(measure: str, measure_type: str,
         smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
-    raw_infections = (input_data / ratio[input_data.index]).rename('infections')
+    raw_infections = pd.concat([input_data, ratio], axis=1)
+    raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
     raw_infections.index -= pd.Timedelta(days=lag)
-    smooth_infections = (smooth_data / ratio[smooth_data.index]).rename('infections')
+    smooth_infections = pd.concat([smooth_data, ratio], axis=1)
+    smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
     smooth_infections.index -= pd.Timedelta(days=lag)
 
     return {'daily':smooth_data, 'cumul':smooth_data.cumsum(),
