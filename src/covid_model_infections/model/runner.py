@@ -340,21 +340,25 @@ def get_infected(location_id: int,
         output_data, smooth_infections, output_draws, population
     )
     
-    if 'deaths' in input_data.keys():
-        logger.info('Create and writing IFR (should do w/ IHR & IDR!!!).')
+    logger.info('Create and writing ratios.')
+    ratio_measure_map = {
+        'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
+    }
+    for measure in input_data.keys():
+        
         output_draws_list = [output_draws[c] for c in output_draws.columns]
-        ifr_draws = [splice_ratios(input_data['deaths']['ratio'].copy(),
-                                   output_data['deaths']['daily'].copy(),
+        ratio_draws = [splice_ratios(input_data[measure]['ratio']['ratio'].copy(),
+                                   output_data[measure]['daily'].copy(),
                                    output_draw,
-                                   input_data['deaths']['lag'],) for output_draw in output_draws_list]
-        ifr_draws = pd.concat(ifr_draws, axis=1)
-        ifr_draws['location_id'] = location_id
-        ifr_draws = (ifr_draws
-                     .reset_index()
-                     .set_index(['location_id', 'date'])
-                     .sort_index())
-        ifr_path = Path(model_out_dir) / f'{location_id}_ifr_draws.h5'
-        ifr_draws.to_hdf(ifr_path, key='data', mode='w')
+                                   input_data[measure]['lag'],) for output_draw in output_draws_list]
+        ratio_draws = pd.concat(ratio_draws, axis=1)
+        ratio_draws['location_id'] = location_id
+        ratio_draws = (ratio_draws
+                       .reset_index()
+                       .set_index(['location_id', 'date'])
+                       .sort_index())
+        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.h5'
+        ratio_draws.to_hdf(ratio_path, key='data', mode='w')
     
     logger.info('Writing outputs.')
     data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
