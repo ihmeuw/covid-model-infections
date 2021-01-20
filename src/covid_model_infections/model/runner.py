@@ -296,8 +296,6 @@ def get_infected(location_id: int,
                                           measure_log, measure_knot_days, num_submodels=1,
                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
-    
-    logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     if 'cases' in input_data.keys():
         infections_inputs = [enforce_idr_ceiling(measure,
                                                  output_data['cases']['daily'],
@@ -308,6 +306,10 @@ def get_infected(location_id: int,
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
             output_data[measure]['infections_daily'] = new_infections
             output_data[measure]['infections_cumul'] = new_infections.cumsum()
+    else:
+        infections_inputs = [v['infections_daily'] for k, v in output_data.items()]
+    
+    logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
     infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()],
                                    axis=1).sort_index()

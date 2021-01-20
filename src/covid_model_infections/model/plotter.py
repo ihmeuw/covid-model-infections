@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import seaborn as sns
 
 MEASURE_COLORS = {
@@ -113,6 +114,50 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
     whitespace_bottom.axis('off')
     
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=.66, left=0., right=.615, top=.95)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=.365, left=0., right=.615, top=.66)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=0., left=0., right=.615, top=.365)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=0., left=.615, right=1., top=.95)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     if plot_dir is not None:
         fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
@@ -137,10 +182,10 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
     else:
         ax.set_xticklabels([])
     
-    #ax.spines['left'].set_visible(False)
-    #ax.spines['right'].set_visible(False)
-    #ax.spines['top'].set_visible(False)
-    #ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
 
 
 def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data, clight, cdark, start_date, end_date, include_xticks=True):
@@ -164,10 +209,10 @@ def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_dat
     else:
         ax.set_xticklabels([])
     
-    #ax.spines['left'].set_visible(False)
-    #ax.spines['right'].set_visible(False)
-    #ax.spines['top'].set_visible(False)
-    #ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
 
 
 def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_draws, start_date, end_date, include_xticks=False):
@@ -202,7 +247,7 @@ def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_dra
     else:
         ax.set_xticklabels([])
     
-    #ax.spines['left'].set_visible(False)
-    #ax.spines['right'].set_visible(False)
-    #ax.spines['top'].set_visible(False)
-    #ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
