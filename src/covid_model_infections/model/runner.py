@@ -13,7 +13,7 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import OMP_NUM_THREADS, IDR_LIMITS
+from covid_model_infections.utils import OMP_NUM_THREADS, IDR_UPPER_LIMIT
 from covid_model_infections.cluster import F_THREAD
 
 LOG_OFFSET = 1
@@ -303,7 +303,7 @@ def get_infected(location_id: int,
                                                  output_data['cases']['daily'],
                                                  output_data[measure]['infections_daily'],
                                                  input_data['cases']['lag'],
-                                                 IDR_LIMITS[1],)
+                                                 IDR_UPPER_LIMIT,)
                              for measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
             output_data[measure]['infections_daily'] = new_infections
