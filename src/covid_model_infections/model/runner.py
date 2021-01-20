@@ -13,7 +13,7 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import OMP_NUM_THREADS
+from covid_model_infections.utils import OMP_NUM_THREADS, IDR_LIMITS
 from covid_model_infections.cluster import F_THREAD
 
 LOG_OFFSET = 1
@@ -234,6 +234,24 @@ def splice_ratios(ratio_data: pd.Series,
     
     return new_ratio
 
+
+def enforce_idr_ceiling(measure: str,
+                        case_data: pd.Series,
+                        infections_data: pd.Series,
+                        case_lag: int,
+                        idr_ceiling: float,):
+    infections_floor = case_data / idr_ceiling
+    infections_floor.index -= pd.Timedelta(days=case_lag)
+    infections_scaler = (infections_floor / infections_data)[infections_data.index]
+    infections_scaler = (infections_scaler
+                         .fillna(1)
+                         .clip(1, np.inf))
+    if infections_scaler.max() > 1:
+        logger.info(f'Adjusting infections from {measure} to preserve IDR ceiling of {idr_ceiling}.')
+    infections_data *= infections_scaler
+
+    return infections_data
+
     
 def determine_n_knots(data: pd.Series, knot_days: int, min_k: int = 4) -> int:
     n_days = (data.reset_index()['date'].max() - data.reset_index()['date'].min()).days
@@ -267,19 +285,28 @@ def get_infected(location_id: int,
     logger.info('Loading data.')
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
     
-    logger.info(f'Running measure-specific smoothing splines.')
+    logger.info('Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
                                           measure_type,
                                           measure_data[measure_type].copy(),
-                                          measure_data['ratio'].copy(),
+                                          measure_data['ratio']['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
                                           measure_log, measure_knot_days, num_submodels=1,
                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
-    infections_inputs = pd.concat([v['infections_daily'] for k, v in output_data.items()],
-                                  axis=1).sort_index()
+    if 'cases' in input_data.keys():
+        infections_inputs = [enforce_idr_ceiling(measure,
+                                                 output_data['cases']['daily'],
+                                                 output_data[measure]['infections_daily'],
+                                                 input_data['cases']['lag'],
+                                                 IDR_LIMITS[1],)
+                             for measure in output_data.keys()]
+        for measure, new_infections in zip(output_data.keys(), infections_inputs):
+            output_data[measure]['infections_daily'] = new_infections
+            output_data[measure]['infections_cumul'] = new_infections.cumsum()
+    infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
     infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()],
                                    axis=1).sort_index()
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
@@ -303,11 +330,11 @@ def get_infected(location_id: int,
     output_draws = dep_trans_out(output_draws)
     
     logger.info('Plot data.')
-    sero_data, test_data = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
+    sero_data, ratio_model_inputs, test_data = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     test_data = (test_data['daily_tests'] / population).rename('testing_rate')
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
-        input_data, test_data, sero_data,
+        input_data, test_data, sero_data, ratio_model_inputs,
         output_data, smooth_infections, output_draws, population
     )
     
