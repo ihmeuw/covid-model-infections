@@ -4,6 +4,6 @@ TIMELINE = {
     'hospitalizations': 11,
 }
 
-IDR_UPPER_LIMIT = 0.7
+IDR_UPPER_LIMIT = 1.
 
 OMP_NUM_THREADS = '6'
