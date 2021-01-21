@@ -20,6 +20,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_kazakhstan].reset_index(drop=True)
         manipulation_metadata['kazakhstan'] = 'dropped all cases'
     elif input_measure == 'hospitalizations':
+        is_greece = data['location_id'] == 82
+        data = data.loc[~is_greece].reset_index(drop=True)
+        manipulation_metadata['greece'] = 'dropped all hospitalizations'
+        
         is_norway = data['location_id'] == 90
         data = data.loc[~is_norway].reset_index(drop=True)
         manipulation_metadata['norway'] = 'dropped all hospitalizations'
