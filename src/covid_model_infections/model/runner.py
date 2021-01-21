@@ -248,9 +248,11 @@ def enforce_idr_ceiling(measure: str,
     infections_scaler = (infections_scaler
                          .fillna(1)
                          .clip(1, np.inf))
-    infections_scaler.loc[infections_data < 100] = 1
-    infections_scaler = infections_scaler.max()
-    if infections_scaler > 1:
+    # infections_scaler.loc[infections_data < 1000] = 1
+    # infections_scaler = infections_scaler.max()
+    # needs_correction = infections_scaler > 1
+    needs_correction = infections_scaler.max() > 1
+    if needs_correction:
         logger.info(f'Adjusting infections from {measure} to preserve IDR ceiling of {idr_ceiling}.')
     infections_data *= infections_scaler
 
