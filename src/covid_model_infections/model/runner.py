@@ -132,9 +132,9 @@ def model_infections(inputs: pd.DataFrame,
                       'spline_degree':3 - diff,}
     if log:
         inputs += LOG_OFFSET
-        prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[-1] = [0, 1e-2]
-        spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
+        # prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
+        # prior_spline_maxder_gaussian[-1] = [0, 1e-2]
+        # spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
         # spline_options.update({'spline_l_linear':True,
         #                        'spline_r_linear':True,})
     elif not diff:
