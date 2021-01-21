@@ -133,7 +133,7 @@ def model_infections(inputs: pd.DataFrame,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[-1] = [0, 1e-3]
+        #prior_spline_maxder_gaussian[-1] = [0, 1e-3]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
         # spline_options.update({'spline_l_linear':True,
         #                        'spline_r_linear':True,})
@@ -248,7 +248,9 @@ def enforce_idr_ceiling(measure: str,
     infections_scaler = (infections_scaler
                          .fillna(1)
                          .clip(1, np.inf))
-    if infections_scaler.max() > 1:
+    infections_scaler.loc[infections_data < 100] = 1
+    infections_scaler = infections_scaler.max()
+    if infections_scaler > 1:
         logger.info(f'Adjusting infections from {measure} to preserve IDR ceiling of {idr_ceiling}.')
     infections_data *= infections_scaler
 
@@ -311,7 +313,7 @@ def get_infected(location_id: int,
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
-    infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()],
+    infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.29 for k, v in output_data.items()],
                                    axis=1).sort_index()
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
