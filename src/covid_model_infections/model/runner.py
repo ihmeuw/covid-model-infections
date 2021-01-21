@@ -56,9 +56,9 @@ def model_measure(measure: str, measure_type: str,
         spline_options.update({'prior_spline_monotonicity':'increasing',})
         prior_spline_maxder_gaussian = np.array([[0, 1.]] * (n_knots + split_l_interval + split_r_interval - 1))
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
-    else:
-        spline_options = {'spline_l_linear':False,
-                          'spline_r_linear':True,}
+    # else:
+    #     spline_options = {'spline_l_linear':False,
+    #                       'spline_r_linear':True,}
 
     if not log:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),})
