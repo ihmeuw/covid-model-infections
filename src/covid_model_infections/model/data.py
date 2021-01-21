@@ -26,13 +26,43 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
 def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
     sero_path = model_in_dir / 'sero_data.h5'
     sero_data = pd.read_hdf(sero_path)
+    sero_data = sero_data.reset_index()
     sero_data = (sero_data
                  .loc[sero_data['location_id'] == location_id]
+                 .drop('location_id', axis=1)
                  .set_index('date'))
-    del sero_data['location_id']
-
+    
+    ifr_model_data_path = model_in_dir / 'ifr_model_data.h5'
+    ifr_model_data = pd.read_hdf(ifr_model_data_path)
+    ifr_model_data = ifr_model_data.reset_index()
+    ifr_model_data = (ifr_model_data
+                      .loc[ifr_model_data['location_id'] == location_id]
+                      .drop('location_id', axis=1)
+                      .set_index('date'))
+    
+    ihr_model_data_path = model_in_dir / 'ihr_model_data.h5'
+    ihr_model_data = pd.read_hdf(ihr_model_data_path)
+    ihr_model_data = ihr_model_data.reset_index()
+    ihr_model_data = (ihr_model_data
+                      .loc[ihr_model_data['location_id'] == location_id]
+                      .drop('location_id', axis=1)
+                      .set_index('date'))
+    
+    idr_model_data_path = model_in_dir / 'idr_model_data.h5'
+    idr_model_data = pd.read_hdf(idr_model_data_path)
+    idr_model_data = idr_model_data.reset_index()
+    idr_model_data = (idr_model_data
+                      .loc[idr_model_data['location_id'] == location_id]
+                      .drop('location_id', axis=1)
+                      .set_index('date'))
+    ratio_model_inputs = {
+        'deaths':ifr_model_data,
+        'hospitalizations':ihr_model_data,
+        'cases':idr_model_data
+    }
+    
     test_path = model_in_dir / 'test_data.h5'
     test_data = pd.read_hdf(test_path)
     test_data = test_data.loc[location_id]
     
-    return sero_data, test_data
+    return sero_data, ratio_model_inputs, test_data
