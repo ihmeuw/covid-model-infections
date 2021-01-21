@@ -130,10 +130,10 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_bottom.axis('off')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=.645, left=0., right=.615, top=.955)
+    outergs.update(bottom=.64, left=0., right=.615, top=.955)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(2.)
+        outerax.spines[axis].set_linewidth(1.5)
     outerax.tick_params(axis='both',which='both',
                         bottom=0, left=0,
                         labelbottom=0, labelleft=0)
@@ -141,10 +141,10 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=.335, left=0., right=.615, top=.645)
+    outergs.update(bottom=.34, left=0., right=.615, top=.64)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(2.)
+        outerax.spines[axis].set_linewidth(1.5)
     outerax.tick_params(axis='both',which='both',
                         bottom=0, left=0,
                         labelbottom=0, labelleft=0)
@@ -152,10 +152,10 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=0., left=0., right=.615, top=.335)
+    outergs.update(bottom=0., left=0., right=.615, top=.34)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(2.)
+        outerax.spines[axis].set_linewidth(1.5)
     outerax.tick_params(axis='both',which='both',
                         bottom=0, left=0,
                         labelbottom=0, labelleft=0)
@@ -166,7 +166,7 @@ def plotter(plot_dir, location_id, location_name,
     outergs.update(bottom=0., left=.615, right=1., top=.955)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(2.)
+        outerax.spines[axis].set_linewidth(1.5)
     outerax.tick_params(axis='both',which='both',
                         bottom=0, left=0,
                         labelbottom=0, labelleft=0)
