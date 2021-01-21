@@ -228,9 +228,11 @@ def splice_ratios(ratio_data: pd.Series,
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
     start_date = new_ratio.index.min()
     end_date = new_ratio.index.max()
+    pre = new_ratio[0] # new_ratio[:trans_period_past].mean()
+    post = new_ratio[-trans_period_future:].mean()
     new_ratio = pd.concat([ratio_data, new_ratio], axis=1)
-    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = new_ratio[ratio_data.name]
-    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = new_ratio[ratio_data.name]
+    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = pre  # new_ratio[ratio_data.name]
+    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = post  # new_ratio[ratio_data.name]
     new_ratio = new_ratio['new_ratio'].rename(ratio_data.name)
     new_ratio = new_ratio.interpolate(limit_area='inside').rename(col_name)
     
@@ -352,10 +354,10 @@ def get_infected(location_id: int,
     }
     for measure in input_data.keys():
         output_draws_list = [output_draws[c] for c in output_draws.columns]
-        ratio_draws = [splice_ratios(input_data[measure]['ratio']['ratio'].copy(),
-                                   output_data[measure]['daily'].copy(),
-                                   output_draw,
-                                   input_data[measure]['lag'],) for output_draw in output_draws_list]
+        ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].copy(),
+                                     smooth_data=output_data[measure]['daily'].copy(),
+                                     infections=output_draw,
+                                     lag=input_data[measure]['lag'],) for output_draw in output_draws_list]
         ratio_draws = pd.concat(ratio_draws, axis=1)
         ratio_draws['location_id'] = location_id
         ratio_draws = (ratio_draws
