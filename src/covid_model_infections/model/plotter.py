@@ -201,11 +201,11 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
         ax.set_title(title, loc='left', fontsize=16)
     ax.set_ylabel(ylabel)
     ax.set_xlim(start_date, end_date)
-    if include_xticks:
-        # ax.tick_params('x', labelrotation=60)
-        ax.xaxis.set_major_locator(DATE_LOCATOR)
-        ax.xaxis.set_major_formatter(DATE_FORMATTER)
-    else:
+    # if include_xticks:
+    #     ax.tick_params('x', labelrotation=60)
+    ax.xaxis.set_major_locator(DATE_LOCATOR)
+    ax.xaxis.set_major_formatter(DATE_FORMATTER)
+    if not include_xticks:
         ax.set_xticklabels([])
     
     ax.spines['left'].set_visible(False)
@@ -231,11 +231,11 @@ def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_in
     ax.set_xlim(start_date, end_date)
     
         
-    if include_xticks:
-        # ax.tick_params('x', labelrotation=60)
-        ax.xaxis.set_major_locator(DATE_LOCATOR)
-        ax.xaxis.set_major_formatter(DATE_FORMATTER)
-    else:
+    # if include_xticks:
+    #     ax.tick_params('x', labelrotation=60)
+    ax.xaxis.set_major_locator(DATE_LOCATOR)
+    ax.xaxis.set_major_formatter(DATE_FORMATTER)
+    if not include_xticks:
         ax.set_xticklabels([])
     
     ax.spines['left'].set_visible(False)
@@ -271,11 +271,11 @@ def model_plot(ax, title, ylabel, measure_data, sero_data, smooth_infections, ou
         ax.set_title(title, loc='left', fontsize=16)
     ax.set_ylabel(ylabel)
     ax.set_xlim(start_date, end_date)
-    if include_xticks:
-        # ax.tick_params('x', labelrotation=60)
-        ax.xaxis.set_major_locator(DATE_LOCATOR)
-        ax.xaxis.set_major_formatter(DATE_FORMATTER)
-    else:
+    # if include_xticks:
+    #     ax.tick_params('x', labelrotation=60)
+    ax.xaxis.set_major_locator(DATE_LOCATOR)
+    ax.xaxis.set_major_formatter(DATE_FORMATTER)
+    if not include_xticks:
         ax.set_xticklabels([])
     
     ax.spines['left'].set_visible(False)
