@@ -13,9 +13,10 @@ def estimate_time_series(data: pd.DataFrame,
                          n_knots: int,
                          dep_var: str,
                          dep_trans_in: Callable[[pd.Series], pd.Series] = lambda x: x,
-                         diff: bool = False,
+                         weight_data: pd.DataFrame = None,
                          dep_var_se: str = None,
                          dep_se_trans_in: Callable[[pd.Series], pd.Series] = lambda x: x,
+                         diff: bool = False,
                          num_submodels: int = 25,
                          single_random_knot: bool = False,
                          min_interval_days: int = 7,
@@ -32,14 +33,20 @@ def estimate_time_series(data: pd.DataFrame,
         data[dep_var] = data[dep_var][data[dep_var].diff().notnull()]
     if data[[dep_var]].shape[1] > 1:
         reshape = True
-        data = reshape_data_long(data, dep_var, dep_var_se)
+        data = reshape_data_long(data, dep_var)
+        if weight_data is not None:
+            weight_data = reshape_data_long(weight_data, dep_var_se)
     else:
         reshape = False
+    if weight_data is not None:
+        if (data['date'] != weight_data['date']).any():
+            raise ValueError('Dates in `data` and `weight_data` not identical.')
+        data['se'] = dep_se_trans_in(weight_data[dep_var_se])
+    else:
+        data['se'] = 1.
     data = data.rename(columns={dep_var:'y'})
     day0 = data['date'].min()
-    keep_vars = ['date', 'y']
-    if dep_var_se:
-        keep_vars = list(set(keep_vars + [dep_var_se]))
+    keep_vars = ['date', 'y', 'se']
     data = data.loc[:, keep_vars]
     start_len = len(data)
     data = data.dropna()
@@ -48,13 +55,9 @@ def estimate_time_series(data: pd.DataFrame,
         if verbose: logger.debug('NAs in data')
     data['t'] = (data['date'] - day0).dt.days
     
-    if dep_var_se:
-        data['se'] = dep_se_trans_in(data[dep_var_se])
-    else:
-        data['se'] = 1.
     col_args = {
         'col_obs':'y',
-        #'col_obs_se':'se',
+        'col_obs_se':'se',
         'col_covs':['t'],
         #'col_study_id':'date',
     }
@@ -116,15 +119,17 @@ def estimate_time_series(data: pd.DataFrame,
 
 
 def model_intercept(data: pd.DataFrame,
-                    prediction: pd.Series,
                     dep_var: str,
+                    prediction: pd.Series,
+                    weight_data: pd.DataFrame = None,
+                    dep_var_se: str = None,
                     dep_trans_in: Callable[[pd.Series], pd.Series] = lambda x: x,
                     dep_trans_out: Callable[[pd.Series], pd.Series] = lambda x: x,
                     verbose: bool = True):
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
     prediction = dep_trans_in(prediction)
-    data = reshape_data_long(data, dep_var, None)
+    data = reshape_data_long(data, dep_var)
     data = data.set_index('date').sort_index()
     data = data[dep_var] - prediction
     data = data.reset_index().dropna()
@@ -147,13 +152,11 @@ def model_intercept(data: pd.DataFrame,
     return prediction
     
     
-def reshape_data_long(data: pd.DataFrame, dep_var: str, dep_var_se: str) -> pd.DataFrame:
-    if dep_var_se != 'y' and dep_var_se is not None:
-        raise ValueError('Additional work required to use SE with reshape.')
-    data = data.loc[:, ['date', dep_var]]
-    data.columns = ['date'] + [f'{dep_var}_{i}' for i in range(data.shape[1] - 1)]
-    data = pd.melt(data, id_vars='date', value_name=dep_var)
-    data = data.loc[:, ['date', dep_var]]
+def reshape_data_long(data: pd.DataFrame, value_var: str) -> pd.DataFrame:
+    data = data.loc[:, ['date', value_var]]
+    data.columns = ['date'] + [f'{value_var}_{i}' for i in range(data.shape[1] - 1)]
+    data = pd.melt(data, id_vars='date', value_name=value_var)
+    data = data.loc[:, ['date', value_var]]
     
     return data
 

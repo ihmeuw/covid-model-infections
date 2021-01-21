@@ -11,17 +11,13 @@ import pandas as pd
 from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model
-from covid_model_infections.utils import TIMELINE, IDR_LIMITS
+from covid_model_infections.utils import TIMELINE, IDR_UPPER_LIMIT  # , IDR_LIMITS
 from covid_model_infections.pdf_merger import pdf_merger
 
 ## TODO:
-##     - holdout
-##     - predict IDR draws
-##     - save other ratio draws
-##     - hospital census?
-##     - throw error if we have case/death/admission data but not ratio (should use parent)
+##     - holdouts
 ##     - modularize data object creation
-##     - make consistent timeline with IDR, IFR, IHR models
+##     - make shared source for timeline with IDR, IFR, IHR models
 
 
 def make_infections(app_metadata: cli_tools.Metadata,
@@ -47,25 +43,34 @@ def make_infections(app_metadata: cli_tools.Metadata,
     shell_tools.mkdir(infections_draws_dir)
     shell_tools.mkdir(ratio_draws_dir)
     
-    logger.info('Loading epi report data.')
-    cumul_deaths, daily_deaths = data.load_model_inputs(model_inputs_root, 'deaths')
-    cumul_hospital, daily_hospital = data.load_model_inputs(model_inputs_root, 'hospitalizations')
-    cumul_cases, daily_cases = data.load_model_inputs(model_inputs_root, 'cases')
-    
-    logger.info('Loading estimated ratios.')
-    ifr_data = data.load_ifr(infection_fatality_root)
-    ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
-    ihr_data = data.load_ihr(infection_hospitalization_root)
-    idr_data = data.load_idr(infection_detection_root, IDR_LIMITS)
-
-    logger.info('Loading extra data for plotting.')
-    sero_data = data.load_sero_data(infection_detection_root)
-    test_data = data.load_testing_data(infection_detection_root)
-    
     logger.info('Loading supplemental data.')
     hierarchy = data.load_hierarchy(model_inputs_root)
     pop_data = data.load_population(model_inputs_root)
     
+    logger.info('Loading epi report data.')
+    cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'deaths')
+    cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'hospitalizations')
+    cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'cases')
+    app_metadata.update({'data_manipulation': {
+        'deaths':deaths_manipulation_metadata,
+        'hospital':hospital_manipulation_metadata,
+        'cases':cases_manipulation_metadata,
+    }})
+    
+    logger.info('Loading estimated ratios.')
+    ifr_data = data.load_ifr(infection_fatality_root)
+    ifr_model_data = data.load_ifr_data(infection_fatality_root)
+    ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
+    ihr_data = data.load_ihr(infection_hospitalization_root)
+    ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
+    # Assumes IDR has estimated floor already applied
+    idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))  # , IDR_LIMITS
+    idr_model_data = data.load_idr_data(infection_detection_root)
+
+    logger.info('Loading extra data for plotting.')
+    sero_data = data.load_sero_data(infection_detection_root)
+    test_data = data.load_testing_data(infection_detection_root)
+        
     logger.info('Creating model input data structure.')
     most_detailed = hierarchy['most_detailed'] == 1
     location_ids = hierarchy.loc[most_detailed, 'location_id'].to_list()
@@ -135,6 +140,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     sero_data.to_hdf(sero_path, key='data', mode='w')
     test_path = model_in_dir / 'test_data.h5'
     test_data.to_hdf(test_path, key='data', mode='w')
+    ifr_data_path = model_in_dir / 'ifr_model_data.h5'
+    ifr_model_data.to_hdf(ifr_data_path, key='data', mode='w')
+    ihr_data_path = model_in_dir / 'ihr_model_data.h5'
+    ihr_model_data.to_hdf(ihr_data_path, key='data', mode='w')
+    idr_data_path = model_in_dir / 'idr_model_data.h5'
+    idr_model_data.to_hdf(idr_data_path, key='data', mode='w')
     
     logger.info('Launching models.')
     job_args_map = {
