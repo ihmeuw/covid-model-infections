@@ -64,7 +64,7 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v17_predbyranef_covidlocs.csv'
+    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v18_predbyranef_covidlocs.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_ifr':'ratio',
@@ -78,7 +78,7 @@ def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
 
 
 def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
-    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v17_predbyranef_covidlocs_agegtlt65.csv'
+    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v18_predbyranef_covidlocs_agegtlt65.csv'
     data = pd.read_csv(data_path)
     data['lr_adj'] = data['ifr_lr'] / data['ifr']
     data['hr_adj'] = data['ifr_hr'] / data['ifr']
@@ -90,7 +90,7 @@ def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
 
 
 def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ifr_v17.csv'
+    data_path = infection_fatality_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ifr_v18.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ifr'].notnull()]
@@ -105,7 +105,7 @@ def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
     
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / '20210118_v57_allage_ihr_by_loctime_v17.csv'
+    data_path = infection_hospitalization_root / '20210118_v57_allage_ihr_by_loctime_v18.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['datevar'])
     data = data.rename(columns={'allage_hir':'ratio',
@@ -119,7 +119,7 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
 
 
 def load_ihr_data(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ihr_v17.csv'
+    data_path = infection_hospitalization_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ihr_v18.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ihr'].notnull()]

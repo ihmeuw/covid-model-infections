@@ -4,6 +4,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.dates as mdates
 import seaborn as sns
 
 MEASURE_COLORS = {
@@ -11,6 +12,9 @@ MEASURE_COLORS = {
     'cases':{'light':'mediumseagreen', 'dark':'darkgreen'},
     'hospitalizations':{'light':'dodgerblue', 'dark':'navy'}
 }
+
+DATE_LOCATOR = mdates.AutoDateLocator(maxticks=10)
+DATE_FORMATTER = mdates.ConciseDateFormatter(DATE_LOCATOR, show_offset=False)
 
 
 def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Timestamp]:
@@ -48,20 +52,20 @@ def plotter(plot_dir, location_id, location_name,
         daily_ax = fig.add_subplot(gs[i*4:i*4+4, 0])
         cumul_ax = fig.add_subplot(gs[i*4:i*4+2, 1])
         if measure in list(input_data.keys()):
-            # if i == 0:
-            #     daily_title = 'Daily'
-            #     cumul_title = 'Cumulative (in thousands)'
-            # else:
-            #     daily_title = None
-            #     cumul_title = None
+            if i == 0:
+                daily_title = 'Daily'
+                cumul_title = 'Cumulative (in thousands)'
+            else:
+                daily_title = None
+                cumul_title = None
             daily_title = None
             cumul_title = None
-            data_plot(daily_ax, daily_title, measure.capitalize(),
+            data_plot(daily_ax, measure.capitalize(), 'Daily',
                       input_data[measure]['daily'][1:], output_data[measure]['daily'][1:],
                       MEASURE_COLORS[measure]['light'], MEASURE_COLORS[measure]['dark'],
                       start_date, end_date, measure==measures[-1])
 
-            data_plot(cumul_ax, cumul_title, measure.capitalize(),
+            data_plot(cumul_ax, None, 'Cumulative',
                       input_data[measure]['cumul'], output_data[measure]['cumul'],
                       MEASURE_COLORS[measure]['light'], MEASURE_COLORS[measure]['dark'],
                       start_date, end_date)
@@ -77,17 +81,28 @@ def plotter(plot_dir, location_id, location_name,
             adj_ratio.index += pd.Timedelta(days=input_data[measure]['lag'])
             adj_ratio = output_data[measure]['daily'] / adj_ratio
             adj_ratio = adj_ratio.dropna()
+            ratio_data = pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio'].dropna()
+            ratio_data_fe = pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio_fe'].dropna()
+            ratio_plot_range = pd.concat([ratio_data, ratio_data_fe, ratio_model_inputs[measure]['ratio']])
+            ratio_plot_range_min = ratio_plot_range.min()
+            ratio_plot_range_max = ratio_plot_range.max()
+            ratio_plot_lims = (max(0, ratio_plot_range_min - ratio_plot_range_max * 0.1),
+                               ratio_plot_range_max + ratio_plot_range_max * 0.1)
             if ratio_names[measure] == 'IFR':
-                adj_ratio = adj_ratio.clip(0, 0.1)
+                adj_ratio[adj_ratio < ratio_plot_lims[0]] = np.nan
+                adj_ratio[adj_ratio > ratio_plot_lims[1]] = np.nan
             elif ratio_names[measure] == 'IHR':
-                adj_ratio = adj_ratio.clip(0, 0.2)
+                adj_ratio[adj_ratio < ratio_plot_lims[0]] = np.nan
+                adj_ratio[adj_ratio > ratio_plot_lims[1]] = np.nan
             elif ratio_names[measure] == 'IDR':
-                adj_ratio = adj_ratio.clip(0, 1.)
+                adj_ratio[adj_ratio < 0] = np.nan
+                adj_ratio[adj_ratio > 1] = np.nan
             else:
                 raise ValueError('Unexpected ratio present in plotting.')
-            ratio_plot(ratio_ax, ratio_names[measure],
-                       pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio'].dropna(),
-                       pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio_fe'].dropna(),
+            ratio_plot(ratio_ax,
+                       ratio_names[measure],
+                       ratio_data,
+                       ratio_data_fe,
                        adj_ratio,
                        ratio_model_inputs[measure],
                        MEASURE_COLORS[measure]['light'],
@@ -115,7 +130,7 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_bottom.axis('off')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=.66, left=0., right=.615, top=.95)
+    outergs.update(bottom=.645, left=0., right=.615, top=.955)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(2.)
@@ -126,7 +141,7 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=.365, left=0., right=.615, top=.66)
+    outergs.update(bottom=.335, left=0., right=.615, top=.645)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(2.)
@@ -137,7 +152,7 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=0., left=0., right=.615, top=.365)
+    outergs.update(bottom=0., left=0., right=.615, top=.335)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(2.)
@@ -148,7 +163,7 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=0., left=.615, right=1., top=.95)
+    outergs.update(bottom=0., left=.615, right=1., top=.955)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(2.)
@@ -174,11 +189,13 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
     ax.plot(smooth_data, color=cdark, alpha=1.)
 
     if title:
-        ax.set_title(title)
+        ax.set_title(title, loc='left', fontsize=16)
     ax.set_ylabel(ylabel)
     ax.set_xlim(start_date, end_date)
     if include_xticks:
-        ax.tick_params('x', labelrotation=60)
+        # ax.tick_params('x', labelrotation=60)
+        ax.xaxis.set_major_locator(DATE_LOCATOR)
+        ax.xaxis.set_major_formatter(DATE_FORMATTER)
     else:
         ax.set_xticklabels([])
     
@@ -205,7 +222,9 @@ def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_dat
     
         
     if include_xticks:
-        ax.tick_params('x', labelrotation=60)
+        # ax.tick_params('x', labelrotation=60)
+        ax.xaxis.set_major_locator(DATE_LOCATOR)
+        ax.xaxis.set_major_formatter(DATE_FORMATTER)
     else:
         ax.set_xticklabels([])
     
@@ -243,7 +262,9 @@ def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_dra
     ax.set_ylabel(title)
     ax.set_xlim(start_date, end_date)
     if include_xticks:
-        ax.tick_params('x', labelrotation=60)
+        # ax.tick_params('x', labelrotation=60)
+        ax.xaxis.set_major_locator(DATE_LOCATOR)
+        ax.xaxis.set_major_formatter(DATE_FORMATTER)
     else:
         ax.set_xticklabels([])
     
