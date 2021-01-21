@@ -13,7 +13,7 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import OMP_NUM_THREADS
+from covid_model_infections.utils import OMP_NUM_THREADS, IDR_UPPER_LIMIT
 from covid_model_infections.cluster import F_THREAD
 
 LOG_OFFSET = 1
@@ -94,9 +94,11 @@ def model_measure(measure: str, measure_type: str,
         smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
-    raw_infections = (input_data / ratio[input_data.index]).rename('infections')
+    raw_infections = pd.concat([input_data, ratio], axis=1)
+    raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
     raw_infections.index -= pd.Timedelta(days=lag)
-    smooth_infections = (smooth_data / ratio[smooth_data.index]).rename('infections')
+    smooth_infections = pd.concat([smooth_data, ratio], axis=1)
+    smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
     smooth_infections.index -= pd.Timedelta(days=lag)
 
     return {'daily':smooth_data, 'cumul':smooth_data.cumsum(),
@@ -131,7 +133,7 @@ def model_infections(inputs: pd.DataFrame,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        prior_spline_maxder_gaussian[-1] = [0, 1e-3]
+        #prior_spline_maxder_gaussian[-1] = [0, 1e-3]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
         # spline_options.update({'spline_l_linear':True,
         #                        'spline_r_linear':True,})
@@ -234,6 +236,26 @@ def splice_ratios(ratio_data: pd.Series,
     
     return new_ratio
 
+
+def enforce_idr_ceiling(measure: str,
+                        case_data: pd.Series,
+                        infections_data: pd.Series,
+                        case_lag: int,
+                        idr_ceiling: float,):
+    infections_floor = case_data / idr_ceiling
+    infections_floor.index -= pd.Timedelta(days=case_lag)
+    infections_scaler = (infections_floor / infections_data)[infections_data.index]
+    infections_scaler = (infections_scaler
+                         .fillna(1)
+                         .clip(1, np.inf))
+    infections_scaler.loc[infections_data < 100] = 1
+    infections_scaler = infections_scaler.max()
+    if infections_scaler > 1:
+        logger.info(f'Adjusting infections from {measure} to preserve IDR ceiling of {idr_ceiling}.')
+    infections_data *= infections_scaler
+
+    return infections_data
+
     
 def determine_n_knots(data: pd.Series, knot_days: int, min_k: int = 4) -> int:
     n_days = (data.reset_index()['date'].max() - data.reset_index()['date'].min()).days
@@ -267,20 +289,31 @@ def get_infected(location_id: int,
     logger.info('Loading data.')
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
     
-    logger.info(f'Running measure-specific smoothing splines.')
+    logger.info('Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
                                           measure_type,
                                           measure_data[measure_type].copy(),
-                                          measure_data['ratio'].copy(),
+                                          measure_data['ratio']['ratio'].copy(),
                                           population, n_draws, measure_data['lag'],
                                           measure_log, measure_knot_days, num_submodels=1,
                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
+    if 'cases' in input_data.keys():
+        infections_inputs = [enforce_idr_ceiling(measure,
+                                                 output_data['cases']['daily'],
+                                                 output_data[measure]['infections_daily'],
+                                                 input_data['cases']['lag'],
+                                                 IDR_UPPER_LIMIT,)
+                             for measure in output_data.keys()]
+        for measure, new_infections in zip(output_data.keys(), infections_inputs):
+            output_data[measure]['infections_daily'] = new_infections
+            output_data[measure]['infections_cumul'] = new_infections.cumsum()
+    else:
+        infections_inputs = [v['infections_daily'] for k, v in output_data.items()]
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
-    infections_inputs = pd.concat([v['infections_daily'] for k, v in output_data.items()],
-                                  axis=1).sort_index()
-    infections_weights = pd.concat([v['infections_daily']**0 - (k == 'hospitalizations') / 2 for k, v in output_data.items()],
+    infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
+    infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.29 for k, v in output_data.items()],
                                    axis=1).sort_index()
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
@@ -303,33 +336,36 @@ def get_infected(location_id: int,
     output_draws = dep_trans_out(output_draws)
     
     logger.info('Plot data.')
-    sero_data, test_data = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
+    sero_data, ratio_model_inputs, test_data = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     test_data = (test_data['daily_tests'] / population).rename('testing_rate')
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
-        input_data, test_data, sero_data,
+        input_data, test_data, sero_data, ratio_model_inputs,
         output_data, smooth_infections, output_draws, population
     )
     
-    if 'deaths' in input_data.keys():
-        logger.info('Create and writing IFR (should do w/ IHR & IDR!!!).')
+    logger.info('Create and writing ratios.')
+    ratio_measure_map = {
+        'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
+    }
+    for measure in input_data.keys():
         output_draws_list = [output_draws[c] for c in output_draws.columns]
-        ifr_draws = [splice_ratios(input_data['deaths']['ratio'].copy(),
-                                   output_data['deaths']['daily'].copy(),
+        ratio_draws = [splice_ratios(input_data[measure]['ratio']['ratio'].copy(),
+                                   output_data[measure]['daily'].copy(),
                                    output_draw,
-                                   input_data['deaths']['lag'],) for output_draw in output_draws_list]
-        ifr_draws = pd.concat(ifr_draws, axis=1)
-        ifr_draws['location_id'] = location_id
-        ifr_draws = (ifr_draws
-                     .reset_index()
-                     .set_index(['location_id', 'date'])
-                     .sort_index())
-        ifr_path = Path(model_out_dir) / f'{location_id}_ifr_draws.h5'
-        ifr_draws.to_hdf(ifr_path, key='data', mode='w')
+                                   input_data[measure]['lag'],) for output_draw in output_draws_list]
+        ratio_draws = pd.concat(ratio_draws, axis=1)
+        ratio_draws['location_id'] = location_id
+        ratio_draws = (ratio_draws
+                       .reset_index()
+                       .set_index(['location_id', 'date'])
+                       .sort_index())
+        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.h5'
+        ratio_draws.to_hdf(ratio_path, key='data', mode='w')
     
     logger.info('Writing outputs.')
-    data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
-    with data_path.open('wb') as file:
+    output_data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
+    with output_data_path.open('wb') as file:
         pickle.dump({location_id:output_data}, file, -1)
     output_draws['location_id'] = location_id
     output_draws = (output_draws

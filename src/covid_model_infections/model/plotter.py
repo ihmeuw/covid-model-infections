@@ -3,10 +3,11 @@ import pandas as pd
 import numpy as np
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import seaborn as sns
 
 MEASURE_COLORS = {
-    'deaths':{'light':'firebrick', 'dark':'maroon'},
+    'deaths':{'light':'indianred', 'dark':'darkred'},
     'cases':{'light':'mediumseagreen', 'dark':'darkgreen'},
     'hospitalizations':{'light':'dodgerblue', 'dark':'navy'}
 }
@@ -24,7 +25,7 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 def plotter(plot_dir, location_id, location_name,
             input_data,
-            test_data, sero_data,
+            test_data, sero_data, ratio_model_inputs,
             output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)
@@ -68,21 +69,29 @@ def plotter(plot_dir, location_id, location_name,
             daily_ax.axis('off')
             cumul_ax.axis('off')
     
+    ratio_names = {'deaths':'IFR', 'hospitalizations':'IHR', 'cases':'IDR'}
     for i, measure in enumerate(measures):
         ratio_ax = fig.add_subplot(gs[i*4+2:i*4+4, 1])
         if measure in list(input_data.keys()):
-            if measure == 'cases':
-                # alt_data = test_data.copy() * 1e5
-                # alt_data = alt_data[input_data[measure]['daily'].index]
-                # alt_measure = 'Tests per 100K'
-                alt_data = None
-                alt_measure = None
+            adj_ratio = smooth_infections.copy()
+            adj_ratio.index += pd.Timedelta(days=input_data[measure]['lag'])
+            adj_ratio = output_data[measure]['daily'] / adj_ratio
+            adj_ratio = adj_ratio.dropna()
+            if ratio_names[measure] == 'IFR':
+                adj_ratio = adj_ratio.clip(0, 0.1)
+            elif ratio_names[measure] == 'IHR':
+                adj_ratio = adj_ratio.clip(0, 0.2)
+            elif ratio_names[measure] == 'IDR':
+                adj_ratio = adj_ratio.clip(0, 1.)
             else:
-                alt_data = None
-                alt_measure = None
-            ratio_plot(ratio_ax, input_data[measure]['ratio'].name.upper(), alt_measure,
-                       input_data[measure]['ratio'][input_data[measure]['daily'].index],
-                       alt_data, MEASURE_COLORS[measure]['dark'],
+                raise ValueError('Unexpected ratio present in plotting.')
+            ratio_plot(ratio_ax, ratio_names[measure],
+                       pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio'].dropna(),
+                       pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio_fe'].dropna(),
+                       adj_ratio,
+                       ratio_model_inputs[measure],
+                       MEASURE_COLORS[measure]['light'],
+                       MEASURE_COLORS[measure]['dark'],
                        start_date, end_date, measure==measures[-1])
         else:
             ratio_ax.axis('off')
@@ -104,6 +113,50 @@ def plotter(plot_dir, location_id, location_name,
                (output_draws.cumsum() / population) * 100, start_date, end_date, True)
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
     whitespace_bottom.axis('off')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=.66, left=0., right=.615, top=.95)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=.365, left=0., right=.615, top=.66)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=0., left=0., right=.615, top=.365)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
+    
+    outergs = gridspec.GridSpec(1, 1)
+    outergs.update(bottom=0., left=.615, right=1., top=.95)
+    outerax = fig.add_subplot(outergs[0])
+    for axis in ['top','bottom','left','right']:
+        outerax.spines[axis].set_linewidth(2.)
+    outerax.tick_params(axis='both',which='both',
+                        bottom=0, left=0,
+                        labelbottom=0, labelleft=0)
+    outerax.grid(False)
+    outerax.set_facecolor('none')
     
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     if plot_dir is not None:
@@ -135,15 +188,21 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
     ax.spines['bottom'].set_visible(False)
 
 
-def ratio_plot(ax, ylabel, alt_ylabel, ratio_data, alt_data, cdark, start_date, end_date, include_xticks=True):
+def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data, clight, cdark, start_date, end_date, include_xticks=True):
     ax.plot(ratio_data, color=cdark, alpha=0.8)
+    ax.plot(ratio_data_fe, linestyle='--', color=cdark, alpha=0.8)
+    ax.plot(adj_ratio, color=clight, alpha=0.8)
+    
+    ax.scatter(ratio_input_data.loc[ratio_input_data['is_outlier'] == 0].index,
+               ratio_input_data.loc[ratio_input_data['is_outlier'] == 0, 'ratio'],
+               color=cdark, alpha=0.8, marker='o', facecolors='none')
+    ax.scatter(ratio_input_data.loc[ratio_input_data['is_outlier'] == 1].index,
+               ratio_input_data.loc[ratio_input_data['is_outlier'] == 1, 'ratio'],
+               color=cdark, alpha=0.8, marker='x')
+    
     ax.set_ylabel(ylabel)
     ax.set_xlim(start_date, end_date)
     
-    if alt_data is not None:
-        ax_alt = ax.twinx()
-        ax_alt.plot(alt_data, color=cdark, linestyle='--', alpha=0.8)
-        ax_alt.set_ylabel(alt_ylabel, verticalalignment='bottom', rotation=270) 
         
     if include_xticks:
         ax.tick_params('x', labelrotation=60)
@@ -158,13 +217,19 @@ def ratio_plot(ax, ylabel, alt_ylabel, ratio_data, alt_data, cdark, start_date, 
 
 def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_draws, start_date, end_date, include_xticks=False):
     if sero_data is not None:
-        sero_date = sero_data.index
-        sero_mean = sero_data['seroprev_mean']
-        # sero_var = (sero_mean * (1 - sero_mean)) / sero_data['sample_size']
-        # sero_size = (1 / sero_var) / 1e4
-        # sero_size = sero_size.clip(25, 250)
-        ax.scatter(sero_date, sero_mean * 100, s=100,
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
                    c='mediumorchid', edgecolors='darkmagenta', alpha=0.6)
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 0), 'seroprev_mean'] * 100, s=100,
+                   c='orange', edgecolors='darkorange', alpha=0.6, marker='^')
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 1)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
+                   c='darkmagenta', edgecolors='darkmagenta', alpha=0.6, marker='x')
+        ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0)].index,
+                   sero_data.loc[(sero_data['manual_outlier'] == 1) & (sero_data['geo_accordance'] == 0), 'seroprev_mean'] * 100, s=100,
+                   c='darkorange', edgecolors='darkorange', alpha=0.6, marker='x')
+
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)
     ax.plot(smooth_infections, color='black', linestyle=':', alpha=0.6)
     ax.fill_between(output_draws.index,
