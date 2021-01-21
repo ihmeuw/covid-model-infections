@@ -118,14 +118,14 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_top.axis('off')
     dailymodel_ax = fig.add_subplot(gs[1:5, 2])
     infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
-    model_plot(dailymodel_ax, 'Daily infections', infection_daily_data, None,
+    model_plot(dailymodel_ax, 'Infections', 'Daily', infection_daily_data, None,
                smooth_infections,
                output_draws, start_date, end_date, False)
     whitespace_mid = fig.add_subplot(gs[5:7, 2])
     whitespace_mid.axis('off')
     cumulmodel_ax = fig.add_subplot(gs[7:11, 2])
     infection_cumul_data = {mm: (output_data[mm]['infections_cumul'] / population) * 100 for mm in model_measures}
-    model_plot(cumulmodel_ax, 'Cumulative infections (%)', infection_cumul_data, sero_data,
+    model_plot(cumulmodel_ax, None, 'Cumulative (%)', infection_cumul_data, sero_data,
                (smooth_infections.cumsum() / population) * 100,
                (output_draws.cumsum() / population) * 100, start_date, end_date, True)
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
@@ -244,7 +244,7 @@ def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_in
     ax.spines['bottom'].set_visible(False)
 
 
-def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_draws, start_date, end_date, include_xticks=False):
+def model_plot(ax, title, ylabel, measure_data, sero_data, smooth_infections, output_draws, start_date, end_date, include_xticks=False):
     if sero_data is not None:
         ax.scatter(sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1)].index,
                    sero_data.loc[(sero_data['manual_outlier'] == 0) & (sero_data['geo_accordance'] == 1), 'seroprev_mean'] * 100, s=100,
@@ -267,9 +267,9 @@ def model_plot(ax, title, measure_data, sero_data, smooth_infections, output_dra
                     color='black', alpha=0.2)
     for m, md in measure_data.items():
         ax.plot(md, color=MEASURE_COLORS[m]['dark'], linestyle='--', alpha=0.6)
-    # if title:
-    #     ax.set_title(title)
-    ax.set_ylabel(title)
+    if title:
+        ax.set_title(title, loc='left', fontsize=16)
+    ax.set_ylabel(ylabel)
     ax.set_xlim(start_date, end_date)
     if include_xticks:
         # ax.tick_params('x', labelrotation=60)
