@@ -56,9 +56,9 @@ def model_measure(measure: str, measure_type: str,
         spline_options.update({'prior_spline_monotonicity':'increasing',})
         prior_spline_maxder_gaussian = np.array([[0, 1.]] * (n_knots + split_l_interval + split_r_interval - 1))
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
-    else:
-        spline_options = {'spline_l_linear':False,
-                          'spline_r_linear':True,}
+    # else:
+    #     spline_options = {'spline_l_linear':False,
+    #                       'spline_r_linear':True,}
 
     if not log:
         spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),})
@@ -133,7 +133,7 @@ def model_infections(inputs: pd.DataFrame,
     if log:
         inputs += LOG_OFFSET
         prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
-        #prior_spline_maxder_gaussian[-1] = [0, 1e-3]
+        prior_spline_maxder_gaussian[-1] = [0, 1e-2]
         spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
         # spline_options.update({'spline_l_linear':True,
         #                        'spline_r_linear':True,})
