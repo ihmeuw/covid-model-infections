@@ -84,22 +84,24 @@ def plotter(plot_dir, location_id, location_name,
             ratio_data = pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio'].dropna()
             ratio_data_fe = pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio_fe'].dropna()
             ratio_plot_range = pd.concat([ratio_data, ratio_data_fe, ratio_model_inputs[measure]['ratio']])
+            ratio_plot_range = ratio_plot_range.replace((-np.inf, np.inf), np.nan).dropna()
             ratio_plot_range_min = ratio_plot_range.min()
             ratio_plot_range_max = ratio_plot_range.max()
-            ratio_plot_lims = (max(0, ratio_plot_range_min - ratio_plot_range_max * 0.1),
-                               ratio_plot_range_max + ratio_plot_range_max * 0.1)
-            if ratio_names[measure] == 'IFR':
-                adj_ratio[adj_ratio < ratio_plot_lims[0]] = np.nan
-                adj_ratio[adj_ratio > ratio_plot_lims[1]] = np.nan
-            elif ratio_names[measure] == 'IHR':
-                adj_ratio[adj_ratio < ratio_plot_lims[0]] = np.nan
-                adj_ratio[adj_ratio > ratio_plot_lims[1]] = np.nan
-            elif ratio_names[measure] == 'IDR':
-                adj_ratio[adj_ratio < 0] = np.nan
-                adj_ratio[adj_ratio > 1] = np.nan
-            else:
-                raise ValueError('Unexpected ratio present in plotting.')
+            ratio_plot_lims = (max(0, ratio_plot_range_min - ratio_plot_range_max * 0.2),
+                               min(1, ratio_plot_range_max + ratio_plot_range_max * 0.2))
+            # if ratio_names[measure] == 'IFR':
+            #     adj_ratio[adj_ratio < ratio_plot_lims[0]] = np.nan
+            #     adj_ratio[adj_ratio > ratio_plot_lims[1]] = np.nan
+            # elif ratio_names[measure] == 'IHR':
+            #     adj_ratio[adj_ratio < ratio_plot_lims[0]] = np.nan
+            #     adj_ratio[adj_ratio > ratio_plot_lims[1]] = np.nan
+            # elif ratio_names[measure] == 'IDR':
+            #     adj_ratio[adj_ratio < 0] = np.nan
+            #     adj_ratio[adj_ratio > 1] = np.nan
+            # else:
+            #     raise ValueError('Unexpected ratio present in plotting.')
             ratio_plot(ratio_ax,
+                       ratio_plot_lims,
                        ratio_names[measure],
                        ratio_data,
                        ratio_data_fe,
@@ -129,8 +131,15 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
     whitespace_bottom.axis('off')
     
+    if len(input_data.keys()) == len(measures):
+        v1 = 0.64
+        v2 = 0.33
+    else:
+        v1 = 0.63
+        v2 = 0.34
+    
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=.64, left=0., right=.615, top=.955)
+    outergs.update(bottom=v1, left=0., right=.615, top=.955)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(1.5)
@@ -141,7 +150,7 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=.34, left=0., right=.615, top=.64)
+    outergs.update(bottom=v2, left=0., right=.615, top=v1)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(1.5)
@@ -152,7 +161,7 @@ def plotter(plot_dir, location_id, location_name,
     outerax.set_facecolor('none')
     
     outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=0., left=0., right=.615, top=.34)
+    outergs.update(bottom=0., left=0., right=.615, top=v2)
     outerax = fig.add_subplot(outergs[0])
     for axis in ['top','bottom','left','right']:
         outerax.spines[axis].set_linewidth(1.5)
@@ -205,7 +214,7 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
     ax.spines['bottom'].set_visible(False)
 
 
-def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data, clight, cdark, start_date, end_date, include_xticks=True):
+def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data, clight, cdark, start_date, end_date, include_xticks=True):
     ax.plot(ratio_data, color=cdark, alpha=0.8)
     ax.plot(ratio_data_fe, linestyle='--', color=cdark, alpha=0.8)
     ax.plot(adj_ratio, color=clight, alpha=0.8)
@@ -218,6 +227,7 @@ def ratio_plot(ax, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_dat
                color=cdark, alpha=0.8, marker='x')
     
     ax.set_ylabel(ylabel)
+    ax.set_ylim(*ylims)
     ax.set_xlim(start_date, end_date)
     
         
