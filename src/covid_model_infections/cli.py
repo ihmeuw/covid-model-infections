@@ -31,7 +31,7 @@ warnings.simplefilter('ignore')
               help=('Which version of the infection-detection-rate (IDR) data to use.'))
 @click.option('-o', '--output-root',
               type=click.Path(file_okay=False),
-              #default=paths.INFECTIONS_OUTPUT_ROOT,
+              default=paths.PAST_INFECTIONS_ROOT,
               show_default=True)
 @click.option('--n-holdout-days',
               type=click.INT,
