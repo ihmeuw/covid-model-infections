@@ -132,55 +132,36 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_bottom.axis('off')
     
     if len(input_data.keys()) == len(measures):
-        v1 = 0.64
-        v2 = 0.33
+        vert1 = 0.64
+        vert2 = 0.33
     else:
-        v1 = 0.63
-        v2 = 0.34
+        vert1 = 0.63
+        vert2 = 0.34
+    horiz = 0.615
+    top = 0.955
+    left = 0.
+    right = 1.
+    bottom = 0.
+    linewidth = 2.
     
-    outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=v1, left=0., right=.615, top=.955)
-    outerax = fig.add_subplot(outergs[0])
-    for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(1.5)
-    outerax.tick_params(axis='both',which='both',
-                        bottom=0, left=0,
-                        labelbottom=0, labelleft=0)
-    outerax.grid(False)
-    outerax.set_facecolor('none')
+    boxes = [
+        (vert1, left, horiz, top),   # left, top (cases)
+        (vert2, left, horiz, vert1),  # left, middle (hosp)
+        (bottom, left, horiz, vert2),  # left, bottom (deaths)
+        (bottom, horiz, right, top),  # right (infections)
+    ]
     
-    outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=v2, left=0., right=.615, top=v1)
-    outerax = fig.add_subplot(outergs[0])
-    for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(1.5)
-    outerax.tick_params(axis='both',which='both',
-                        bottom=0, left=0,
-                        labelbottom=0, labelleft=0)
-    outerax.grid(False)
-    outerax.set_facecolor('none')
-    
-    outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=0., left=0., right=.615, top=v2)
-    outerax = fig.add_subplot(outergs[0])
-    for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(1.5)
-    outerax.tick_params(axis='both',which='both',
-                        bottom=0, left=0,
-                        labelbottom=0, labelleft=0)
-    outerax.grid(False)
-    outerax.set_facecolor('none')
-    
-    outergs = gridspec.GridSpec(1, 1)
-    outergs.update(bottom=0., left=.615, right=1., top=.955)
-    outerax = fig.add_subplot(outergs[0])
-    for axis in ['top','bottom','left','right']:
-        outerax.spines[axis].set_linewidth(1.5)
-    outerax.tick_params(axis='both',which='both',
-                        bottom=0, left=0,
-                        labelbottom=0, labelleft=0)
-    outerax.grid(False)
-    outerax.set_facecolor('none')
+    for _bottom, _left, _right, _top in boxes:
+        outergs = gridspec.GridSpec(1, 1)
+        outergs.update(bottom=_bottom, left=_left, right=_right, top=_top)
+        outerax = fig.add_subplot(outergs[0])
+        for axis in ['top','bottom','left','right']:
+            outerax.spines[axis].set_linewidth(linewidth)
+        outerax.tick_params(axis='both',which='both',
+                            bottom=0, left=0,
+                            labelbottom=0, labelleft=0)
+        outerax.grid(False)
+        outerax.set_facecolor('none')
     
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     if plot_dir is not None:
@@ -188,7 +169,6 @@ def plotter(plot_dir, location_id, location_name,
         plt.close(fig)
     else:
         plt.show()
-    
 
 
 def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_date, end_date, include_xticks=False):
