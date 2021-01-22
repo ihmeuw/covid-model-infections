@@ -178,7 +178,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
     
     logger.info('Identifying failed models.')
-    failed_model_location_ids = set(modeled_location_ids) - set(completed_modeled_location_ids)
+    failed_model_location_ids = list(set(modeled_location_ids) - set(completed_modeled_location_ids))
     app_metadata.update({'failed_model_location_ids': failed_model_location_ids})
     if failed_model_location_ids:
         logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
