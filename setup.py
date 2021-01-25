@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     install_requirements = [
         'click',
-        'covid_shared>=1.0.53',
+        'covid_shared>=1.0.54',
         'dill',
         'loguru',
         'matplotlib',

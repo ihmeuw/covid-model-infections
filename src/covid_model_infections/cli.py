@@ -59,14 +59,14 @@ def run_infections(run_metadata,
     model_inputs_root = cli_tools.get_last_stage_directory(model_inputs_version,
                                                            last_stage_root=paths.MODEL_INPUTS_ROOT)
     infection_fatality_root = Path(infection_fatality_version)
-    # infection_fatality_root = cli_tools.get_last_stage_directory(infection_fatality_version,
-    #                                                              last_stage_root=paths.INFECTION_FATALITY_ROOT)
+    infection_fatality_root = cli_tools.get_last_stage_directory(infection_fatality_version,
+                                                                 last_stage_root=paths.INFECTION_FATALITY_RATIO_ROOT)
     infection_hospitalization_root = Path(infection_hospitalization_version)
-    # infection_hospitalization_root = cli_tools.get_last_stage_directory(infection_hospitalization_version,
-    #                                                                     last_stage_root=paths.INECTION_HOSPITALIZATION_ROOT)
+    infection_hospitalization_root = cli_tools.get_last_stage_directory(infection_hospitalization_version,
+                                                                        last_stage_root=paths.INFECTION_HOSPITALIZATION_RATIO_ROOT)
     infection_detection_root = Path(infection_detection_version)
-    # infection_detection_root = cli_tools.get_last_stage_directory(infection_detection_version,
-    #                                                               last_stage_root=paths.INECTION_DETECTION_ROOT)
+    infection_detection_root = cli_tools.get_last_stage_directory(infection_detection_version,
+                                                                  last_stage_root=paths.INFECTION_DETECTION_RATE_ROOT)
     run_metadata.update_from_path('model_inputs_metadata', model_inputs_root / paths.METADATA_FILE_NAME)
 
     output_root = Path(output_root).resolve()
