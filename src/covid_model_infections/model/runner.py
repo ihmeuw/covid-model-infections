@@ -14,7 +14,6 @@ from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import OMP_NUM_THREADS, IDR_UPPER_LIMIT
-from covid_model_infections.cluster import F_THREAD
 
 LOG_OFFSET = 1
 FLOOR = 1e-4
