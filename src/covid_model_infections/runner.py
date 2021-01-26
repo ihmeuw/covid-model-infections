@@ -14,6 +14,8 @@ from covid_model_infections import data, cluster, model
 from covid_model_infections.utils import TIMELINE, IDR_UPPER_LIMIT  # , IDR_LIMITS
 from covid_model_infections.pdf_merger import pdf_merger
 
+MP_THREADS = 25
+
 ## TODO:
 ##     - holdouts
 ##     - modularize data object creation
@@ -173,9 +175,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
         infections_draws.append(pd.read_hdf(draws_path))
     infections_draws = pd.concat(infections_draws)
     completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
-    # draw_path = output_root / 'infections_draws.h5'
-    # infections_draws.to_hdf(draw_path, key='data', mode='w')
-    infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
     
     logger.info('Identifying failed models.')
     failed_model_location_ids = list(set(modeled_location_ids) - set(completed_modeled_location_ids))
@@ -201,16 +200,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Writing SEIR inputs - infections draw files.')
     infections_draws_cols = infections_draws.columns
-    infections_draws = pd.concat([infections_draws, infections_mean, deaths], axis=1)
-    infections_mean = infections_draws['infections_mean'].copy()
+    infections_draws = pd.concat([infections_draws, deaths], axis=1)
     deaths = infections_draws['deaths'].copy()
     infections_draws = [infections_draws[infections_draws_col].copy() for infections_draws_col in infections_draws_cols]
-    infections_draws = [pd.concat([infections_draw, infections_mean, deaths], axis=1) for infections_draw in infections_draws]
+    infections_draws = [pd.concat([infections_draw, deaths], axis=1) for infections_draw in infections_draws]
     _inf_writer = functools.partial(
         data.write_infections_draws,
         infections_draws_dir=infections_draws_dir,
     )
-    with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
+    with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
     
     for measure, estimated_ratio in estimated_ratios.items():
@@ -219,19 +217,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
         for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.h5')]:
             ratio_draws.append(pd.read_hdf(draws_path))
         ratio_draws = pd.concat(ratio_draws)
-        # draw_path = output_root / f'{estimated_ratio}_draws.h5'
-        # ratio_draws.to_hdf(draw_path, key='data', mode='w')
-        ratio_mean = ratio_draws.mean(axis=1).rename(f'{estimated_ratio}_mean')
 
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
         ratio_draws_cols = ratio_draws.columns
-        ratio_draws = pd.concat([ratio_draws, ratio_mean], axis=1)
         if estimated_ratio == 'ifr':
             ratio_draws = ratio_draws.join(ifr_risk_data, on='location_id')
             ifr_risk_data = ratio_draws[['lr_adj', 'hr_adj']].copy()
-        ratio_mean = ratio_draws[f'{estimated_ratio}_mean'].copy()
         ratio_draws = [ratio_draws[ratio_draws_col].copy() for ratio_draws_col in ratio_draws_cols]
-        ratio_draws = [pd.concat([ratio_draw, ratio_mean], axis=1) for ratio_draw in ratio_draws]
         if estimated_ratio == 'ifr':
             ratio_draws = [pd.concat([ratio_draw, ifr_risk_data], axis=1) for ratio_draw in ratio_draws]
         ratio_draws_dir = output_root / f'{estimated_ratio}_draws'
@@ -242,7 +234,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
             duration=TIMELINE[measure],
             ratio_draws_dir=ratio_draws_dir,
         )
-        with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
+        with multiprocessing.Pool(MP_THREADS) as p:
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
             
     logger.info('Writing serology data for grid plots.')
