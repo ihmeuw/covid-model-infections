@@ -68,7 +68,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     idr_model_data = data.load_idr_data(infection_detection_root)
     # TODO: centralize this information, is used elsewhere...
     estimated_ratios = {'deaths':('ifr', ifr_data.copy()),
-                        'hospitalizations':('ihr', ifr_data.copy()),
+                        'hospitalizations':('ihr', ihr_data.copy()),
                         'cases':('idr', idr_data.copy()),}
 
     logger.info('Loading extra data for plotting.')
