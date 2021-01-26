@@ -67,7 +67,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
     idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))
     idr_model_data = data.load_idr_data(infection_detection_root)
     # TODO: centralize this information, is used elsewhere...
-    estimated_ratios = {'deaths':'ifr', 'hospitalizations':'ihr', 'cases':'idr'}
+    estimated_ratios = {'deaths':('ifr', ifr_data.copy()),
+                        'hospitalizations':('ihr', ifr_data.copy()),
+                        'cases':('idr', idr_data.copy()),}
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)
@@ -201,6 +203,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Writing SEIR inputs - infections draw files.')
     infections_draws_cols = infections_draws.columns
     infections_draws = pd.concat([infections_draws, deaths], axis=1)
+    infections_draws = infections_draws.sort_index()
     deaths = infections_draws['deaths'].copy()
     infections_draws = [infections_draws[infections_draws_col].copy() for infections_draws_col in infections_draws_cols]
     infections_draws = [pd.concat([infections_draw, deaths], axis=1) for infections_draw in infections_draws]
@@ -211,18 +214,32 @@ def make_infections(app_metadata: cli_tools.Metadata,
     with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
     
-    for measure, estimated_ratio in estimated_ratios.items():
+    for measure, (estimated_ratio, ratio_prior_data) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
         for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.h5')]:
             ratio_draws.append(pd.read_hdf(draws_path))
         ratio_draws = pd.concat(ratio_draws)
+        
+        logger.info(f'Filling {estimated_ratio.upper()} with original model estimate where we do not have a posterior.')
+        ratio_draws_cols = ratio_draws.columns
+        ratio_prior_data = ratio_prior_data.reset_index()
+        is_missing = ~ratio_prior_data['location_id'].isin(ratio_draws.reset_index()['location_id'].unique())
+        is_model_loc = ratio_prior_data['location_id'].isin(completed_modeled_location_ids)
+        ratio_prior_data = ratio_prior_data.loc[is_missing & is_model_loc]
+        ratio_prior_data = (ratio_prior_data
+                            .set_index(['location_id', 'date'])
+                            .loc[:, 'ratio'])
+        ratio_draws = ratio_draws.join(ratio_prior_data, how='outer')
+        ratio_draws[ratio_draws_cols] = (ratio_draws[ratio_draws_cols]
+                                         .apply(lambda x: x.fillna(ratio_draws['ratio'])))
+        del ratio_draws['ratio']
 
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
-        ratio_draws_cols = ratio_draws.columns
         if estimated_ratio == 'ifr':
             ratio_draws = ratio_draws.join(ifr_risk_data, on='location_id')
             ifr_risk_data = ratio_draws[['lr_adj', 'hr_adj']].copy()
+        ratio_draws = ratio_draws.sort_index()
         ratio_draws = [ratio_draws[[ratio_draws_col]].copy() for ratio_draws_col in ratio_draws_cols]
         if estimated_ratio == 'ifr':
             ratio_draws = [pd.concat([ratio_draw, ifr_risk_data], axis=1) for ratio_draw in ratio_draws]
