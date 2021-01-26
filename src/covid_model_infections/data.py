@@ -255,15 +255,11 @@ def load_population(model_inputs_root: Path) -> pd.Series:
 
 
 def write_infections_draws(data: pd.DataFrame,
-                           infections_draws_dir: Path,
-                           inf_to_death: int,):
+                           infections_draws_dir: Path,):
     draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
     draw = int(draw_col.split('_')[-1])
     data = data.rename(columns={draw_col:'infections_draw'})
     data['draw'] = draw
-    #data['observed_infections'] = data['infections_mean'].notnull().astype(int)
-    #data['observed_deaths'] = data['deaths'].notnull().astype(int)
-    data['duration'] = inf_to_death
     
     out_path = infections_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)
@@ -272,15 +268,19 @@ def write_infections_draws(data: pd.DataFrame,
 
 
 def write_ratio_draws(data: pd.DataFrame,
-                      ratio_draws_dir: Path,):
+                      estimated_ratio: str,
+                      ratio_draws_dir: Path,
+                      duration: int,):
     draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
     draw = int(draw_col.split('_')[-1])
-    data = data.rename(columns={draw_col:'ifr_draw'})
-    data['ifr_lr_draw'] = data['ifr_draw'] * data['lr_adj']
-    data['ifr_hr_draw'] = data['ifr_draw'] * data['hr_adj']
+    data = data.rename(columns={draw_col:f'{estimated_ratio}_draw'})
+    if estimated_ratio == 'ifr':
+        data['ifr_lr_draw'] = data['ifr_draw'] * data['lr_adj']
+        data['ifr_hr_draw'] = data['ifr_draw'] * data['hr_adj']
+        del data['lr_adj']
+        del data['hr_adj']
     data['draw'] = draw
-    del data['lr_adj']
-    del data['hr_adj']
+    data['duration'] = duration
 
     out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)

@@ -36,12 +36,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     model_out_dir = output_root / 'model_outputs'
     plot_dir = output_root / 'plots'
     infections_draws_dir = output_root / 'infections_draws'
-    ratio_draws_dir = output_root / 'ratio_draws'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
     shell_tools.mkdir(plot_dir)
     shell_tools.mkdir(infections_draws_dir)
-    shell_tools.mkdir(ratio_draws_dir)
     
     logger.info('Loading supplemental data.')
     hierarchy = data.load_hierarchy(model_inputs_root)
@@ -57,15 +55,17 @@ def make_infections(app_metadata: cli_tools.Metadata,
         'cases':cases_manipulation_metadata,
     }})
     
-    logger.info('Loading estimated ratios.')
+    logger.info('Loading estimated ratios and adding draw directories.')
     ifr_data = data.load_ifr(infection_fatality_root)
     ifr_model_data = data.load_ifr_data(infection_fatality_root)
     ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
     # Assumes IDR has estimated floor already applied
-    idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))  # , IDR_LIMITS
+    idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))
     idr_model_data = data.load_idr_data(infection_detection_root)
+    # TODO: centralize this information, is used elsewhere...
+    estimated_ratios = {'deaths':'ifr', 'hospitalizations':'ihr', 'cases':'idr'}
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)
@@ -183,15 +183,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     if failed_model_location_ids:
         logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
     
-    logger.info('Compiling IFR draws.')
-    ifr_draws = []
-    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_ifr_draws.h5')]:
-        ifr_draws.append(pd.read_hdf(draws_path))
-    ifr_draws = pd.concat(ifr_draws)
-    draw_path = output_root / 'ifr_draws.h5'
-    ifr_draws.to_hdf(draw_path, key='data', mode='w')
-    ifr_mean = ifr_draws.mean(axis=1).rename('ifr_mean')
-    
     logger.info('Compiling other model outputs.')
     outputs = {}
     for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]:
@@ -218,24 +209,41 @@ def make_infections(app_metadata: cli_tools.Metadata,
     _inf_writer = functools.partial(
         data.write_infections_draws,
         infections_draws_dir=infections_draws_dir,
-        inf_to_death=TIMELINE['deaths'],
     )
     with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
     
-    logger.info('Writing SEIR inputs - IFR.')
-    ifr_draws_cols = ifr_draws.columns
-    ifr_draws = pd.concat([ifr_draws, ifr_mean], axis=1).join(ifr_risk_data, on='location_id')
-    ifr_mean = ifr_draws['ifr_mean'].copy()
-    ifr_risk_data = ifr_draws[['lr_adj', 'hr_adj']].copy()
-    ifr_draws = [ifr_draws[ifr_draws_col].copy() for ifr_draws_col in ifr_draws_cols]
-    ifr_draws = [pd.concat([ifr_draw, ifr_mean, ifr_risk_data], axis=1) for ifr_draw in ifr_draws]
-    _ifr_writer = functools.partial(
-        data.write_ratio_draws,
-        ratio_draws_dir=ratio_draws_dir,
-    )
-    with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
-        ratio_draws_paths = list(tqdm(p.imap(_ifr_writer, ifr_draws), total=n_draws, file=sys.stdout))
+    for measure, estimated_ratio in estimated_ratios.items():
+        logger.info(f'Compiling {estimated_ratio.upper()} draws.')
+        ratio_draws = []
+        for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.h5')]:
+            ratio_draws.append(pd.read_hdf(draws_path))
+        ratio_draws = pd.concat(ratio_draws)
+        draw_path = output_root / f'{estimated_ratio}_draws.h5'
+        ratio_draws.to_hdf(draw_path, key='data', mode='w')
+        ratio_mean = ratio_draws.mean(axis=1).rename(f'{estimated_ratio}_mean')
+
+        logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
+        ratio_draws_cols = ratio_draws.columns
+        ratio_draws = pd.concat([ratio_draws, ratio_mean], axis=1)
+        if estimated_ratio == 'ifr':
+            ratio_draws = ratio_draws.join(ifr_risk_data, on='location_id')
+            ifr_risk_data = ratio_draws[['lr_adj', 'hr_adj']].copy()
+        ratio_mean = ratio_draws[f'{estimated_ratio}_mean'].copy()
+        ratio_draws = [ratio_draws[ratio_draws_col].copy() for ratio_draws_col in ratio_draws_cols]
+        ratio_draws = [pd.concat([ratio_draw, ratio_mean], axis=1) for ratio_draw in ratio_draws]
+        if estimated_ratio == 'ifr':
+            ratio_draws = [pd.concat([ratio_draw, ifr_risk_data], axis=1) for ratio_draw in ratio_draws]
+        ratio_draws_dir = output_root / f'{estimated_ratio}_draws'
+        shell_tools.mkdir(ratio_draws_dir)
+        _ratio_writer = functools.partial(
+            data.write_ratio_draws,
+            estimated_ratio=estimated_ratio,
+            duration=TIMELINE[measure],
+            ratio_draws_dir=ratio_draws_dir,
+        )
+        with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
+            ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
         
     logger.info(f'Model run complete -- {str(output_root)}.')
     
