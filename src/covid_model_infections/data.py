@@ -48,15 +48,7 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_dc].reset_index(drop=True)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
     elif input_measure == 'deaths':
-        is_india_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(','))
-        india_location_ids = hierarchy.loc[is_india_hierarchy, 'location_id'].to_list()
-        is_india_data = data['location_id'].isin(india_location_ids)
-        data.loc[is_india_data, f'cumulative_{input_measure}'] *= 1.98
-        manipulation_metadata['india'] = 'scale deaths up by a factor of 1.98'
-        
-        is_russia = data['location_id'] == 62
-        data.loc[is_russia, f'cumulative_{input_measure}'] *= 3.38
-        manipulation_metadata['russia'] = 'scale deaths up by a factor of 3.38'
+        pass
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
     
@@ -64,11 +56,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v19_predbyranef_covidlocs.csv'
+    data_path = infection_fatality_root / 'allage_ifr_by_loctime.csv'
     data = pd.read_csv(data_path)
-    data['date'] = pd.to_datetime(data['datevar'])
-    data = data.rename(columns={'allage_ifr':'ratio',
-                                'allage_ifr_nore':'ratio_fe'})
+    data['date'] = pd.to_datetime(data['date'])
+    data = data.rename(columns={'ifr':'ratio',
+                                'ifr_no_random_effect':'ratio_fe'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -78,7 +70,7 @@ def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
 
 
 def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
-    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v19_predbyranef_covidlocs_agegtlt65.csv'
+    data_path = infection_fatality_root / 'terminal_ifr.csv'
     data = pd.read_csv(data_path)
     data['lr_adj'] = data['ifr_lr'] / data['ifr']
     data['hr_adj'] = data['ifr_hr'] / data['ifr']
@@ -90,12 +82,11 @@ def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
 
 
 def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ifr_v19.csv'
+    data_path = infection_fatality_root / 'ifr_model_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ifr'].notnull()]
-    data = data.rename(columns={'ifr':'ratio',
-                                'is_outlier_ifr':'is_outlier'})
+    data = data.rename(columns={'ifr':'ratio'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -105,11 +96,11 @@ def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
     
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / '20210118_v57_allage_ihr_by_loctime_v19.csv'
+    data_path = infection_hospitalization_root / 'allage_ihr_by_loctime.csv'
     data = pd.read_csv(data_path)
-    data['date'] = pd.to_datetime(data['datevar'])
-    data = data.rename(columns={'allage_hir':'ratio',
-                                'allage_hir_nore':'ratio_fe'})
+    data['date'] = pd.to_datetime(data['date'])
+    data = data.rename(columns={'ihr':'ratio',
+                                'ihr_no_random_effect':'ratio_fe'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -119,12 +110,11 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
 
 
 def load_ihr_data(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ihr_v19.csv'
+    data_path = infection_hospitalization_root / 'ihr_model_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ihr'].notnull()]
-    data = data.rename(columns={'ihr':'ratio',
-                                'is_outlier_ihr':'is_outlier'})
+    data = data.rename(columns={'ihr':'ratio'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()

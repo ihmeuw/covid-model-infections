@@ -173,8 +173,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
         infections_draws.append(pd.read_hdf(draws_path))
     infections_draws = pd.concat(infections_draws)
     completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
-    draw_path = output_root / 'infections_draws.h5'
-    infections_draws.to_hdf(draw_path, key='data', mode='w')
+    # draw_path = output_root / 'infections_draws.h5'
+    # infections_draws.to_hdf(draw_path, key='data', mode='w')
     infections_mean = infections_draws.mean(axis=1).rename('infections_mean')
     
     logger.info('Identifying failed models.')
@@ -219,8 +219,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
         for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.h5')]:
             ratio_draws.append(pd.read_hdf(draws_path))
         ratio_draws = pd.concat(ratio_draws)
-        draw_path = output_root / f'{estimated_ratio}_draws.h5'
-        ratio_draws.to_hdf(draw_path, key='data', mode='w')
+        # draw_path = output_root / f'{estimated_ratio}_draws.h5'
+        # ratio_draws.to_hdf(draw_path, key='data', mode='w')
         ratio_mean = ratio_draws.mean(axis=1).rename(f'{estimated_ratio}_mean')
 
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
@@ -244,6 +244,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
         )
         with multiprocessing.Pool(int(cluster.F_THREAD) - 2) as p:
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
+            
+    logger.info('Writing serology data for grid plots.')
+    sero_data['included'] = 1 - sero_data[['geo_accordance', 'manual_outlier']].max(axis=1)
+    sero_data = sero_data.rename(columns={'seroprev_mean':'value'})
+    sero_data = sero_data.loc[:, ['included', 'value']]
+    sero_path = output_root / 'sero_data.csv'
+    sero_data.reset_index().to_csv(sero_path, index=False)
         
     logger.info(f'Model run complete -- {str(output_root)}.')
     
