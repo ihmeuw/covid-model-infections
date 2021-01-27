@@ -20,6 +20,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_kazakhstan].reset_index(drop=True)
         manipulation_metadata['kazakhstan'] = 'dropped all cases'
     elif input_measure == 'hospitalizations':
+        is_oman = data['location_id'] == 150
+        data = data.loc[~is_oman].reset_index(drop=True)
+        manipulation_metadata['oman'] = 'dropped all hospitalizations'
+        
         is_greece = data['location_id'] == 82
         data = data.loc[~is_greece].reset_index(drop=True)
         manipulation_metadata['greece'] = 'dropped all hospitalizations'
@@ -48,15 +52,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_dc].reset_index(drop=True)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
     elif input_measure == 'deaths':
-        is_india_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(','))
-        india_location_ids = hierarchy.loc[is_india_hierarchy, 'location_id'].to_list()
-        is_india_data = data['location_id'].isin(india_location_ids)
-        data.loc[is_india_data, f'cumulative_{input_measure}'] *= 1.98
-        manipulation_metadata['india'] = 'scale deaths up by a factor of 1.98'
-        
-        is_russia = data['location_id'] == 62
-        data.loc[is_russia, f'cumulative_{input_measure}'] *= 3.38
-        manipulation_metadata['russia'] = 'scale deaths up by a factor of 3.38'
+        is_sierra_leone = data['location_id'] == 217
+        data = data.loc[~is_sierra_leone].reset_index(drop=True)
+        manipulation_metadata['sierra_leone'] = 'dropped all deaths'
+
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
     
@@ -64,11 +63,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
 
 
 def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v19_predbyranef_covidlocs.csv'
+    data_path = infection_fatality_root / 'allage_ifr_by_loctime.csv'
     data = pd.read_csv(data_path)
-    data['date'] = pd.to_datetime(data['datevar'])
-    data = data.rename(columns={'allage_ifr':'ratio',
-                                'allage_ifr_nore':'ratio_fe'})
+    data['date'] = pd.to_datetime(data['date'])
+    data = data.rename(columns={'ifr':'ratio',
+                                'ifr_no_random_effect':'ratio_fe'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -78,7 +77,7 @@ def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
 
 
 def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
-    data_path = infection_fatality_root / '20210118_v57_allage_ifr_by_loctime_v19_predbyranef_covidlocs_agegtlt65.csv'
+    data_path = infection_fatality_root / 'terminal_ifr.csv'
     data = pd.read_csv(data_path)
     data['lr_adj'] = data['ifr_lr'] / data['ifr']
     data['hr_adj'] = data['ifr_hr'] / data['ifr']
@@ -90,12 +89,11 @@ def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
 
 
 def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ifr_v19.csv'
+    data_path = infection_fatality_root / 'ifr_model_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ifr'].notnull()]
-    data = data.rename(columns={'ifr':'ratio',
-                                'is_outlier_ifr':'is_outlier'})
+    data = data.rename(columns={'ifr':'ratio'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -105,11 +103,11 @@ def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
     
 
 def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / '20210118_v57_allage_ihr_by_loctime_v19.csv'
+    data_path = infection_hospitalization_root / 'allage_ihr_by_loctime.csv'
     data = pd.read_csv(data_path)
-    data['date'] = pd.to_datetime(data['datevar'])
-    data = data.rename(columns={'allage_hir':'ratio',
-                                'allage_hir_nore':'ratio_fe'})
+    data['date'] = pd.to_datetime(data['date'])
+    data = data.rename(columns={'ihr':'ratio',
+                                'ihr_no_random_effect':'ratio_fe'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -119,12 +117,11 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
 
 
 def load_ihr_data(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / 'dev_output_dirs' / '57_rsoren' / 'df_prepped_ihr_v19.csv'
+    data_path = infection_hospitalization_root / 'ihr_model_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.loc[data['ihr'].notnull()]
-    data = data.rename(columns={'ihr':'ratio',
-                                'is_outlier_ihr':'is_outlier'})
+    data = data.rename(columns={'ihr':'ratio'})
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -255,15 +252,11 @@ def load_population(model_inputs_root: Path) -> pd.Series:
 
 
 def write_infections_draws(data: pd.DataFrame,
-                           infections_draws_dir: Path,
-                           inf_to_death: int,):
+                           infections_draws_dir: Path,):
     draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
     draw = int(draw_col.split('_')[-1])
     data = data.rename(columns={draw_col:'infections_draw'})
     data['draw'] = draw
-    #data['observed_infections'] = data['infections_mean'].notnull().astype(int)
-    #data['observed_deaths'] = data['deaths'].notnull().astype(int)
-    data['duration'] = inf_to_death
     
     out_path = infections_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)
@@ -272,15 +265,19 @@ def write_infections_draws(data: pd.DataFrame,
 
 
 def write_ratio_draws(data: pd.DataFrame,
-                      ratio_draws_dir: Path,):
+                      estimated_ratio: str,
+                      ratio_draws_dir: Path,
+                      duration: int,):
     draw_col = np.array([c for c in data.columns if c.startswith('draw_')]).item()
     draw = int(draw_col.split('_')[-1])
-    data = data.rename(columns={draw_col:'ifr_draw'})
-    data['ifr_lr_draw'] = data['ifr_draw'] * data['lr_adj']
-    data['ifr_hr_draw'] = data['ifr_draw'] * data['hr_adj']
+    data = data.rename(columns={draw_col:f'{estimated_ratio}_draw'})
+    if estimated_ratio == 'ifr':
+        data['ifr_lr_draw'] = data['ifr_draw'] * data['lr_adj']
+        data['ifr_hr_draw'] = data['ifr_draw'] * data['hr_adj']
+        del data['lr_adj']
+        del data['hr_adj']
     data['draw'] = draw
-    del data['lr_adj']
-    del data['hr_adj']
+    data['duration'] = duration
 
     out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)

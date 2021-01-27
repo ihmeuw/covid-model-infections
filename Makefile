@@ -16,16 +16,15 @@ install_env:
 	( \
         git clone git@github.com:zhengp0/limetr.git && \
         git clone git@github.com:ihmeuw-msca/MRTool.git && \
-        eval "$($(CONDA_PREFIX)/conda shell.bash hook)" && \
-		conda create -n $(ENV_NAME) -y -c conda-forge cyipopt python=3.7 && \
-		source $(CONDA_PREFIX)/activate $(ENV_NAME) && \
+        source $(CONDA_PREFIX)/etc/profile.d/conda.sh && \
+		conda create -n $(ENV_NAME) -y -c conda-forge python=3.7 cyipopt gmp && \
+		conda activate $(ENV_NAME) && \
 		conda install --yes h5py && \
-		pip install --extra-index-url https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple/ \
-                  numpy scipy pandas matplotlib seaborn pyyaml dill loguru pytest xspline && \
+		pip install --global-option=build_ext --global-option '-I$(CONDA_PREFIX)/envs/$(ENV_NAME)/include/' pycddlib && \
 		cd limetr && make install && cd .. && \
 		cd MRTool && python setup.py install && cd .. && \
 		pip install -e . ; \
-    )
+	)
 
 .PHONY: test
 test:
@@ -33,4 +32,8 @@ test:
 
 
 uninstall_env:
-	conda remove --name $(ENV_NAME) --all
+	( \
+		source $(CONDA_PREFIX)/etc/profile.d/conda.sh && \
+		conda remove --name $(ENV_NAME) --all ; \
+	)
+
