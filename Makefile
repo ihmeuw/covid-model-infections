@@ -20,11 +20,11 @@ install_env:
 		conda create -n $(ENV_NAME) -y -c conda-forge python=3.7 cyipopt gmp && \
 		conda activate $(ENV_NAME) && \
 		conda install --yes h5py && \
-                pip install --global-option=build_ext --global-option '-I$(CONDA_PREFIX)/envs/$(ENV_NAME)/include/' pycddlib && \
+		pip install --global-option=build_ext --global-option '-I$(CONDA_PREFIX)/envs/$(ENV_NAME)/include/' pycddlib && \
 		cd limetr && make install && cd .. && \
 		cd MRTool && python setup.py install && cd .. && \
-                pip install -e . ; \
-    	)
+		pip install -e . ; \
+	)
 
 .PHONY: test
 test:
