@@ -255,6 +255,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
             
     logger.info('Writing serology data for grid plots.')
+    sero_data['geo_accordance'] = 1 - sero_data['geo_accordance']
     sero_data['included'] = 1 - sero_data[['geo_accordance', 'manual_outlier']].max(axis=1)
     sero_data = sero_data.rename(columns={'seroprev_mean':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]

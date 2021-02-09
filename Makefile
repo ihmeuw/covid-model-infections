@@ -36,4 +36,3 @@ uninstall_env:
 		source $(CONDA_PREFIX)/etc/profile.d/conda.sh && \
 		conda remove --name $(ENV_NAME) --all ; \
 	)
-
