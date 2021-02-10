@@ -353,8 +353,8 @@ def get_infected(location_id: int,
     ratio_measure_map = {
         'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
     }
+    output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     for measure in input_data.keys():
-        output_draws_list = [output_draws[c] for c in output_draws.columns]
         ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].copy(),
                                      smooth_data=output_data[measure]['daily'].copy(),
                                      infections=output_draw.copy(),
