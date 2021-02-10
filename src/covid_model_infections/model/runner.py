@@ -357,7 +357,7 @@ def get_infected(location_id: int,
         output_draws_list = [output_draws[c] for c in output_draws.columns]
         ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].copy(),
                                      smooth_data=output_data[measure]['daily'].copy(),
-                                     infections=output_draw,
+                                     infections=output_draw.copy(),
                                      lag=input_data[measure]['lag'],) for output_draw in output_draws_list]
         ratio_draws = pd.concat(ratio_draws, axis=1)
         ratio_draws['location_id'] = location_id
