@@ -238,8 +238,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
         if estimated_ratio == 'ifr':
             ratio_draws = ratio_draws.join(ifr_risk_data, on='location_id')
+            ratio_draws = ratio_draws.sort_index()
             ifr_risk_data = ratio_draws[['lr_adj', 'hr_adj']].copy()
-        ratio_draws = ratio_draws.sort_index()
+        else:
+            ratio_draws = ratio_draws.sort_index()
         ratio_draws = [ratio_draws[[ratio_draws_col]].copy() for ratio_draws_col in ratio_draws_cols]
         if estimated_ratio == 'ifr':
             ratio_draws = [pd.concat([ratio_draw, ifr_risk_data], axis=1) for ratio_draw in ratio_draws]
