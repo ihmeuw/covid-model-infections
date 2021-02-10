@@ -237,7 +237,9 @@ def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.
     
     if fh_subnationals:
         # add level for WA
-        for location_id, parent_id in [(3543, 60886), (3563, 60887), (3530, 60887)]:
+        for location_id, parent_id, parent_name in [(3543, 60886, 'King and Snohomish Counties'),
+                                                    (3563, 60887, 'Washington except for King, Snohomish, and Spokane Counties'),
+                                                    (3530, 60887, 'Washington except for King, Snohomish, and Spokane Counties'),]:
             is_location = data['location_id'] == location_id
             if data.loc[is_location, 'parent_id'].item() == parent_id:
                 pass
@@ -253,6 +255,12 @@ def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.
                 path_to_top_parent.insert(-1, str(parent_id))
                 path_to_top_parent = ','.join(path_to_top_parent)
                 data.loc[is_location, 'path_to_top_parent'] = path_to_top_parent
+                # make row for this location
+                if parent_id not in data['location_id'].to_list():
+                    data = data.append(pd.DataFrame({'location_id':parent_id,
+                                                     'location_name':parent_name},
+                                                    index=[0]))
+                    data = data.reset_index(drop=True)
     
     return data
 
