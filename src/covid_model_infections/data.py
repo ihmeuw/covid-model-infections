@@ -1,5 +1,6 @@
 from typing import List, Tuple, Dict
 from pathlib import Path
+from loguru import logger
 
 import pandas as pd
 import numpy as np
@@ -233,6 +234,25 @@ def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.
         data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
+    
+    if fh_subnationals:
+        # add level for WA
+        for location_id, parent_id in [(3543, 60886), (3563, 60887), (3530, 60887)]:
+            is_location = data['location_id'] == location_id
+            if data.loc[is_location, 'parent_id'].item() == parent_id:
+                pass
+            else:
+                logger.info(f'Adding level to path_to_top_parent for {location_id} -- new parent is {parent_id}')
+                # parent_id
+                data.loc[is_location, 'parent_id'] = parent_id
+                # level
+                data.loc[is_location, 'level'] += 1
+                # path_to_top_parent
+                path_to_top_parent = data.loc[is_location, 'path_to_top_parent'].item()
+                path_to_top_parent = path_to_top_parent.split(',')
+                path_to_top_parent.insert(-1, str(parent_id))
+                path_to_top_parent = ','.join(path_to_top_parent)
+                data.loc[is_location, 'path_to_top_parent'] = path_to_top_parent
     
     return data
 
