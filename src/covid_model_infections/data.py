@@ -182,18 +182,17 @@ def load_testing_data(infection_detection_root: Path):
     return data
 
 
-def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str) -> Tuple[pd.Series, pd.Series, Dict]:
-    #data_path = model_inputs_root / 'output_measures' / input_measure / 'cumulative.csv'
-    data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
+                      input_measure: str, fh_subnationals: bool = False) -> Tuple[pd.Series, pd.Series, Dict]:
+    if fh_subnationals:
+        data_path = model_inputs_root / 'full_data_fh_subnationals.csv'
+    else:
+        data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Deaths':'cumulative_deaths',
                                 'Confirmed':'cumulative_cases',
                                 'Hospitalizations':'cumulative_hospitalizations',})
     data['date'] = pd.to_datetime(data['Date'])
-    #is_all_ages = data['age_group_id'] == 22
-    #is_both_sexes = data['sex_id'] == 3
-    #data = data.loc[is_all_ages & is_both_sexes]
-    #data = data.rename(columns={'value': f'cumulative_{input_measure}'})
     keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
     data = data.loc[:, keep_cols].dropna()
     data['location_id'] = data['location_id'].astype(int)
@@ -227,8 +226,11 @@ def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     return data[['location_id', 'date'] + interp_vars]
 
 
-def load_hierarchy(model_inputs_root:Path) -> pd.DataFrame:
-    data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.DataFrame:
+    if fh_subnationals:
+        data_pathdata_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
+    else:
+        data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
     

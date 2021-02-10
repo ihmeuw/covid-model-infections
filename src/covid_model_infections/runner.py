@@ -29,7 +29,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     infection_detection_root: Path,
                     output_root: Path,
                     holdout_days: int,
-                    n_draws: int):
+                    n_draws: int,
+                    fh_subnationals: bool,):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
     
@@ -43,14 +44,23 @@ def make_infections(app_metadata: cli_tools.Metadata,
     shell_tools.mkdir(plot_dir)
     shell_tools.mkdir(infections_draws_dir)
     
+    if fh_subnationals:
+        logger.debug("Using Fred Hutch small-area hierarchy.")
+    
     logger.info('Loading supplemental data.')
-    hierarchy = data.load_hierarchy(model_inputs_root)
+    hierarchy = data.load_hierarchy(model_inputs_root, fh_subnationals)
     pop_data = data.load_population(model_inputs_root)
     
     logger.info('Loading epi report data.')
-    cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'deaths')
-    cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'hospitalizations')
-    cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'cases')
+    cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
+        model_inputs_root, hierarchy, 'deaths', fh_subnationals
+    )
+    cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
+        model_inputs_root, hierarchy, 'hospitalizations', fh_subnationals
+    )
+    cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
+        model_inputs_root, hierarchy, 'cases', fh_subnationals
+    )
     app_metadata.update({'data_manipulation': {
         'deaths':deaths_manipulation_metadata,
         'hospital':hospital_manipulation_metadata,

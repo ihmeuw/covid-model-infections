@@ -41,6 +41,9 @@ warnings.simplefilter('ignore')
               type=click.INT,
               default=1000,
               help='Number of posterior samples.')
+@click.option('--fh-subnationals',
+              is_flag=True,
+              help='Whether to run Fred Hutch small area hierarchy or not.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,
               help='Marks the new outputs as best in addition to marking them as latest.')
@@ -51,7 +54,7 @@ warnings.simplefilter('ignore')
 def run_infections(run_metadata,
                    model_inputs_version,
                    infection_fatality_version, infection_hospitalization_version, infection_detection_version,
-                   output_root, n_holdout_days, n_draws,
+                   output_root, n_holdout_days, n_draws, fh_subnationals,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
     """Run infections model."""
@@ -80,7 +83,7 @@ def run_infections(run_metadata,
                            infection_fatality_root,
                            infection_hospitalization_root,
                            infection_detection_root,
-                           run_directory, n_holdout_days, n_draws)
+                           run_directory, n_holdout_days, n_draws, fh_subnationals)
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
                                  mark_dir_as_best, production_tag)
