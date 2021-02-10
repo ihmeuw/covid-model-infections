@@ -228,7 +228,7 @@ def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
 
 def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.DataFrame:
     if fh_subnationals:
-        data_pathdata_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
+        data_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
     else:
         data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
