@@ -248,7 +248,6 @@ def enforce_idr_ceiling(measure: str,
     infections_scaler = (infections_floor / infections_data)[infections_data.index]
     infections_scaler = (infections_scaler
                          .fillna(method='ffill')
-                         .fillna(method='bfill')
                          .fillna(1)
                          .clip(1, np.inf))
     # infections_scaler.loc[infections_data < 1000] = 1
