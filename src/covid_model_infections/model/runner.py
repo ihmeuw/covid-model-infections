@@ -364,6 +364,9 @@ def get_infected(location_id: int,
     if infection_log:
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
+    if infection_log:
+        output_draws -= LOG_OFFSET
+        output_draws = output_draws.clip(FLOOR, np.inf)
     
     logger.info('Plot data.')
     sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))  # , test_data
