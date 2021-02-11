@@ -233,7 +233,6 @@ def trim_leading_zeros(data: pd.DataFrame, input_measure: str, leading_window: i
     return data
 
 
-
 def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     data = data.set_index('date').sort_index()
     data = data.asfreq('D').reset_index()
