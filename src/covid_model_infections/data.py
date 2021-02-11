@@ -6,7 +6,15 @@ import pandas as pd
 import numpy as np
 
 
-def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str) -> Tuple[pd.DataFrame, Dict]:
+def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
+                input_measure: str, fh_subnationals: bool) -> Tuple[pd.DataFrame, Dict]:
+    if fh_subnationals:
+        fh_col_subnats = [(54740, 'medellin'),
+                          (54155, 'bogota_dc'),
+                          (54158, 'caldas'),
+                          (54177, 'santander'),]
+    else:
+        fh_col_subnats = []
     manipulation_metadata = {}
     if input_measure == 'cases':
         is_peru = data['location_id'] == 123
@@ -20,6 +28,14 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_kazakhstan = data['location_id'] == 36
         data = data.loc[~is_kazakhstan].reset_index(drop=True)
         manipulation_metadata['kazakhstan'] = 'dropped all cases'
+        
+        for location_id, location_label in fh_col_subnats:
+            is_col_subnat = data['location_id'] == location_id
+            last_date = data.loc[is_col_subnat, 'date'].max()
+            last_date_sub_2w = last_date - pd.Timedelta(days=14)
+            is_last_2w = data['date'] > last_date_sub_2w
+            data = data.loc[~(is_col_subnat & is_last_2w)].reset_index(drop=True)
+            manipulation_metadata[location_label] = 'dropped last 14 days of cases'
     elif input_measure == 'hospitalizations':
         is_oman = data['location_id'] == 150
         data = data.loc[~is_oman].reset_index(drop=True)
@@ -53,7 +69,13 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_dc].reset_index(drop=True)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
     elif input_measure == 'deaths':
-        pass
+        for location_id, location_label in fh_col_subnats:
+            is_col_subnat = data['location_id'] == location_id
+            last_date = data.loc[is_col_subnat, 'date'].max()
+            last_date_sub_2w = last_date - pd.Timedelta(days=14)
+            is_last_2w = data['date'] > last_date_sub_2w
+            data = data.loc[~(is_col_subnat & is_last_2w)].reset_index(drop=True)
+            manipulation_metadata[location_label] = 'dropped last 14 days of deaths'
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
     
@@ -197,7 +219,7 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
     data = data.loc[:, keep_cols].dropna()
     data['location_id'] = data['location_id'].astype(int)
     
-    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure)
+    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh_subnationals)
     
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
