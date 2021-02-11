@@ -33,16 +33,19 @@ def model_measure(measure: str, measure_type: str,
     if measure_type not in ['cumul', 'daily']:
         raise ValueError(f'Invalid measure_type (must be `cumul` or `daily`): {measure_type}')
     
-    logger.info('Doing 7-day rolling average to help eliminate day-of-week reporting bias.')
     if measure_type == 'daily':
+        logger.info('Doing 7-day rolling average to help eliminate day-of-week reporting bias.')
+        total = input_data.sum()
         day0_value = max(0, input_data[0])
         input_data = input_data[1:]
-    input_data = (input_data
-                  .clip(0, np.inf)
-                  .rolling(window=7,
-                           min_periods=7,
-                           center=True).mean()
-                  .dropna())
+        input_data = (input_data
+                      .clip(0, np.inf)
+                      .rolling(window=7,
+                               min_periods=7,
+                               center=True).mean()
+                      .dropna())
+    elif measure_type == 'cumul':
+        total = input_data[-1]
     
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log)
     
@@ -93,12 +96,16 @@ def model_measure(measure: str, measure_type: str,
         smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
-    raw_infections = pd.concat([input_data, ratio], axis=1)
-    raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
-    raw_infections.index -= pd.Timedelta(days=lag)
-    smooth_infections = pd.concat([smooth_data, ratio], axis=1)
-    smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
-    smooth_infections.index -= pd.Timedelta(days=lag)
+    if total >= 1:
+        raw_infections = pd.concat([input_data, ratio], axis=1)
+        raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
+        raw_infections.index -= pd.Timedelta(days=lag)
+        smooth_infections = pd.concat([smooth_data, ratio], axis=1)
+        smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
+        smooth_infections.index -= pd.Timedelta(days=lag)
+    else:
+        raw_infections = (input_data * np.nan).rename('infections')
+        smooth_infections = (smooth_data * np.nan).rename('infections')
 
     return {'daily':smooth_data, 'cumul':smooth_data.cumsum(),
             'infections_daily_raw':raw_infections, 'infections_cumul_raw':raw_infections.cumsum(),
@@ -187,7 +194,7 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     smooth_infections = dep_trans_in(smooth_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)    
     residuals = dep_trans_in(raw_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)
     
-    residuals['infections'] = smooth_infections.to_frame().values - residuals.values
+    residuals['infections'] = (smooth_infections.to_frame() - residuals).values
     residuals = mr_spline.reshape_data_long(residuals.reset_index(), 'infections')
     residuals = residuals.dropna().sort_values('date').rename(columns={'infections':'residuals'})
     
@@ -351,7 +358,7 @@ def get_infected(location_id: int,
     
     logger.info('Create and writing ratios.')
     ratio_measure_map = {
-        'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
+        'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr',
     }
     for measure in input_data.keys():
         output_draws_list = [output_draws[c] for c in output_draws.columns]

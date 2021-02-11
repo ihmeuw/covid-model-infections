@@ -54,7 +54,6 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
     elif input_measure == 'deaths':
         pass
-    
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
     
