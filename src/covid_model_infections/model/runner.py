@@ -26,7 +26,9 @@ def model_measure(measure: str, measure_type: str,
                   log: bool, knot_days: int,
                   num_submodels: int,
                   split_l_interval: bool,
-                  split_r_interval: bool,) -> Dict:
+                  split_r_interval: bool,
+                  total_threshold: int = 1,
+                  n_obs_threshold: int = 28,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
@@ -46,6 +48,7 @@ def model_measure(measure: str, measure_type: str,
                       .dropna())
     elif measure_type == 'cumul':
         total = input_data[-1]
+    n_obs = len(input_data)
     
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log)
     
@@ -96,7 +99,8 @@ def model_measure(measure: str, measure_type: str,
         smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
-    if total >= 1:
+    
+    if total >= total_threshold and n_obs >= n_obs_threshold:
         raw_infections = pd.concat([input_data, ratio], axis=1)
         raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
         raw_infections.index -= pd.Timedelta(days=lag)
@@ -104,6 +108,8 @@ def model_measure(measure: str, measure_type: str,
         smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
         smooth_infections.index -= pd.Timedelta(days=lag)
     else:
+        logger.info('Data does not meet requirements for use in infections model '
+                    f'(at least a cumulative total of {total_threshold} reported and {n_obs_threshold} observations)')
         raw_infections = (input_data * np.nan).rename('infections')
         smooth_infections = (smooth_data * np.nan).rename('infections')
 
