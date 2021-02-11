@@ -9,10 +9,12 @@ import numpy as np
 def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
                 input_measure: str, fh_subnationals: bool) -> Tuple[pd.DataFrame, Dict]:
     if fh_subnationals:
-        fh_col_subnats = [(54740, 'medellin'),
-                          (54155, 'bogota_dc'),
-                          (54158, 'caldas'),
-                          (54177, 'santander'),]
+        is_md_hierarchy = hierarchy['most_detailed'] == 1
+        is_col_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '125' in x.split(','))
+        col_hierarchy = hierarchy.loc[is_md_hierarchy & is_col_hierarchy]
+        fh_col_ids = col_hierarchy['location_id'].to_list()
+        fh_col_labels = col_hierarchy['location_ascii_name'].str.replace('[^a-zA-Z ]', '').str.replace(' ', '_').str.lower().to_list()
+        fh_col_subnats = list(zip(fh_col_ids, fh_col_labels))
     else:
         fh_col_subnats = []
     manipulation_metadata = {}
