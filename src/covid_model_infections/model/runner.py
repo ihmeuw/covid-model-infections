@@ -255,7 +255,6 @@ def enforce_idr_ceiling(measure: str,
     infections_scaler = (infections_floor / infections_data)[infections_data.index]
     infections_scaler = (infections_scaler
                          .fillna(method='ffill')
-                         .fillna(method='bfill')
                          .fillna(1)
                          .clip(1, np.inf))
     # infections_scaler.loc[infections_data < 1000] = 1
@@ -312,8 +311,8 @@ def get_infected(location_id: int,
                    for measure, measure_data in input_data.items()}
     if 'cases' in input_data.keys():
         infections_inputs = [enforce_idr_ceiling(measure,
-                                                 output_data['cases']['daily'],
-                                                 output_data[measure]['infections_daily'],
+                                                 output_data['cases']['daily'].copy(),
+                                                 output_data[measure]['infections_daily'].copy(),
                                                  input_data['cases']['lag'],
                                                  IDR_UPPER_LIMIT,)
                              for measure in output_data.keys()]
