@@ -202,6 +202,7 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
+    data = trim_leading_zeros(data, input_measure, leading_window=14)
     data[f'daily_{input_measure}'] = (data
                                       .groupby('location_id')[f'cumulative_{input_measure}']
                                       .apply(lambda x: x.diff())
@@ -214,6 +215,23 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
     daily_data = data[f'daily_{input_measure}']
 
     return cumulative_data, daily_data, manipulation_metadata
+
+
+def trim_leading_zeros(data: pd.DataFrame, input_measure: str, leading_window: int) -> pd.DataFrame:
+    trimmer = data.copy()
+    trimmer['is_zero'] = (trimmer[f'cumulative_{input_measure}'] == 0).astype(int)
+    trimmer = trimmer.sort_values(['location_id', 'date']).reset_index(drop=True)
+    trimmer['n_zeros'] = trimmer.groupby('location_id')['is_zero'].cumsum()
+    trimmer['n_leading_zeros'] = trimmer.groupby('location_id')['n_zeros'].transform(max) - trimmer['n_zeros']
+    to_be_trimmed = (trimmer['n_leading_zeros'] > leading_window).sum()
+    if to_be_trimmed > 0:
+        logger.info(f'Trimming leading 0s more than {leading_window} days out from {input_measure} data -- {to_be_trimmed} observations.')
+    trimmer = trimmer.loc[trimmer['n_leading_zeros'] <= leading_window]
+    trimmer = trimmer.loc[:, ['location_id', 'date']]
+    data = data.merge(trimmer)
+    
+    return data
+
 
 
 def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
