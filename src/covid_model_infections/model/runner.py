@@ -33,7 +33,7 @@ def smooth_measure(measure: str,
                    num_submodels: int,
                    split_l_interval: bool,
                    split_r_interval: bool,
-                   total_threshold: int = 1,
+                   total_threshold: int = 2,
                    n_days_threshold: int = 28,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
