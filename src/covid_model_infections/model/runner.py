@@ -103,7 +103,7 @@ def smooth_measure(measure: str,
     smooth_data = smooth_data.clip(FLOOR, np.inf)
     
     total = cumul_input_data[-1]
-    trimmed_dates = data.get_trimmed_dates(cumul_input_data.copy(), measure, leading_window = 14)
+    trimmed_dates = data.get_trimmed_dates(cumul_input_data.copy(), measure, leading_window=n_days_threshold)
     trimmed_dates = trimmed_dates.intersection(smooth_data.index)
     n_days = len(trimmed_dates)
     
@@ -343,8 +343,10 @@ def get_infected(location_id: int,
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
-    infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.29 for k, v in output_data.items()],
+    infections_inputs = infections_inputs.loc[infections_inputs.notnull().any(axis=1)]
+    infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.5 for k, v in output_data.items()],
                                    axis=1).sort_index()
+    infections_weights = np.sqrt(infections_weights)
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=100)
