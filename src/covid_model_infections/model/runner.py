@@ -20,15 +20,21 @@ FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 
 
-def model_measure(measure: str, measure_type: str,
-                  input_data: pd.Series, ratio: pd.Series, population: float,
-                  n_draws: int, lag: int,
-                  log: bool, knot_days: int,
-                  num_submodels: int,
-                  split_l_interval: bool,
-                  split_r_interval: bool,
-                  total_threshold: int = 1,
-                  n_obs_threshold: int = 28,) -> Dict:
+def smooth_measure(measure: str,
+                   measure_type: str,
+                   input_data: pd.Series,
+                   cumul_input_data: pd.Series,
+                   ratio: pd.Series,
+                   population: float,
+                   n_draws: int,
+                   lag: int,
+                   log: bool,
+                   knot_days: int,
+                   num_submodels: int,
+                   split_l_interval: bool,
+                   split_r_interval: bool,
+                   total_threshold: int = 1,
+                   n_days_threshold: int = 28,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
@@ -37,7 +43,6 @@ def model_measure(measure: str, measure_type: str,
     
     if measure_type == 'daily':
         logger.info('Doing 7-day rolling average to help eliminate day-of-week reporting bias.')
-        total = input_data.sum()
         day0_value = max(0, input_data[0])
         input_data = input_data[1:]
         input_data = (input_data
@@ -46,9 +51,6 @@ def model_measure(measure: str, measure_type: str,
                                min_periods=7,
                                center=True).mean()
                       .dropna())
-    elif measure_type == 'cumul':
-        total = input_data[-1]
-    n_obs = len(input_data)
     
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log)
     
@@ -100,18 +102,28 @@ def model_measure(measure: str, measure_type: str,
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
     
-    if total >= total_threshold and n_obs >= n_obs_threshold:
+    total = cumul_input_data[-1]
+    trimmed_dates = data.get_trimmed_dates(cumul_input_data.copy(), measure, leading_window = 14)
+    trimmed_dates = trimmed_dates.intersection(smooth_data.index)
+    n_days = len(trimmed_dates)
+    
+    if total >= total_threshold and n_days >= n_days_threshold:
         raw_infections = pd.concat([input_data, ratio], axis=1)
+        raw_infections = raw_infections.loc[trimmed_dates]
         raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
         raw_infections.index -= pd.Timedelta(days=lag)
+        
         smooth_infections = pd.concat([smooth_data, ratio], axis=1)
+        smooth_infections = smooth_infections.loc[trimmed_dates]
         smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
         smooth_infections.index -= pd.Timedelta(days=lag)
     else:
         logger.info('Data does not meet requirements for use in infections model '
-                    f'(at least a cumulative total of {total_threshold} reported and {n_obs_threshold} observations)')
+                    f'(at least a cumulative total of {total_threshold} reported and {n_days_threshold} days of smoothed data).')
         raw_infections = (input_data * np.nan).rename('infections')
+        raw_infections.index -= pd.Timedelta(days=lag)
         smooth_infections = (smooth_data * np.nan).rename('infections')
+        smooth_infections.index -= pd.Timedelta(days=lag)
 
     return {'daily':smooth_data, 'cumul':smooth_data.cumsum(),
             'infections_daily_raw':raw_infections, 'infections_cumul_raw':raw_infections.cumsum(),
@@ -307,13 +319,14 @@ def get_infected(location_id: int,
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
     
     logger.info('Running measure-specific smoothing splines.')
-    output_data = {measure: model_measure(measure,
-                                          measure_type,
-                                          measure_data[measure_type].copy(),
-                                          measure_data['ratio']['ratio'].copy(),
-                                          population, n_draws, measure_data['lag'],
-                                          measure_log, measure_knot_days, num_submodels=1,
-                                          split_l_interval=False, split_r_interval=False,)
+    output_data = {measure: smooth_measure(measure,
+                                           measure_type,
+                                           measure_data[measure_type].copy(),
+                                           measure_data['cumul'].copy(),
+                                           measure_data['ratio']['ratio'].copy(),
+                                           population, n_draws, measure_data['lag'],
+                                           measure_log, measure_knot_days, num_submodels=1,
+                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
     if 'cases' in input_data.keys():
         infections_inputs = [enforce_idr_ceiling(measure,

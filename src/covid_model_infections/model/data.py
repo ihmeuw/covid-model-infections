@@ -66,3 +66,15 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
     # test_data = test_data.loc[location_id]
     
     return sero_data, ratio_model_inputs  # , test_data
+
+
+def get_trimmed_dates(data: pd.DataFrame, measure: str, leading_window: int) -> pd.DataFrame:
+    is_zero = (data == 0).astype(int)
+    n_zeros = is_zero.cumsum()
+    n_leading_zeros = n_zeros.max() - n_zeros
+    to_be_trimmed = (n_leading_zeros > leading_window).sum()
+    if to_be_trimmed > 0:
+        logger.info(f'Trimming leading 0s more than {leading_window} days out from {measure} data -- {to_be_trimmed} days.')
+    trimmed_dates = n_leading_zeros[n_leading_zeros <= leading_window].index
+    
+    return trimmed_dates
