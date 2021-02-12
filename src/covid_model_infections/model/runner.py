@@ -347,6 +347,7 @@ def get_infected(location_id: int,
     infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.5 for k, v in output_data.items()],
                                    axis=1).sort_index()
     infections_weights = np.sqrt(infections_weights)
+    infections_weights = infections_weights.loc[infections_inputs.index]
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=100)
