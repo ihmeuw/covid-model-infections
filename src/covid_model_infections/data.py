@@ -70,6 +70,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         is_dc = data['location_id'] == 531
         data = data.loc[~is_dc].reset_index(drop=True)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
+        
+        if fh_subnationals:
+            is_pulaski = data['location_id'] == 725
+            data = data.loc[~is_pulaski].reset_index(drop=True)
+            manipulation_metadata['pulaski_county'] = 'dropped all hospitalizations (looks to be aggregate of multiple Pulaski Counties)'
     elif input_measure == 'deaths':
         for location_id, location_label in fh_col_subnats:
             is_col_subnat = data['location_id'] == location_id
