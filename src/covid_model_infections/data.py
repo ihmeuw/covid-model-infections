@@ -11,18 +11,18 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
     if fh_subnationals:
         is_md = hierarchy['most_detailed'] == 1
         is_col_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '125' in x.split(','))
-        is_pr_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '385' in x.split(','))
+        # is_pr_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '385' in x.split(','))
         col_hierarchy = hierarchy.loc[is_md & is_col_hierarchy]
-        pr_hierarchy = hierarchy.loc[is_md & is_pr_hierarchy]
+        # pr_hierarchy = hierarchy.loc[is_md & is_pr_hierarchy]
         fh_col_ids = col_hierarchy['location_id'].to_list()
-        fh_pr_ids = pr_hierarchy['location_id'].to_list()
+        # fh_pr_ids = pr_hierarchy['location_id'].to_list()
         fh_col_labels = col_hierarchy['location_ascii_name'].str.replace('[^a-zA-Z ]', '').str.replace(' ', '_').str.lower().to_list()
-        fh_pr_labels = pr_hierarchy['location_ascii_name'].str.replace('[^a-zA-Z ]', '').str.replace(' ', '_').str.lower().to_list()
+        # fh_pr_labels = pr_hierarchy['location_ascii_name'].str.replace('[^a-zA-Z ]', '').str.replace(' ', '_').str.lower().to_list()
         fh_col_subnats = list(zip(fh_col_ids, fh_col_labels))
-        fh_pr_subnats = list(zip(fh_pr_ids, fh_pr_labels))
+        # fh_pr_subnats = list(zip(fh_pr_ids, fh_pr_labels))
     else:
         fh_col_subnats = []
-        fh_pr_subnats = []
+        # fh_pr_subnats = []
     manipulation_metadata = {}
     if input_measure == 'cases':
         is_peru = data['location_id'] == 123
@@ -89,10 +89,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
             is_last_2w = data['date'] > last_date_sub_2w
             data = data.loc[~(is_fh_col_subnat & is_last_2w)].reset_index(drop=True)
             manipulation_metadata[location_label] = 'dropped last 14 days of deaths'
-        for location_id, location_label in fh_pr_subnats:
-            is_fh_pr_subnat = data['location_id'] == location_id
-            data = data.loc[~is_fh_pr_subnat].reset_index(drop=True)
-            manipulation_metadata[location_label] = 'dropped all deaths'
+        # for location_id, location_label in fh_pr_subnats:
+        #     is_fh_pr_subnat = data['location_id'] == location_id
+        #     data = data.loc[~is_fh_pr_subnat].reset_index(drop=True)
+        #     manipulation_metadata[location_label] = 'dropped all deaths'
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
     
