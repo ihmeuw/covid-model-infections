@@ -92,6 +92,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
             else:
                 logger.info(f'Using parent IFR for {location_name}.')
                 ratio_location_id = parent_id
+                ifr_risk_data = ifr_risk_data.append(
+                    ifr_risk_data.loc[parent_id].rename(location_id)
+                )
             modeled_location = True
             location_model_data.update({'deaths':{'daily':daily_deaths.loc[location_id],
                                                   'cumul':cumul_deaths.loc[location_id],
