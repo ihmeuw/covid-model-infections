@@ -105,6 +105,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     if int(parent_id) in ifr_data.reset_index()['location_id'].values:
                         ifr_location_id = int(parent_id)
                         logger.info(f'Using parent IFR for {location_name}.')
+                        ifr_risk_data = ifr_risk_data.append(
+                            ifr_risk_data.loc[int(parent_id)].rename(location_id)
+                        )
                     else:
                         pass
             modeled_location = True
