@@ -19,6 +19,13 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_kazakhstan = data['location_id'] == 36
         data = data.loc[~is_kazakhstan].reset_index(drop=True)
         manipulation_metadata['kazakhstan'] = 'dropped all cases'
+        
+        india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
+                                           'location_id'].to_list()
+        is_india = data['location_id'].isin(india_location_ids)
+        data = data.loc[~is_india].reset_index(drop=True)
+        manipulation_metadata['india'] = 'dropped all cases'
+
     elif input_measure == 'hospitalizations':
         is_oman = data['location_id'] == 150
         data = data.loc[~is_oman].reset_index(drop=True)
@@ -55,6 +62,18 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_dc = data['location_id'] == 531
         data = data.loc[~is_dc].reset_index(drop=True)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
+        
+        pakistan_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '165' in x.split(',')),
+                                              'location_id'].to_list()
+        is_pakistan = data['location_id'].isin(pakistan_location_ids)
+        data = data.loc[~is_pakistan].reset_index(drop=True)
+        manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
+        
+        wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
+                                                  'location_id'].to_list()
+        is_wa = data['location_id'].isin(wa_location_ids)
+        data = data.loc[~is_wa].reset_index(drop=True)
+        manipulation_metadata['washington'] = 'dropped all hospitalizations'
     elif input_measure == 'deaths':
         pass
     
