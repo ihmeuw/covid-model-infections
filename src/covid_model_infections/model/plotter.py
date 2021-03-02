@@ -119,8 +119,8 @@ def plotter(plot_dir, location_id, location_name,
     dailymodel_ax = fig.add_subplot(gs[1:5, 2])
     infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
     model_plot(dailymodel_ax, 'Infections', 'Daily', infection_daily_data, None,
-               smooth_infections,
-               output_draws, start_date, end_date, False)
+               smooth_infections[1:],
+               output_draws[1:], start_date, end_date, False)
     whitespace_mid = fig.add_subplot(gs[5:7, 2])
     whitespace_mid.axis('off')
     cumulmodel_ax = fig.add_subplot(gs[7:11, 2])

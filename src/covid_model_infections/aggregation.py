@@ -100,7 +100,9 @@ def create_parent_draws(md_draws: pd.DataFrame, parent_id: int, hierarchy: pd.Da
     parent_draws_count = parent_draws.groupby(level=1).count().iloc[:,0]
     keep_idx = parent_draws_count[parent_draws_count == len(child_ids)].index
     parent_draws = parent_draws.groupby(level=1).sum()
+    parent_draws = parent_draws.cumsum()
     parent_draws = parent_draws.loc[keep_idx]
+    parent_draws = parent_draws.diff().fillna(parent_draws)
     parent_draws['location_id'] = parent_id
     parent_draws = (parent_draws
                     .reset_index()
