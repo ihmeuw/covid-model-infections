@@ -20,12 +20,12 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_kazakhstan].reset_index(drop=True)
         manipulation_metadata['kazakhstan'] = 'dropped all cases'
         
-        # india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
-        #                                    'location_id'].to_list()
-        # india_location_ids = [i for i in india_location_ids if i not in [4842, 4862, 4863, 4864, 4869, 60896]]
-        # is_india = data['location_id'].isin(india_location_ids)
-        # data = data.loc[~is_india].reset_index(drop=True)
-        # manipulation_metadata['india'] = 'dropped all cases'
+        india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
+                                           'location_id'].to_list()
+        india_location_ids = [i for i in india_location_ids if i not in [4842, 4862, 4863, 4864, 4869, 60896]]
+        is_india = data['location_id'].isin(india_location_ids)
+        data = data.loc[~is_india].reset_index(drop=True)
+        manipulation_metadata['india'] = 'dropped all cases'
 
     elif input_measure == 'hospitalizations':
         is_oman = data['location_id'] == 150

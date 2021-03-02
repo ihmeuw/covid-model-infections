@@ -219,6 +219,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
     pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
     
+    logger.info('Processing mean deaths.')
+    deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
+    deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
+    deaths = pd.concat(deaths)
+    deaths = (deaths
+              .set_index(['location_id', 'date'])
+              .sort_index()
+              .loc[:, 'deaths'])
+    
     logger.info('Writing SEIR inputs - infections draw files.')
     infections_draws_cols = infections_draws.columns
     infections_draws = pd.concat([infections_draws, deaths], axis=1)
@@ -233,15 +242,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
         
-    logger.info('Processing mean deaths.')
-    deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
-    deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
-    deaths = pd.concat(deaths)
-    deaths = (deaths
-              .set_index(['location_id', 'date'])
-              .sort_index()
-              .loc[:, 'deaths'])
-    
     for measure, (estimated_ratio, ratio_prior_data) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
