@@ -187,7 +187,7 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     smooth_infections = dep_trans_in(smooth_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)    
     residuals = dep_trans_in(raw_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)
     
-    residuals['infections'] = smooth_infections.to_frame().values - residuals.values
+    residuals = smooth_infections.to_frame() - residuals
     residuals = mr_spline.reshape_data_long(residuals.reset_index(), 'infections')
     residuals = residuals.dropna().sort_values('date').rename(columns={'infections':'residuals'})
     
