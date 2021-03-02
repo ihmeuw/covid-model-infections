@@ -61,8 +61,4 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
         'cases':idr_model_data
     }
     
-    test_path = model_in_dir / 'test_data.h5'
-    test_data = pd.read_hdf(test_path)
-    test_data = test_data.loc[location_id]
-    
-    return sero_data, ratio_model_inputs, test_data
+    return sero_data, ratio_model_inputs

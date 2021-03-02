@@ -29,7 +29,7 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 def plotter(plot_dir, location_id, location_name,
             input_data,
-            test_data, sero_data, ratio_model_inputs,
+            sero_data, ratio_model_inputs,
             output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)

@@ -340,11 +340,10 @@ def get_infected(location_id: int,
     output_draws = dep_trans_out(output_draws)
     
     logger.info('Plot data.')
-    sero_data, ratio_model_inputs, test_data = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
-    test_data = (test_data['daily_tests'] / population).rename('testing_rate')
+    sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
-        input_data, test_data, sero_data, ratio_model_inputs,
+        input_data, sero_data, ratio_model_inputs,
         output_data, smooth_infections, output_draws, population
     )
     
