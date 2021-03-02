@@ -22,7 +22,7 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         
         india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
                                            'location_id'].to_list()
-        india_location_ids = [i for i in india_location_ids if i not in [4842, 4862, 4863, 4864, 4869]]
+        india_location_ids = [i for i in india_location_ids if i not in [4842, 4862, 4863, 4864, 4869, 60896]]
         is_india = data['location_id'].isin(india_location_ids)
         data = data.loc[~is_india].reset_index(drop=True)
         manipulation_metadata['india'] = 'dropped all cases'
