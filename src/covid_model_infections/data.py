@@ -75,6 +75,23 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_wa = data['location_id'].isin(wa_location_ids)
         data = data.loc[~is_wa].reset_index(drop=True)
         manipulation_metadata['washington'] = 'dropped all hospitalizations'
+        
+        is_poland = data['location_id'] == 51
+        data = data.loc[~is_poland].reset_index(drop=True)
+        manipulation_metadata['poland'] = 'dropped all hospitalizations'
+        
+        is_philippines = data['location_id'] == 16
+        data = data.loc[~is_philippines].reset_index(drop=True)
+        manipulation_metadata['philippines'] = 'dropped all hospitalizations'
+        
+        is_portugal = data['location_id'] == 91
+        data = data.loc[~is_portugal].reset_index(drop=True)
+        manipulation_metadata['portugal'] = 'dropped all hospitalizations'
+        
+        is_jordan = data['location_id'] == 144
+        data = data.loc[~is_jordan].reset_index(drop=True)
+        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+    
     elif input_measure == 'deaths':
         pass
     
