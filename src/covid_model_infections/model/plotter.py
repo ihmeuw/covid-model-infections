@@ -29,7 +29,7 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 def plotter(plot_dir, location_id, location_name,
             input_data,
-            test_data, sero_data, ratio_model_inputs,
+            sero_data, ratio_model_inputs,
             output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)
@@ -119,8 +119,8 @@ def plotter(plot_dir, location_id, location_name,
     dailymodel_ax = fig.add_subplot(gs[1:5, 2])
     infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
     model_plot(dailymodel_ax, 'Infections', 'Daily', infection_daily_data, None,
-               smooth_infections,
-               output_draws, start_date, end_date, False)
+               smooth_infections[1:],
+               output_draws[1:], start_date, end_date, False)
     whitespace_mid = fig.add_subplot(gs[5:7, 2])
     whitespace_mid.axis('off')
     cumulmodel_ax = fig.add_subplot(gs[7:11, 2])

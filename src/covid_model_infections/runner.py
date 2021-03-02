@@ -10,7 +10,7 @@ import pandas as pd
 
 from covid_shared import shell_tools, cli_tools
 
-from covid_model_infections import data, cluster, model
+from covid_model_infections import data, cluster, model, aggregation
 from covid_model_infections.utils import TIMELINE, IDR_UPPER_LIMIT  # , IDR_LIMITS
 from covid_model_infections.pdf_merger import pdf_merger
 
@@ -53,9 +53,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'cases')
     app_metadata.update({'data_manipulation': {
         'deaths':deaths_manipulation_metadata,
-        'hospital':hospital_manipulation_metadata,
+        'hospitalizations':hospital_manipulation_metadata,
         'cases':cases_manipulation_metadata,
     }})
+    measures = ['deaths', 'hospitalizations', 'cases']
     
     logger.info('Loading estimated ratios and adding draw directories.')
     ifr_data = data.load_ifr(infection_fatality_root)
@@ -162,18 +163,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     }
     cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
     
-    logger.info('Merging PDFs.')
-    possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
-    existing_pdfs = [str(x).split('/')[-1] for x in plot_dir.iterdir() if x.is_file()]
-    pdf_paths = [pdf for pdf in possible_pdfs if pdf in existing_pdfs]
-    pdf_location_ids = [int(pdf_path[:-4]) for pdf_path in pdf_paths]
-    pdf_location_names = [hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item() for location_id in pdf_location_ids]
-    pdf_parent_ids = [hierarchy.loc[hierarchy['location_id'] == location_id, 'parent_id'].item() for location_id in pdf_location_ids]
-    pdf_parent_names = [hierarchy.loc[hierarchy['location_id'] == parent_id, 'location_name'].item() for parent_id in pdf_parent_ids]
-    pdf_paths = [str(plot_dir / pdf_path) for pdf_path in pdf_paths]
-    pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
-    pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
-    
     logger.info('Compiling infection draws.')
     infections_draws = []
     for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.h5')]:
@@ -195,6 +184,42 @@ def make_infections(app_metadata: cli_tools.Metadata,
     output_path = output_root / 'output_data.pkl'
     with output_path.open('wb') as file:
         pickle.dump(outputs, file, -1)
+        
+    logger.info('Aggregating data.')
+    agg_model_data = aggregation.aggregate_md_data_dict(model_data.copy(), hierarchy, measures)
+    agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures)
+    agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy)
+    
+    logger.info('Plotting aggregates.')
+    plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
+    for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
+        aggregation.plot_aggregate(
+            plot_parent_id,
+            agg_model_data[plot_parent_id],
+            agg_outputs[plot_parent_id],
+            agg_infections_draws.loc[plot_parent_id],
+            hierarchy,
+            pop_data,
+            sero_data,
+            ifr_model_data,
+            ihr_model_data,
+            idr_model_data,
+            plot_dir
+        )
+    
+    logger.info('Merging PDFs.')
+    possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
+    existing_pdfs = [str(x).split('/')[-1] for x in plot_dir.iterdir() if x.is_file()]
+    pdf_paths = [pdf for pdf in possible_pdfs if pdf in existing_pdfs]
+    pdf_location_ids = [int(pdf_path[:-4]) for pdf_path in pdf_paths]
+    pdf_location_names = [hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item() for location_id in pdf_location_ids]
+    pdf_parent_ids = [hierarchy.loc[hierarchy['location_id'] == location_id, 'parent_id'].item() for location_id in pdf_location_ids]
+    pdf_parent_names = [hierarchy.loc[hierarchy['location_id'] == parent_id, 'location_name'].item() for parent_id in pdf_parent_ids]
+    pdf_paths = [str(plot_dir / pdf_path) for pdf_path in pdf_paths]
+    pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
+    pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
+    
+    logger.info('Processing mean deaths.')
     deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
     deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
     deaths = pd.concat(deaths)
@@ -216,7 +241,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     )
     with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
-    
+        
     for measure, (estimated_ratio, ratio_prior_data) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
