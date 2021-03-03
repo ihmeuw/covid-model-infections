@@ -37,6 +37,13 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         data = data.loc[~is_kazakhstan].reset_index(drop=True)
         manipulation_metadata['kazakhstan'] = 'dropped all cases'
         
+        india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
+                                           'location_id'].to_list()
+        india_location_ids = [i for i in india_location_ids if i not in [4842, 4862, 4863, 4864, 4869, 60896]]
+        is_india = data['location_id'].isin(india_location_ids)
+        data = data.loc[~is_india].reset_index(drop=True)
+        manipulation_metadata['india'] = 'dropped all cases'
+
         for location_id, location_label in fh_col_subnats:
             is_fh_col_subnat = data['location_id'] == location_id
             last_date = data.loc[is_fh_col_subnat, 'date'].max()
@@ -44,6 +51,7 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
             is_last_2w = data['date'] > last_date_sub_2w
             data = data.loc[~(is_fh_col_subnat & is_last_2w)].reset_index(drop=True)
             manipulation_metadata[location_label] = 'dropped last 14 days of cases'
+        
     elif input_measure == 'hospitalizations':
         is_oman = data['location_id'] == 150
         data = data.loc[~is_oman].reset_index(drop=True)
@@ -85,6 +93,35 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
             is_pulaski = data['location_id'] == 725
             data = data.loc[~is_pulaski].reset_index(drop=True)
             manipulation_metadata['pulaski_county'] = 'dropped all hospitalizations (looks to be aggregate of multiple Pulaski Counties)'
+
+        pakistan_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '165' in x.split(',')),
+                                              'location_id'].to_list()
+        is_pakistan = data['location_id'].isin(pakistan_location_ids)
+        data = data.loc[~is_pakistan].reset_index(drop=True)
+        manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
+        
+        wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
+                                                  'location_id'].to_list()
+        is_wa = data['location_id'].isin(wa_location_ids)
+        data = data.loc[~is_wa].reset_index(drop=True)
+        manipulation_metadata['washington'] = 'dropped all hospitalizations'
+        
+        is_poland = data['location_id'] == 51
+        data = data.loc[~is_poland].reset_index(drop=True)
+        manipulation_metadata['poland'] = 'dropped all hospitalizations'
+        
+        is_philippines = data['location_id'] == 16
+        data = data.loc[~is_philippines].reset_index(drop=True)
+        manipulation_metadata['philippines'] = 'dropped all hospitalizations'
+        
+        is_portugal = data['location_id'] == 91
+        data = data.loc[~is_portugal].reset_index(drop=True)
+        manipulation_metadata['portugal'] = 'dropped all hospitalizations'
+        
+        is_jordan = data['location_id'] == 144
+        data = data.loc[~is_jordan].reset_index(drop=True)
+        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+    
     elif input_measure == 'deaths':
         for location_id, location_label in fh_col_subnats:
             is_fh_col_subnat = data['location_id'] == location_id
@@ -240,8 +277,6 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
     data = data.loc[:, keep_cols].dropna()
     data['location_id'] = data['location_id'].astype(int)
     
-    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh_subnationals)
-    
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
@@ -250,9 +285,11 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
                                       .apply(lambda x: x.diff())
                                       .fillna(data[f'cumulative_{input_measure}']))
     data = data.dropna()
+    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh_subnationals)
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index())
+    
     cumulative_data = data[f'cumulative_{input_measure}']
     daily_data = data[f'daily_{input_measure}']
 
