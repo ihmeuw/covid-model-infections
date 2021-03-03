@@ -266,8 +266,8 @@ def splice_ratios(ratio_data: pd.Series,
     pre = new_ratio[:trans_period_past].mean()
     post = new_ratio[-trans_period_future:].mean()
     new_ratio = pd.concat([ratio_data, new_ratio], axis=1)
-    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = pre  # new_ratio[ratio_data.name]
-    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = post  # new_ratio[ratio_data.name]
+    new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = pre
+    new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = post
     new_ratio = new_ratio['new_ratio'].rename(ratio_data.name)
     new_ratio = new_ratio.interpolate(limit_area='inside').rename(col_name)
     

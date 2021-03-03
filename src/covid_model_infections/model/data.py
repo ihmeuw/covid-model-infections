@@ -5,6 +5,7 @@ import dill as pickle
 
 import pandas as pd
 
+
 def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float]:
     hierarchy_path = model_in_dir / 'hierarchy.h5'
     hierarchy = pd.read_hdf(hierarchy_path)
