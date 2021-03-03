@@ -149,7 +149,8 @@ def plot_aggregate(location_id: int,
     for measure, ratio_model_data in [('deaths', ifr_model_data),
                                       ('hospitalizations', ihr_model_data),
                                       ('cases', idr_model_data)]:
-        ratio_model_data = idr_model_data.reset_index()
+        ratio_model_data = ratio_model_data.copy()
+        ratio_model_data = ratio_model_data.reset_index()
         ratio_model_data = (ratio_model_data
                             .loc[ratio_model_data['location_id'] == location_id]
                             .drop('location_id', axis=1)
