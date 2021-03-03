@@ -306,9 +306,11 @@ def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     return data[['location_id', 'date'] + interp_vars]
 
 
-def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.DataFrame:
+def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False, gbd: bool = False) -> pd.DataFrame:
     if fh_subnationals:
         data_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
+    elif gbd:
+        data_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
     else:
         data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)

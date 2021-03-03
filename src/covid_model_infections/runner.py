@@ -11,7 +11,7 @@ import pandas as pd
 from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model, aggregation
-from covid_model_infections.utils import TIMELINE, IDR_UPPER_LIMIT  # , IDR_LIMITS
+from covid_model_infections.utils import TIMELINE, IDR_UPPER_LIMIT
 from covid_model_infections.pdf_merger import pdf_merger
 
 MP_THREADS = 25
@@ -30,7 +30,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     output_root: Path,
                     holdout_days: int,
                     n_draws: int,
-                    fh_subnationals: bool,):
+                    fh_subnationals: bool,
+                    gbd: bool,):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
     
@@ -46,9 +47,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     if fh_subnationals:
         logger.debug("Using Fred Hutch small-area hierarchy.")
+    elif gbd:
+        logger.debug("Using GBD hierarchy.")
     
     logger.info('Loading supplemental data.')
-    hierarchy = data.load_hierarchy(model_inputs_root, fh_subnationals)
+    hierarchy = data.load_hierarchy(model_inputs_root, fh_subnationals, gbd)
     pop_data = data.load_population(model_inputs_root)
     
     logger.info('Loading epi report data.')

@@ -44,6 +44,9 @@ warnings.simplefilter('ignore')
 @click.option('--fh-subnationals',
               is_flag=True,
               help='Whether to run Fred Hutch small area hierarchy or not.')
+@click.option('--gbd',
+              is_flag=True,
+              help='Whether to run GBD hierarchy or not.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,
               help='Marks the new outputs as best in addition to marking them as latest.')
@@ -54,7 +57,7 @@ warnings.simplefilter('ignore')
 def run_infections(run_metadata,
                    model_inputs_version,
                    infection_fatality_version, infection_hospitalization_version, infection_detection_version,
-                   output_root, n_holdout_days, n_draws, fh_subnationals,
+                   output_root, n_holdout_days, n_draws, fh_subnationals, gbd,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
     """Run infections model."""
@@ -71,6 +74,9 @@ def run_infections(run_metadata,
     run_metadata.update_from_path('ifr_metadata', infection_fatality_root / paths.METADATA_FILE_NAME)
     run_metadata.update_from_path('ihr_metadata', infection_hospitalization_root / paths.METADATA_FILE_NAME)
     run_metadata.update_from_path('idr_metadata', infection_detection_root / paths.METADATA_FILE_NAME)
+    
+    if fh_subnationals and gbd:
+        raise ValueError('Cannot specify Fred Hutch hierarchy AND GBD hierarchy - must be one or nethier.')
 
     output_root = Path(output_root).resolve()
     cli_tools.setup_directory_structure(output_root, with_production=True)
@@ -83,7 +89,7 @@ def run_infections(run_metadata,
                            infection_fatality_root,
                            infection_hospitalization_root,
                            infection_detection_root,
-                           run_directory, n_holdout_days, n_draws, fh_subnationals)
+                           run_directory, n_holdout_days, n_draws, fh_subnationals, gbd)
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
                                  mark_dir_as_best, production_tag)
