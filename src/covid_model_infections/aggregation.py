@@ -2,6 +2,8 @@ import sys
 from typing import List, Dict
 from pathlib import Path
 from tqdm import tqdm
+from functools import partial
+from multiprocessing import Pool
 
 import pandas as pd
 import numpy as np
@@ -9,7 +11,7 @@ import numpy as np
 from covid_model_infections.model import plotter
 
 
-def aggregate_md_data_dict(md_data: Dict, hierarchy: pd.DataFrame, measures: List[str]):
+def aggregate_md_data_dict(md_data: Dict, hierarchy: pd.DataFrame, measures: List[str]) -> Dict:
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
     
     agg_data = {parent_id: create_parent_dict(md_data, parent_id, hierarchy, measures) for parent_id in parent_ids}
@@ -35,7 +37,7 @@ def create_parent_dict(md_data: Dict, parent_id: int, hierarchy: pd.DataFrame, m
     return parent_data
 
     
-def sum_data_from_child_dicts(children_data: Dict, measures: List[str]):
+def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
     child_dict = {}
     for measure in measures:
         measure_dict = {}
@@ -77,28 +79,38 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]):
             child_dict.update({measure: measure_dict})
     
     return child_dict
+
+
+def subset_to_parent_md_draws(md_draws: pd.DataFrame, parent_id: int, hierarchy: pd.DataFrame) -> pd.DataFrame:
+    child_ids = get_child_ids(parent_id, hierarchy)
+    
+    idx_names = md_draws.index.names
+    parent_draws = md_draws.reset_index()
+    parent_draws['parent_id'] = parent_id
+    parent_draws = parent_draws.loc[parent_draws['location_id'].isin(child_ids)]
+    
+    return parent_draws.set_index(idx_names).sort_index()
     
     
-def aggregate_md_draws(md_draws: pd.DataFrame, hierarchy: pd.DataFrame) -> pd.DataFrame:
+def aggregate_md_draws(md_draws: pd.DataFrame, hierarchy: pd.DataFrame, mp_threads: int) -> pd.DataFrame:
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
     
-    agg_draws = []
-    for parent_id in tqdm(parent_ids, total=len(parent_ids), file=sys.stdout):
-        agg_draws.append(create_parent_draws(md_draws, parent_id, hierarchy))
+    parent_draws_list = [subset_to_parent_md_draws(md_draws, parent_id, hierarchy) for parent_id in parent_ids]
+    with Pool(mp_threads - 1) as p:
+        agg_draws = list(tqdm(p.imap(create_parent_draws, parent_draws_list), total=len(parent_ids), file=sys.stdout))
     agg_draws = pd.concat(agg_draws)
     
     return agg_draws
     
 
-def create_parent_draws(md_draws: pd.DataFrame, parent_id: int, hierarchy: pd.DataFrame):
-    child_ids = get_child_ids(parent_id, hierarchy)
-    child_ids = [i for i in child_ids if i in md_draws.reset_index()['location_id'].to_list()]
-    
-    parent_draws = md_draws.loc[child_ids]
+def create_parent_draws(parent_draws: pd.DataFrame) -> pd.DataFrame:
+    n_child_locations = parent_draws.reset_index()['location_id'].unique().size
+    parent_id = parent_draws['parent_id'].unique().item()
+    del parent_draws['parent_id']
     if parent_draws.index.names != ['location_id', 'date']:
         raise ValueError("Multi-index differs from expected (['location_id', 'date']).")
     parent_draws_count = parent_draws.groupby(level=1).count().iloc[:,0]
-    keep_idx = parent_draws_count[parent_draws_count == len(child_ids)].index
+    keep_idx = parent_draws_count[parent_draws_count == n_child_locations].index
     parent_draws = parent_draws.groupby(level=1).sum()
     parent_draws = parent_draws.cumsum()
     parent_draws = parent_draws.loc[keep_idx]
@@ -110,6 +122,7 @@ def create_parent_draws(md_draws: pd.DataFrame, parent_id: int, hierarchy: pd.Da
                     .sort_index())
     
     return parent_draws
+
 
 def plot_aggregate(location_id: int,
                    model_data: Dict, outputs: Dict, infections_draws: pd.DataFrame,

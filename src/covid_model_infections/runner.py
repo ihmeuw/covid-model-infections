@@ -188,7 +188,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Aggregating data.')
     agg_model_data = aggregation.aggregate_md_data_dict(model_data.copy(), hierarchy, measures)
     agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures)
-    agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy)
+    agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
     
     logger.info('Plotting aggregates.')
     plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
