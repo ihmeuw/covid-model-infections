@@ -17,10 +17,11 @@ DATE_LOCATOR = mdates.AutoDateLocator(maxticks=10)
 DATE_FORMATTER = mdates.ConciseDateFormatter(DATE_LOCATOR, show_offset=False)
 
 
-def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Timestamp]:
+def get_dates(input_data: Dict, output_data: Dict, smooth_infections: pd.DataFrame) -> Tuple[pd.Timestamp, pd.Timestamp]:
     input_dates = [v['cumul'].reset_index()['date'] for k, v in input_data.items()]
     output_dates = [v['infections_cumul'].reset_index()['date'] for k, v in output_data.items()]
-    dates = pd.concat(input_dates + output_dates)
+    infection_dates = smooth_infections.reset_index()['date']
+    dates = pd.concat(input_dates + output_dates + [infection_dates])
     start_date = dates.min() - pd.Timedelta(days=7)
     end_date = dates.max() + pd.Timedelta(days=7)
     
@@ -32,7 +33,7 @@ def plotter(plot_dir, location_id, location_name,
             sero_data, ratio_model_inputs,
             output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
-    start_date, end_date = get_dates(input_data, output_data)
+    start_date, end_date = get_dates(input_data, output_data, smooth_infections)
     
     n_cols = 3
     n_rows = 12

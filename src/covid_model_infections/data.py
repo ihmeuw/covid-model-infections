@@ -7,7 +7,7 @@ import numpy as np
 
 
 def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
-                input_measure: str, fh_subnationals: bool) -> Tuple[pd.DataFrame, Dict]:
+                input_measure: str, fh_subnationals: bool, gbd: bool) -> Tuple[pd.DataFrame, Dict]:
     if fh_subnationals:
         is_md = hierarchy['most_detailed'] == 1
         is_col_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '125' in x.split(','))
@@ -134,6 +134,14 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         #     is_fh_pr_subnat = data['location_id'] == location_id
         #     data = data.loc[~is_fh_pr_subnat].reset_index(drop=True)
         #     manipulation_metadata[location_label] = 'dropped all deaths'
+        
+        if gbd:
+            ethiopia_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '179' in x.split(',')),
+                                                  'location_id'].to_list()
+            is_ethiopia = data['location_id'].isin(ethiopia_location_ids)
+            data = data.loc[~is_ethiopia].reset_index(drop=True)
+            manipulation_metadata['ethiopia'] = 'dropped all deaths'
+        
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
     
@@ -263,7 +271,7 @@ def load_testing_data(infection_detection_root: Path):
 
 
 def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
-                      input_measure: str, fh_subnationals: bool = False) -> Tuple[pd.Series, pd.Series, Dict]:
+                      input_measure: str, fh_subnationals: bool, gbd: bool) -> Tuple[pd.Series, pd.Series, Dict]:
     if fh_subnationals:
         data_path = model_inputs_root / 'full_data_fh_subnationals.csv'
     else:
@@ -285,7 +293,7 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
                                       .apply(lambda x: x.diff())
                                       .fillna(data[f'cumulative_{input_measure}']))
     data = data.dropna()
-    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh_subnationals)
+    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh_subnationals, gbd)
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index())

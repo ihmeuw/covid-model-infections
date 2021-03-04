@@ -4,6 +4,7 @@ from pathlib import Path
 from tqdm import tqdm
 from functools import partial
 from multiprocessing import Pool
+from loguru import logger
 
 import pandas as pd
 import numpy as np
@@ -42,7 +43,7 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
     for measure in measures:
         measure_dict = {}
         metrics = [list(child_data.get(measure, {}).keys()) for child_data in children_data]
-        if not all([bool(m) for m in metrics]):
+        if not metrics or not all([bool(m) for m in metrics]):
             metrics = []
         else:
             metrics = metrics[0]
@@ -100,27 +101,37 @@ def aggregate_md_draws(md_draws: pd.DataFrame, hierarchy: pd.DataFrame, mp_threa
         agg_draws = list(tqdm(p.imap(create_parent_draws, parent_draws_list), total=len(parent_ids), file=sys.stdout))
     agg_draws = pd.concat(agg_draws)
     
+    not_agged = [str(i) for i in parent_ids if i not in agg_draws.reset_index()['location_id'].to_list()]
+    if not_agged:
+        logger.warning(f"No draw aggregate produced for the following locations: {', '.join(not_agged)}.")
+    
     return agg_draws
     
 
 def create_parent_draws(parent_draws: pd.DataFrame) -> pd.DataFrame:
     n_child_locations = parent_draws.reset_index()['location_id'].unique().size
-    parent_id = parent_draws['parent_id'].unique().item()
-    del parent_draws['parent_id']
-    if parent_draws.index.names != ['location_id', 'date']:
-        raise ValueError("Multi-index differs from expected (['location_id', 'date']).")
-    parent_draws_count = parent_draws.groupby(level=1).count().iloc[:,0]
-    keep_idx = parent_draws_count[parent_draws_count == n_child_locations].index
-    parent_draws = parent_draws.groupby(level=1).sum()
-    parent_draws = parent_draws.cumsum()
-    parent_draws = parent_draws.loc[keep_idx]
-    parent_draws = parent_draws.diff().fillna(parent_draws)
-    parent_draws['location_id'] = parent_id
-    parent_draws = (parent_draws
-                    .reset_index()
-                    .set_index(['location_id', 'date'])
-                    .sort_index())
-    
+    if n_child_locations > 0:
+        parent_id = parent_draws['parent_id'].unique().item()
+        del parent_draws['parent_id']
+        if parent_draws.index.names != ['location_id', 'date']:
+            raise ValueError("Multi-index differs from expected (['location_id', 'date']).")
+        parent_draws_count = parent_draws.groupby(level=1).count().iloc[:,0]
+        keep_idx = parent_draws_count[parent_draws_count == n_child_locations].index
+        parent_draws = parent_draws.groupby(level=1).sum()
+        parent_draws = parent_draws.cumsum()
+        parent_draws = parent_draws.loc[keep_idx]
+        parent_draws = parent_draws.diff().fillna(parent_draws)
+        parent_draws['location_id'] = parent_id
+        parent_draws = (parent_draws
+                        .reset_index()
+                        .set_index(['location_id', 'date'])
+                        .sort_index())
+    else:
+        del parent_draws['parent_id']
+        parent_draws *= np.nan
+        parent_draws = parent_draws.dropna()
+        
+
     return parent_draws
 
 

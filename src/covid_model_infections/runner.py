@@ -56,13 +56,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Loading epi report data.')
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths', fh_subnationals
+        model_inputs_root, hierarchy, 'deaths', fh_subnationals, gbd
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'hospitalizations', fh_subnationals
+        model_inputs_root, hierarchy, 'hospitalizations', fh_subnationals, gbd
     )
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'cases', fh_subnationals
+        model_inputs_root, hierarchy, 'cases', fh_subnationals, gbd
     )
     app_metadata.update({'data_manipulation': {
         'deaths':deaths_manipulation_metadata,
