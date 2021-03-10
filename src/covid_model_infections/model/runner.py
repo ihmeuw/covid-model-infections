@@ -328,8 +328,9 @@ def get_infected(location_id: int,
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
-    infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.29 for k, v in output_data.items()],
-                                   axis=1).sort_index()
+    # infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.29 for k, v in output_data.items()],
+    #                                axis=1).sort_index()
+    infections_weights = pd.concat([v['infections_daily'] ** 0 for k, v in output_data.items()], axis=1).sort_index()
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=100)

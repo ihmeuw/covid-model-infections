@@ -36,9 +36,9 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_greece].reset_index(drop=True)
         manipulation_metadata['greece'] = 'dropped all hospitalizations'
         
-        is_norway = data['location_id'] == 90
-        data = data.loc[~is_norway].reset_index(drop=True)
-        manipulation_metadata['norway'] = 'dropped all hospitalizations'
+        # is_norway = data['location_id'] == 90
+        # data = data.loc[~is_norway].reset_index(drop=True)
+        # manipulation_metadata['norway'] = 'dropped all hospitalizations'
         
         is_argentina = data['location_id'] == 97
         data = data.loc[~is_argentina].reset_index(drop=True)
