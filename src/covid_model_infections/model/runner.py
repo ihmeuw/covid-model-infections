@@ -355,8 +355,9 @@ def get_infected(location_id: int,
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
     infections_inputs = infections_inputs.loc[infections_inputs.notnull().any(axis=1)]
-    infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.5 for k, v in output_data.items()],
-                                   axis=1).sort_index()
+    # infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.5 for k, v in output_data.items()],
+    #                                axis=1).sort_index()
+    infections_weights = pd.concat([v['infections_daily'] ** 0 for k, v in output_data.items()], axis=1).sort_index()
     infections_weights = np.sqrt(infections_weights)
     infections_weights = infections_weights.loc[infections_inputs.index]
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
@@ -378,6 +379,7 @@ def get_infected(location_id: int,
     if infection_log:
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
+
     if infection_log:
         output_draws -= LOG_OFFSET
         output_draws = output_draws.clip(FLOOR, np.inf)
