@@ -106,6 +106,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     if int(parent_id) in ifr_data.reset_index()['location_id'].values:
                         ifr_location_id = int(parent_id)
                         logger.info(f'Using parent IFR for {location_name}.')
+                        ifr_data = ifr_data.append(
+                            ifr_data.loc[int(parent_id)].rename(location_id)
+                        )
                         ifr_risk_data = ifr_risk_data.append(
                             ifr_risk_data.loc[int(parent_id)].rename(location_id)
                         )
@@ -126,6 +129,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     if int(parent_id) in ihr_data.reset_index()['location_id'].values:
                         ihr_location_id = int(parent_id)
                         logger.info(f'Using parent IHR for {location_name}.')
+                        ihr_data = ihr_data.append(
+                            ihr_data.loc[int(parent_id)].rename(location_id)
+                        )
                     else:
                         pass
             modeled_location = True
@@ -143,6 +149,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     if int(parent_id) in idr_data.reset_index()['location_id'].values:
                         idr_location_id = int(parent_id)
                         logger.info(f'Using parent IDR for {location_name}.')
+                        idr_data = idr_data.append(
+                            idr_data.loc[int(parent_id)].rename(location_id)
+                        )
                     else:
                         pass
             modeled_location = True
