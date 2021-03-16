@@ -107,10 +107,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
                         ifr_location_id = int(parent_id)
                         logger.info(f'Using parent IFR for {location_name}.')
                         ifr_data = ifr_data.append(
-                            ifr_data.loc[int(parent_id)].rename(location_id)
+                            pd.concat({location_id: ifr_data.loc[ifr_location_id]}, names=['location_id'])
                         )
                         ifr_risk_data = ifr_risk_data.append(
-                            ifr_risk_data.loc[int(parent_id)].rename(location_id)
+                            ifr_risk_data.loc[ifr_location_id].rename(location_id)
                         )
                     else:
                         pass
@@ -130,7 +130,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                         ihr_location_id = int(parent_id)
                         logger.info(f'Using parent IHR for {location_name}.')
                         ihr_data = ihr_data.append(
-                            ihr_data.loc[int(parent_id)].rename(location_id)
+                            pd.concat({location_id: ihr_data.loc[ihr_location_id]}, names=['location_id'])
                         )
                     else:
                         pass
@@ -150,7 +150,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                         idr_location_id = int(parent_id)
                         logger.info(f'Using parent IDR for {location_name}.')
                         idr_data = idr_data.append(
-                            idr_data.loc[int(parent_id)].rename(location_id)
+                            pd.concat({location_id: idr_data.loc[idr_location_id]}, names=['location_id'])
                         )
                     else:
                         pass
