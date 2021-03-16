@@ -230,9 +230,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pdf_location_names = [hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item() for location_id in pdf_location_ids]
     pdf_parent_ids = [hierarchy.loc[hierarchy['location_id'] == location_id, 'parent_id'].item() for location_id in pdf_location_ids]
     pdf_parent_names = [hierarchy.loc[hierarchy['location_id'] == parent_id, 'location_name'].item() for parent_id in pdf_parent_ids]
+    pdf_levels = [hierarchy.loc[hierarchy['location_id'] == location_id, 'level'].item() for location_id in pdf_location_ids]
     pdf_paths = [str(plot_dir / pdf_path) for pdf_path in pdf_paths]
     pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
-    pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, str(pdf_out_path))
+    pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, pdf_levels, str(pdf_out_path))
     
     logger.info('Processing mean deaths.')
     deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
