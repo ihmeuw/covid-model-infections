@@ -99,67 +99,55 @@ def make_infections(app_metadata: cli_tools.Metadata,
         modeled_location = False
         # DEATHS
         if location_id in daily_deaths.reset_index()['location_id'].values:
-            if location_id in ifr_data.reset_index()['location_id'].values:
-                ifr_location_id = location_id
-            else:
-                for parent_id in path_to_top_parent.split(','):
+            if location_id not in ifr_data.reset_index()['location_id'].values:
+                for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
                     if int(parent_id) in ifr_data.reset_index()['location_id'].values:
-                        ifr_location_id = int(parent_id)
                         logger.info(f'Using parent IFR for {location_name}.')
                         ifr_data = ifr_data.append(
-                            pd.concat({location_id: ifr_data.loc[ifr_location_id]}, names=['location_id'])
+                            pd.concat({location_id: ifr_data.loc[int(parent_id)]}, names=['location_id'])
                         )
                         ifr_risk_data = ifr_risk_data.append(
-                            ifr_risk_data.loc[ifr_location_id].rename(location_id)
+                            ifr_risk_data.loc[int(parent_id)].rename(location_id)
                         )
                     else:
                         pass
             modeled_location = True
             location_model_data.update({'deaths':{'daily': daily_deaths.loc[location_id],
                                                   'cumul': cumul_deaths.loc[location_id],
-                                                  'ratio': ifr_data.loc[ifr_location_id],
+                                                  'ratio': ifr_data.loc[location_id],
                                                   'lag': TIMELINE['deaths'],},})
-            del ifr_location_id
         # HOSPITAL ADMISSIONS
         if location_id in daily_hospital.reset_index()['location_id'].values:
-            if location_id in ihr_data.reset_index()['location_id'].values:
-                ihr_location_id = location_id
-            else:
-                for parent_id in path_to_top_parent.split(','):
+            if location_id not in ihr_data.reset_index()['location_id'].values:
+                for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
                     if int(parent_id) in ihr_data.reset_index()['location_id'].values:
-                        ihr_location_id = int(parent_id)
                         logger.info(f'Using parent IHR for {location_name}.')
                         ihr_data = ihr_data.append(
-                            pd.concat({location_id: ihr_data.loc[ihr_location_id]}, names=['location_id'])
+                            pd.concat({location_id: ihr_data.loc[int(parent_id)]}, names=['location_id'])
                         )
                     else:
                         pass
             modeled_location = True
             location_model_data.update({'hospitalizations':{'daily': daily_hospital.loc[location_id],
                                                             'cumul': cumul_hospital.loc[location_id],
-                                                            'ratio': ihr_data.loc[ihr_location_id],
+                                                            'ratio': ihr_data.loc[location_id],
                                                             'lag': TIMELINE['hospitalizations'],},})
-            del ihr_location_id
         # CASES
         if location_id in daily_cases.reset_index()['location_id'].values:
-            if location_id in idr_data.reset_index()['location_id'].values:
-                idr_location_id = location_id
-            else:                
-                for parent_id in path_to_top_parent.split(','):
+            if location_id not in idr_data.reset_index()['location_id'].values:
+                for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
                     if int(parent_id) in idr_data.reset_index()['location_id'].values:
-                        idr_location_id = int(parent_id)
                         logger.info(f'Using parent IDR for {location_name}.')
                         idr_data = idr_data.append(
-                            pd.concat({location_id: idr_data.loc[idr_location_id]}, names=['location_id'])
+                            pd.concat({location_id: idr_data.loc[int(parent_id)]}, names=['location_id'])
                         )
                     else:
                         pass
             modeled_location = True
             location_model_data.update({'cases':{'daily': daily_cases.loc[location_id],
                                                  'cumul': cumul_cases.loc[location_id],
-                                                 'ratio': idr_data.loc[idr_location_id],
+                                                 'ratio': idr_data.loc[location_id],
                                                  'lag': TIMELINE['cases'],},})
-            del idr_location_id
         if modeled_location:
             modeled_location_ids.append(location_id)
             model_data.update({
