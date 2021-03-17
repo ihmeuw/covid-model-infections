@@ -351,9 +351,8 @@ def get_infected(location_id: int,
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
 
-    if location_id in [62, 67]:
-        logger.warning('Droppping last three days of infections for Japan and Russia.')
-        output_draws = output_draws[:-3]
+    logger.warning('Droppping last three days of infections for stability.')
+    output_draws = output_draws[:-3]
     
     logger.info('Plot data.')
     sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
