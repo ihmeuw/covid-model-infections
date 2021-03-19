@@ -324,6 +324,10 @@ def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False, gbd: b
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
     
+    if gbd:
+        # cut out Other Union Territories branch
+        data = data.loc[~data['location_id'].isin([44538, 44539, 44540])]
+    
     if fh_subnationals:
         # add level for WA
         for location_id, parent_id, parent_name in [(3543, 60886, 'King and Snohomish Counties'),
