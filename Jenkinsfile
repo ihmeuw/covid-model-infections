@@ -6,7 +6,7 @@ def cloneRepoToBuild(code_branch) {
   sh "pwd"
   sh "echo 'mkdir $BUILD_NUMBER'"
   sh "mkdir $BUILD_NUMBER"
-  sshagent (credentials: ['jenkins-general']) {
+  sshagent (credentials: ['svccovidvi-privatekey']) {
       sh "echo 'Downloading source code...'"
       sh "git clone --branch $code_branch git@github.com:ihmeuw/covid-model-infections.git $BUILD_NUMBER/covid-model-infections/"
       sh "ls -lr $BUILD_NUMBER"
