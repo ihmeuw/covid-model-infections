@@ -17,11 +17,13 @@ def cloneRepoToBuild(code_branch) {
 
 def install_miniconda(dir) {
   // It seems that on COVID Jenkins every project installs its own mini conda. Let's follow.
-  if (fileExists(dir)) {
-    sh "echo miniconda already installed at $dir"
-  } else {
-    sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $dir"
+  script {
+    if (fileExists(dir)) {
+      sh "echo miniconda already installed at $dir"
+    } else {
+      sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+      sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $dir"
+    }
   }
 }
 
@@ -49,10 +51,8 @@ pipeline {
 
     stage ('Install miniconda') {
       steps{
-        script {
-          node('qlogin'){
-            install_miniconda(conda_dir)
-          }
+        node('qlogin'){
+          install_miniconda(conda_dir)
         }
       }
     }
