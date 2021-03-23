@@ -51,14 +51,13 @@ pipeline {
       steps{
         node('qlogin'){
           // install_miniconda(conda_dir)
-          when { fileExists(conda_dir) }
-          steps { 
-            sh "echo miniconda already installed at $conda_dir"
-          }
-          when {  !fileExists(conda_dir) }
-          steps {
-            sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-            sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $conda_dir"
+          script {
+            if (fileExists(dir)) {
+              sh "echo miniconda already installed at $dir"
+            } else {
+              sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+              sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $dir"
+            }
           }
         }
       }
