@@ -55,39 +55,37 @@ pipeline {
       }
     }
 
-      // stage ('Run snapshot-etl scripts') {
-      //   steps{
-      //         script{
-      //           if(params.PRODUCTION_RUN){
-      //             node('qlogin') {
-      //                today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
-      //                sh "chmod +x $BUILD_NUMBER/snapshot-etl/snapshot-etl.sh"
-      //                sh "echo 'Snapshot command that will be used: ${SNAPSHOT_CMD} -p $today'"
-      //                sh "echo 'ETL command that will be used: ${ETL_CMD} -p $today'"
-      //                ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/snapshot-etl/snapshot-etl.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${SNAPSHOT_CMD} -p $today\"\' \'\"${ETL_CMD} -p $today\"\'"
-      //                sh "echo 'ssh cmd to send is $ssh_cmd'"
-      //                //TODO: change to qsub later
-      //                sshagent(['svccovidci-privatekey']) {
-      //                   sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
-      //                }
-
-      //              }
-      //           }else{
-      //              node('qlogin') {
-      //                 sh "chmod +x $BUILD_NUMBER/snapshot-etl/snapshot-etl.sh"
-      //                sh "echo 'Snapshot command that will be used: ${SNAPSHOT_CMD}'"
-      //                 sh "echo 'ETL command that will be used: ${ETL_CMD}'"
-      //                 ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/snapshot-etl/snapshot-etl.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${SNAPSHOT_CMD}\"\' \'\"${ETL_CMD}\"\'"
-      //                 sh "echo 'ssh cmd to send is $ssh_cmd'"
-      //                 //TODO: change to qsub later
-      //                 sshagent(['svccovidci-privatekey']) {
-      //                    sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
-      //                 }
-      //              }
-      //           }
-      //         }
-      //     }
-      //   }
+    stage ('Run jenkins scripts') {
+      steps{
+            script{
+              if(params.PRODUCTION_RUN){
+                node('qlogin') {
+                    today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
+                    sh "chmod +x $BUILD_NUMBER/covid-model-infections/jeffrey.sh"
+                    sh "echo 'Command that will be used: ${CMD} -p $today'"
+                    ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/covid-model-infections/jeffrey.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${CMD} -p $today\"\'"
+                    sh "echo 'ssh cmd to send is $ssh_cmd'"
+                    //TODO: change to qsub later
+                    sshagent(['svccovidci-privatekey']) {
+                      sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
+                    }
+                  }
+              }else{
+                  node('qlogin') {
+                    today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
+                    sh "chmod +x $BUILD_NUMBER/covid-model-infections/jeffrey.sh"
+                    sh "echo 'Command that will be used: ${CMD}'"
+                    ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/covid-model-infections/jeffrey.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${CMD}\"\'"
+                    sh "echo 'ssh cmd to send is $ssh_cmd'"
+                    //TODO: change to qsub later
+                    sshagent(['svccovidci-privatekey']) {
+                      sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
+                    }
+                  }
+              }
+            }
+        }
+      }
   }
 
 
