@@ -50,7 +50,9 @@ pipeline {
     stage ('Install miniconda') {
       steps{
         node('qlogin'){
-          install_miniconda(conda_dir)
+          script {
+            install_miniconda(conda_dir)
+          }
         }
       }
     }
