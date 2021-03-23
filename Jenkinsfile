@@ -6,22 +6,22 @@ def cloneRepoToBuild(code_branch) {
   sh "pwd"
   sh "echo 'mkdir $BUILD_NUMBER'"
   sh "mkdir $BUILD_NUMBER"
-  // sshagent (credentials: ['svccovidvi-privatekey']) {
-  sshagent (credentials: ['jenkins-general']) {
-      sh "echo 'Downloading source code...'"
-      sh "git clone --branch $code_branch git@github.com:ihmeuw/covid-model-infections.git $BUILD_NUMBER/covid-model-infections/"
-      sh "ls -lr $BUILD_NUMBER"
-      sh "echo 'Source code downloaded'"
+  sshagent (credentials: ['svccovidvi-privatekey']) {
+  // sshagent (credentials: ['jenkins-general']) {
+    sh "echo 'Downloading source code...'"
+    sh "git clone --branch $code_branch git@github.com:ihmeuw/covid-model-infections.git $BUILD_NUMBER/covid-model-infections/"
+    sh "ls -lr $BUILD_NUMBER"
+    sh "echo 'Source code downloaded'"
   }
 }
 
 def install_miniconda(dir) {
   // It seems that on COVID Jenkins every project installs its own mini conda. Let's follow.
   if (fileExists(dir)) {
-      sh "echo miniconda already installed at $dir"
-  }else {
-      sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-      sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $dir"
+    sh "echo miniconda already installed at $dir"
+  } else {
+    sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+    sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $dir"
   }
 }
 
@@ -31,31 +31,30 @@ pipeline {
   agent { label 'qlogin' }
 
   stages{
-      stage ('Notify job start'){
-         steps{
-           emailext body: 'Another email will be send when the job finishes.\n\nMeanwhile, you can view the progress here:\n\n    $BUILD_URL',
-                          to: "${EMAIL_TO}",
-                          subject: 'Build started in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
-         }
+    stage ('Notify job start'){
+      steps {
+        emailext  body: 'Another email will be send when the job finishes.\n\nMeanwhile, you can view the progress here:\n\n    $BUILD_URL',
+                  to: "${EMAIL_TO}",
+                  subject: 'Build started in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
       }
+    }
 
-      stage ('Download source code') {
-        steps{
-          node('qlogin') {
-            cloneRepoToBuild("${JEFFREY_BRANCH}")
-            }
-           }
+    stage ('Download source code') {
+      steps {
+        node('qlogin') {
+          cloneRepoToBuild("${JEFFREY_BRANCH}")
+        }
       }
+    }
 
-      stage ('Install miniconda') {
-        steps{
-          node('qlogin'){
-            install_miniconda(conda_dir)
-              }
-            }
+    stage ('Install miniconda') {
+      steps{
+        node('qlogin'){
+          install_miniconda(conda_dir)
+        }
       }
+    }
 
-      
       // stage ('Run snapshot-etl scripts') {
       //   steps{
       //         script{
@@ -89,22 +88,23 @@ pipeline {
       //         }
       //     }
       //   }
-      }
+  }
 
 
   post {
-       // Currently only email notification is available on COVID Jenkins. If we want to do slack, we will have to
-       // coordinate with INFRA to set it up first. It may request server reboot.
-       success {
-                emailext body: 'Check console output to view the results:\n\n    $BUILD_URL',
-                          to: "${EMAIL_TO}",
-                          subject: 'Build succeeded in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
-        }
-       failure {
-                emailext body: 'Check console output to view the results:\n\n    $BUILD_URL',
-                         to: "${EMAIL_TO}",
-                         subject: 'Build failed in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
-
-            }
+  // Currently only email notification is available on COVID Jenkins. If we want to do slack, we will have to
+  // coordinate with INFRA to set it up first. It may request server reboot.
+    
+    success {
+      emailext  body: 'Check console output to view the results:\n\n    $BUILD_URL',
+                to: "${EMAIL_TO}",
+                subject: 'Build succeeded in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
     }
+    
+    failure {
+      emailext  body: 'Check console output to view the results:\n\n    $BUILD_URL',
+                to: "${EMAIL_TO}",
+                subject: 'Build failed in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
+    }
+  }
 }
