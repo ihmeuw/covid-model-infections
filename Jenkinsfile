@@ -70,14 +70,31 @@ pipeline {
     //     }
     //   }
     // }
+    // stage ('Install miniconda') {
+    //   steps {
+    //     node('qlogin') {
+    //       when { expression { fileExists(conda_dir) } }
+    //       sh "echo miniconda already installed at $conda_dir"
+    //       when { expression { !fileExists(conda_dir) } }
+    //       sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+    //       sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $conda_dir"
+    //     }
+    //   }
+    // }
     stage ('Install miniconda') {
-      steps {
-        node('qlogin') {
+      parallel {
+        stage ('Exists') {
           when { expression { fileExists(conda_dir) } }
-          sh "echo miniconda already installed at $conda_dir"
+          steps {
+            sh "echo miniconda already installed at $conda_dir"
+          }
+        }
+        stage ('Install') {
           when { expression { !fileExists(conda_dir) } }
-          sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-          sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $conda_dir"
+          steps {
+            sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+            sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $conda_dir"
+          }
         }
       }
     }
