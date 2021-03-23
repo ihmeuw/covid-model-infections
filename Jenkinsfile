@@ -9,8 +9,7 @@ def cloneRepoToBuild(code_branch) {
   sshagent (credentials: ['svccovidvi-privatekey']) {
   //sshagent (credentials: ['jenkins-general']) {
       sh "echo 'Downloading source code...'"
-      // sh "git clone --branch $code_branch git@github.com:ihmeuw/covid-model-infections.git $BUILD_NUMBER/covid-model-infections/"
-      sh "git clone --branch $share_branch git@github.com:ihmeuw/covid-model-infections.git $BUILD_NUMBER/covid-model-infections/"
+      sh "git clone --branch $code_branch git@github.com:ihmeuw/covid-model-infections.git $BUILD_NUMBER/covid-model-infections/"
       sh "ls -lr $BUILD_NUMBER"
       sh "echo 'Source code downloaded'"
   }
