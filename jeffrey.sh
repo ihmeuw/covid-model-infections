@@ -14,6 +14,9 @@ export ENV_NAME=$env_name
 export CONDA_PREFIX=$conda_root
 
 echo "Troubleshooting location"
+pwd
+ls
+
 cd 'covid-model-infections'
 pwd
 ls
