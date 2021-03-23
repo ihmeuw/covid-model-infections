@@ -19,9 +19,9 @@ def install_miniconda(dir) {
   // It seems that on COVID Jenkins every project installs its own mini conda. Let's follow.
   if (fileExists(dir)) {
     sh "echo miniconda already installed at $dir"
-  } else {
+  }else {
     sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p -u $dir"
+    sh "bash Miniconda3-latest-Linux-x86_64.sh -b -p $dir"
   }
 }
 
