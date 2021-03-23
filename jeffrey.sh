@@ -12,6 +12,12 @@ eval "$(conda shell.bash hook)"
 
 export ENV_NAME=$env_name
 export CONDA_PREFIX=$conda_root
+
+echo "Troubleshooting location"
+pwd
+echo "Source root is ${src_root}"
+cd $src_root
+ls
 echo "Installing python dependencies for environment $env_name" &&
 make install_env &&
 # check status of previous command

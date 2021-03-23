@@ -47,13 +47,13 @@ pipeline {
       }
     }
 
-    stage ('Install miniconda') {
-      steps {
-        node('qlogin') {
-          install_miniconda(conda_dir)
-        }
-      }
-    }
+    //stage ('Install miniconda') {
+    //  steps {
+    //    node('qlogin') {
+    //      install_miniconda(conda_dir)
+    //    }
+    //  }
+   // }
 
     stage ('Run jenkins scripts') {
       steps{
