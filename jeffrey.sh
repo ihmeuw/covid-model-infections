@@ -14,9 +14,8 @@ export ENV_NAME=$env_name
 export CONDA_PREFIX=$conda_root
 
 echo "Troubleshooting location"
+cd 'covid-model-infections'
 pwd
-echo "Source root is ${src_root}"
-cd $src_root
 ls
 echo "Installing python dependencies for environment $env_name" &&
 make install_env &&
