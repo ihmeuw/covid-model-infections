@@ -14,10 +14,12 @@ export ENV_NAME=$env_name
 export CONDA_PREFIX=$conda_root
 
 echo "Troubleshooting location"
+echo "Before"
 pwd
 ls
-
+cd $src_root
 cd 'covid-model-infections'
+echo "After"
 pwd
 ls
 echo "Installing python dependencies for environment $env_name" &&
