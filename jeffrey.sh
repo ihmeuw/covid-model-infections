@@ -32,6 +32,16 @@ else
     exit 1
 fi
 
+echo "Activating environment $env_name"
+source activate "$env_name"
+# check status of previous command
+if [ $? -eq 0 ]; then
+    echo "Activated environment ${env_name}"
+else
+    echo "Activating conda env failed"
+    exit 1
+fi
+
 echo "Run model infections"
 echo $cmd
 if eval "$cmd"; then
