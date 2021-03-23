@@ -41,18 +41,18 @@ pipeline {
 
     stage ('Download source code') {
       steps {
-        script {
-          node('qlogin') {
-            cloneRepoToBuild("${JEFFREY_BRANCH}")
-          }
+        node('qlogin') {
+          cloneRepoToBuild("${JEFFREY_BRANCH}")
         }
       }
     }
 
     stage ('Install miniconda') {
       steps{
-        node('qlogin'){
-          install_miniconda(conda_dir)
+        script {
+          node('qlogin'){
+            install_miniconda(conda_dir)
+          }
         }
       }
     }
