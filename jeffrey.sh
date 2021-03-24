@@ -12,8 +12,10 @@ eval "$(conda shell.bash hook)"
 
 export ENV_NAME=$env_name
 export CONDA_PREFIX=$conda_root
-export SGE_CLUSTER_NAME='cluster'
-export SGE_ROOT='/opt/sge/'
+export SGE_ENV=prod-el7
+export SGE_CELL=ihme
+export SGE_ROOT=/opt/sge
+export SGE_CLUSTER_NAME=cluster
 
 echo "Troubleshooting location"
 echo "Before"
