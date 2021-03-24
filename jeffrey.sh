@@ -42,6 +42,9 @@ else
     exit 1
 fi
 
+echo "Running conda list"
+conda list
+
 echo "Run model infections"
 echo $cmd
 if eval "$cmd"; then
