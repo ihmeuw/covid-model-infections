@@ -46,6 +46,7 @@ echo "Running conda list"
 conda list
 
 echo "Run model infections"
+echo $env
 echo $cmd
 if eval "$cmd"; then
     echo "Jeffrey completed"
