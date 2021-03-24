@@ -108,6 +108,5 @@ def get_drmaa():
             os.environ['DRMAA_LIBRARY_PATH'] = '/opt/sge/lib/lx-amd64/libdrmaa.so'
             import drmaa
         else:
-            raise Exception("drmaa path not found!")
             drmaa = object()
     return drmaa
