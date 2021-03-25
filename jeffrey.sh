@@ -17,15 +17,7 @@ export SGE_CELL=ihme
 export SGE_ROOT=/opt/sge
 export SGE_CLUSTER_NAME=cluster
 
-echo "Troubleshooting location"
-echo "Before"
-pwd
-ls
-cd $src_root
-cd 'covid-model-infections'
-echo "After"
-pwd
-ls
+
 echo "Installing python dependencies for environment $env_name" &&
 make install_env &&
 # check status of previous command
@@ -35,6 +27,7 @@ else
     echo "Installing dependencies failed"
     exit 1
 fi
+
 
 echo "Activating environment $env_name"
 source activate "$env_name"
@@ -46,11 +39,8 @@ else
     exit 1
 fi
 
-echo "Running conda list"
-conda list
 
 echo "Run model infections"
-env
 echo $cmd
 if eval "$cmd"; then
     echo "Jeffrey completed"

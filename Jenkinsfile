@@ -15,23 +15,13 @@ def cloneRepoToBuild(code_branch) {
   }
 }
 
-def install_miniconda(dir) {
-  // It seems that on COVID Jenkins every project installs its own mini conda. Let's follow.
-  if (fileExists(dir)) {
-    sh "echo miniconda already installed at $dir"
-  }else {
-    sh "wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    sh "bash Miniconda3-latest-Linux-x86_64.sh -b -u -p $dir"
-  }
-}
-
 pipeline {
   //The Jenkinsfile of ssh://git@stash.ihme.washington.edu:7999/scic/covid-snapshot-etl-orchestration.git
 
   agent { label 'qlogin' }
 
-  stages{
-    stage ('Notify job start'){
+  stages {
+    stage ('Notify job start') {
       steps {
         emailext  body: 'Another email will be send when the job finishes.\n\nMeanwhile, you can view the progress here:\n\n    $BUILD_URL',
                   to: "${EMAIL_TO}",
@@ -47,45 +37,37 @@ pipeline {
       }
     }
 
-    //stage ('Install miniconda') {
-    //  steps {
-    //    node('qlogin') {
-    //      install_miniconda(conda_dir)
-    //    }
-    //  }
-   // }
-
     stage ('Run jenkins scripts') {
       steps{
-            script{
-              if(params.PRODUCTION_RUN){
-                node('qlogin') {
-                    today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
-                    sh "chmod +x $BUILD_NUMBER/covid-model-infections/jeffrey.sh"
-                    sh "echo 'Command that will be used: ${CMD} -p $today'"
-                    ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/covid-model-infections/jeffrey.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${CMD} -p $today\"\'"
-                    sh "echo 'ssh cmd to send is $ssh_cmd'"
-                    //TODO: change to qsub later
-                    sshagent(['svccovidci-privatekey']) {
-                      sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
-                    }
-                  }
-              }else{
-                  node('qlogin') {
-                    today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
-                    sh "chmod +x $BUILD_NUMBER/covid-model-infections/jeffrey.sh"
-                    sh "echo 'Command that will be used: ${CMD}'"
-                    ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/covid-model-infections/jeffrey.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${CMD}\"\'"
-                    sh "echo 'ssh cmd to send is $ssh_cmd'"
-                    //TODO: change to qsub later
-                    sshagent(['svccovidci-privatekey']) {
-                      sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
-                    }
-                  }
+        script{
+          if(params.PRODUCTION_RUN) {
+            node('qlogin') {
+              today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
+              sh "chmod +x $BUILD_NUMBER/covid-model-infections/jeffrey.sh"
+              sh "echo 'Command that will be used: ${CMD} -p $today'"
+              ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/covid-model-infections/jeffrey.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${CMD} -p $today\"\'"
+              sh "echo 'ssh cmd to send is $ssh_cmd'"
+              //TODO: change to qsub later
+              sshagent(['svccovidci-privatekey']) {
+                sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
               }
             }
+          } else {
+            node('qlogin') {
+              today = sh(script: 'date +%Y_%m_%d', returnStdout: true).trim()
+              sh "chmod +x $BUILD_NUMBER/covid-model-infections/jeffrey.sh"
+              sh "echo 'Command that will be used: ${CMD}'"
+              ssh_cmd = "$WORKSPACE/$BUILD_NUMBER/covid-model-infections/jeffrey.sh $env_name $WORKSPACE/$BUILD_NUMBER $conda_dir \'\"${CMD}\"\'"
+              sh "echo 'ssh cmd to send is $ssh_cmd'"
+              //TODO: change to qsub later
+              sshagent(['svccovidci-privatekey']) {
+                sh "ssh -o StrictHostKeyChecking=no svccovidci@int-uge-archive-p012.cluster.ihme.washington.edu \"$ssh_cmd\""
+              }
+            }
+          }
         }
       }
+    }
   }
 
 
