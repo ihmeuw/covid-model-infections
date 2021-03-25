@@ -19,6 +19,8 @@ export SGE_CLUSTER_NAME=cluster
 
 
 echo "Installing python dependencies for environment $env_name" &&
+cd $src_root &&
+cd 'covid-model-infections' &&
 make install_env &&
 # check status of previous command
 if [ $? -eq 0 ]; then
