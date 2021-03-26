@@ -123,6 +123,13 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         manipulation_metadata['jordan'] = 'dropped all hospitalizations'
     
     elif input_measure == 'deaths':
+        uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
+                                                  'location_id'].to_list()
+        is_uk = data['location_id'].isin(uk_location_ids)
+        is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
+        data = data.loc[~(is_uk & is_pre_mar1)].reset_index(drop=True)
+        manipulation_metadata['uk'] = 'dropped leading 0s in deaths from UK (pre March 1)'
+        
         for location_id, location_label in fh_col_subnats:
             is_fh_col_subnat = data['location_id'] == location_id
             last_date = data.loc[is_fh_col_subnat, 'date'].max()
