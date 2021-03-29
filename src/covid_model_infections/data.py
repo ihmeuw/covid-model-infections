@@ -221,6 +221,18 @@ def load_sero_data(infection_detection_root: Path) -> pd.DataFrame:
     return data
 
 
+def load_reinfection_data(infection_fatality_root: Path) -> pd.Series:
+    data_path = infection_fatality_root / 'reinfection_data.csv'
+    data = pd.read_csv(data_path)
+    data['date'] = pd.to_datetime(data['date'])
+    
+    data = (data
+            .set_index(['location_id', 'date'])
+            .loc[:, 'inflation_factor'])
+    
+    return data
+
+
 def load_testing_data(infection_detection_root: Path):
     data_path = infection_detection_root / 'test_data.csv'
     data = pd.read_csv(data_path)

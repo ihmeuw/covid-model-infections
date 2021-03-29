@@ -62,12 +62,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_data = data.load_ifr(infection_fatality_root)
     ifr_model_data = data.load_ifr_data(infection_fatality_root)
     ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
+    reinfection_data = data.load_reinfection_data(infection_fatality_root)
     ihr_data = data.load_ihr(infection_hospitalization_root)
     ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
     # Assumes IDR has estimated floor already applied
     idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))
     idr_model_data = data.load_idr_data(infection_detection_root)
-
+    
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)
     test_data = data.load_testing_data(infection_detection_root)
@@ -165,6 +166,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     test_data.to_hdf(test_path, key='data', mode='w')
     ifr_data_path = model_in_dir / 'ifr_model_data.h5'
     ifr_model_data.to_hdf(ifr_data_path, key='data', mode='w')
+    reinfection_data_path = model_in_dir / 'reinfection_data.h5'
+    reinfection_data.to_hdf(reinfection_data_path, key='data', mode='w')
     ihr_data_path = model_in_dir / 'ihr_model_data.h5'
     ihr_model_data.to_hdf(ihr_data_path, key='data', mode='w')
     idr_data_path = model_in_dir / 'idr_model_data.h5'
@@ -216,6 +219,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
             hierarchy,
             pop_data,
             sero_data,
+            reinfection_data,
             ifr_model_data,
             ihr_model_data,
             idr_model_data,
@@ -301,8 +305,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
             
     logger.info('Writing serology data for grid plots.')
-    sero_data['geo_accordance'] = 1 - sero_data['geo_accordance']
-    sero_data['included'] = 1 - sero_data[['geo_accordance', 'manual_outlier']].max(axis=1)
+    sero_data['included'] = 1 - sero_data['manual_outlier']
     sero_data = sero_data.rename(columns={'seroprev_mean':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
     sero_path = output_root / 'sero_data.csv'

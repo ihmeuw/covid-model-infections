@@ -355,11 +355,11 @@ def get_infected(location_id: int,
     output_draws = output_draws[:-3]
     
     logger.info('Plot data.')
-    sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
+    sero_data, reinfection_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
-        input_data, sero_data, ratio_model_inputs,
-        output_data, smooth_infections, output_draws, population
+        input_data, sero_data, ratio_model_inputs, reinfection_data,
+        output_data.copy(), smooth_infections.copy(), output_draws, population
     )
     
     logger.info('Create and writing ratios.')

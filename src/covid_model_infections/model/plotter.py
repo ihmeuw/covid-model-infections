@@ -29,7 +29,7 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 def plotter(plot_dir, location_id, location_name,
             input_data,
-            sero_data, ratio_model_inputs,
+            sero_data, ratio_model_inputs, reinfection_data,
             output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)
@@ -123,11 +123,24 @@ def plotter(plot_dir, location_id, location_name,
                output_draws[1:], start_date, end_date, False)
     whitespace_mid = fig.add_subplot(gs[5:7, 2])
     whitespace_mid.axis('off')
+    
+    smooth_infections = smooth_infections.cumsum()
+    output_draws = output_draws.cumsum()
+    if not reinfection_data.empty:
+        output_draws = output_draws.join(reinfection_data, how='left')
+        output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
+        output_draws = output_draws.divide(output_draws[['inflation_factor']].values)
+        del output_draws['inflation_factor']
+        sero_data = sero_data.join(reinfection_data, how='left')
+        sero_data['inflation_factor'] = sero_data['inflation_factor'].fillna(1)
+        sero_data['seroprev_mean_no_vacc_waning'] /= sero_data['inflation_factor']
+        del sero_data['inflation_factor']
+    
     cumulmodel_ax = fig.add_subplot(gs[7:11, 2])
     infection_cumul_data = {mm: (output_data[mm]['infections_cumul'] / population) * 100 for mm in model_measures}
     model_plot(cumulmodel_ax, None, 'Cumulative (%)', infection_cumul_data, sero_data,
-               (smooth_infections.cumsum() / population) * 100,
-               (output_draws.cumsum() / population) * 100, start_date, end_date, True)
+               (smooth_infections / population) * 100,
+               (output_draws / population) * 100, start_date, end_date, True)
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
     whitespace_bottom.axis('off')
     
@@ -229,7 +242,7 @@ def model_plot(ax, title, ylabel, measure_data, sero_data, smooth_infections, ou
     if sero_data is not None:
         ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
                    sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean'] * 100,
-                   s=80, c='orange', edgecolors='darkorange', alpha=0.3, marker='^')
+                   s=80, c='darkturquoise', edgecolors='darkcyan', alpha=0.3, marker='^')
         ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 1].index,
                    sero_data.loc[sero_data['manual_outlier'] == 1, 'seroprev_mean'] * 100,
                    s=80, c='maroon', edgecolors='maroon', alpha=0.45, marker='x')
