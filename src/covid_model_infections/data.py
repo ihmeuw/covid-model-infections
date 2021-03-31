@@ -70,11 +70,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_pakistan].reset_index(drop=True)
         manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
         
-        wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
-                                                  'location_id'].to_list()
-        is_wa = data['location_id'].isin(wa_location_ids)
-        data = data.loc[~is_wa].reset_index(drop=True)
-        manipulation_metadata['washington'] = 'dropped all hospitalizations'
+        # wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
+        #                                           'location_id'].to_list()
+        # is_wa = data['location_id'].isin(wa_location_ids)
+        # data = data.loc[~is_wa].reset_index(drop=True)
+        # manipulation_metadata['washington'] = 'dropped all hospitalizations'
         
         is_poland = data['location_id'] == 51
         data = data.loc[~is_poland].reset_index(drop=True)
@@ -91,6 +91,14 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_jordan = data['location_id'] == 144
         data = data.loc[~is_jordan].reset_index(drop=True)
         manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+        
+        is_bc = data['location_id'] == 43859
+        data = data.loc[~is_bc].reset_index(drop=True)
+        manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
+        
+        is_luxembourg = data['location_id'] == 87
+        data = data.loc[~is_luxembourg].reset_index(drop=True)
+        manipulation_metadata['luxembourg'] = 'dropped all hospitalizations'
     
     elif input_measure == 'deaths':
         uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
