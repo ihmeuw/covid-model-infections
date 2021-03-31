@@ -41,6 +41,8 @@ else
     exit 1
 fi
 
+echo "Conda packages:"
+conda list
 
 echo "Run model infections"
 echo $cmd
