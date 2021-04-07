@@ -95,6 +95,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # is_bc = data['location_id'] == 43859
         # data = data.loc[~is_bc].reset_index(drop=True)
         # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
+        
+        is_ohio = data['location_id'] == 558
+        is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
+        data = data.loc[~(is_ohio & is_pre_mar1)].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped leading 0s in admissions from Ohio (pre March 1)'
     
     elif input_measure == 'deaths':
         uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
@@ -108,11 +113,6 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_pre_mar15 = data['date'] < pd.Timestamp('2020-03-15')
         data = data.loc[~(is_arkansas & is_pre_mar15)].reset_index(drop=True)
         manipulation_metadata['arkansas'] = 'dropped leading 0s in deaths from Arkansas (pre March 15)'
-        
-        is_ohio = data['location_id'] == 558
-        is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-        data = data.loc[~(is_ohio & is_pre_mar1)].reset_index(drop=True)
-        manipulation_metadata['ohio'] = 'dropped leading 0s in deaths from Ohio (pre March 1)'
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
