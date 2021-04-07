@@ -28,77 +28,73 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # manipulation_metadata['india'] = 'dropped all cases'
 
     elif input_measure == 'hospitalizations':
-        is_oman = data['location_id'] == 150
-        data = data.loc[~is_oman].reset_index(drop=True)
-        manipulation_metadata['oman'] = 'dropped all hospitalizations'
-        
-        is_greece = data['location_id'] == 82
-        data = data.loc[~is_greece].reset_index(drop=True)
-        manipulation_metadata['greece'] = 'dropped all hospitalizations'
-        
+        # is_oman = data['location_id'] == 150
+        # data = data.loc[~is_oman].reset_index(drop=True)
+        # manipulation_metadata['oman'] = 'dropped all hospitalizations'
+
+        # is_greece = data['location_id'] == 82
+        # data = data.loc[~is_greece].reset_index(drop=True)
+        # manipulation_metadata['greece'] = 'dropped all hospitalizations'
+
         # is_norway = data['location_id'] == 90
         # data = data.loc[~is_norway].reset_index(drop=True)
         # manipulation_metadata['norway'] = 'dropped all hospitalizations'
-        
+
         is_argentina = data['location_id'] == 97
         data = data.loc[~is_argentina].reset_index(drop=True)
         manipulation_metadata['argentina'] = 'dropped all hospitalizations'
-        
+
         is_romania = data['location_id'] == 52
         data = data.loc[~is_romania].reset_index(drop=True)
         manipulation_metadata['romania'] = 'dropped all hospitalizations'
-        
+
         is_slovenia = data['location_id'] == 55
         data = data.loc[~is_slovenia].reset_index(drop=True)
         manipulation_metadata['slovenia'] = 'dropped all hospitalizations'
-        
+
         is_vietnam = data['location_id'] == 20
         data = data.loc[~is_vietnam].reset_index(drop=True)
         manipulation_metadata['vietnam'] = 'dropped all hospitalizations'
-        
+
         is_murcia = data['location_id'] == 60366
         data = data.loc[~is_murcia].reset_index(drop=True)
         manipulation_metadata['murcia'] = 'dropped all hospitalizations'
-        
+
         is_dc = data['location_id'] == 531
         data = data.loc[~is_dc].reset_index(drop=True)
         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
-        
+
         pakistan_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '165' in x.split(',')),
                                               'location_id'].to_list()
         is_pakistan = data['location_id'].isin(pakistan_location_ids)
         data = data.loc[~is_pakistan].reset_index(drop=True)
         manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
-        
+
         # wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
         #                                           'location_id'].to_list()
         # is_wa = data['location_id'].isin(wa_location_ids)
         # data = data.loc[~is_wa].reset_index(drop=True)
         # manipulation_metadata['washington'] = 'dropped all hospitalizations'
-        
+
         is_poland = data['location_id'] == 51
         data = data.loc[~is_poland].reset_index(drop=True)
         manipulation_metadata['poland'] = 'dropped all hospitalizations'
-        
+
         is_philippines = data['location_id'] == 16
         data = data.loc[~is_philippines].reset_index(drop=True)
         manipulation_metadata['philippines'] = 'dropped all hospitalizations'
-        
+
         is_portugal = data['location_id'] == 91
         data = data.loc[~is_portugal].reset_index(drop=True)
         manipulation_metadata['portugal'] = 'dropped all hospitalizations'
-        
-        is_jordan = data['location_id'] == 144
-        data = data.loc[~is_jordan].reset_index(drop=True)
-        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
-        
-        is_bc = data['location_id'] == 43859
-        data = data.loc[~is_bc].reset_index(drop=True)
-        manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
-        
-        is_luxembourg = data['location_id'] == 87
-        data = data.loc[~is_luxembourg].reset_index(drop=True)
-        manipulation_metadata['luxembourg'] = 'dropped all hospitalizations'
+
+        # is_jordan = data['location_id'] == 144
+        # data = data.loc[~is_jordan].reset_index(drop=True)
+        # manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+
+        # is_bc = data['location_id'] == 43859
+        # data = data.loc[~is_bc].reset_index(drop=True)
+        # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
     
     elif input_measure == 'deaths':
         uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
@@ -131,10 +127,11 @@ def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
 def load_ifr_risk_adjustment(infection_fatality_root: Path) -> pd.Series:
     data_path = infection_fatality_root / 'terminal_ifr.csv'
     data = pd.read_csv(data_path)
+    data['date'] = pd.to_datetime(data['date'])
     data['lr_adj'] = data['ifr_lr'] / data['ifr']
     data['hr_adj'] = data['ifr_hr'] / data['ifr']
     data = (data
-            .set_index('location_id')
+            .set_index(['location_id', 'date'])
             .loc[:, ['lr_adj', 'hr_adj']])
     
     return data
@@ -252,12 +249,23 @@ def load_testing_data(infection_detection_root: Path):
     return data
 
 
-def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str) -> Tuple[pd.Series, pd.Series, Dict]:
+def load_em_scalars(infection_fatality_root: Path) -> pd.DataFrame:
+        data_path = infection_fatality_root / 'excess_mortalilty.csv'
+        data = pd.read_csv(data_path)
+        
+        return data
+
+
+def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,
+                      excess_mortality: bool = True,) -> Tuple[pd.Series, pd.Series, Dict]:
     data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
-    data = data.rename(columns={'Deaths':'cumulative_deaths',
-                                'Confirmed':'cumulative_cases',
+    data = data.rename(columns={'Confirmed':'cumulative_cases',
                                 'Hospitalizations':'cumulative_hospitalizations',})
+    if input_measure == 'deaths' and excess_mortality:
+        data = data.rename(columns={'Deaths':'cumulative_deaths',})
+    else:
+        data = data.rename(columns={'UNSCALED Deaths':'cumulative_deaths',})
     data['date'] = pd.to_datetime(data['Date'])
     keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
     data = data.loc[:, keep_cols].dropna()
@@ -266,6 +274,7 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_mea
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
+
     data[f'daily_{input_measure}'] = (data
                                       .groupby('location_id')[f'cumulative_{input_measure}']
                                       .apply(lambda x: x.diff())

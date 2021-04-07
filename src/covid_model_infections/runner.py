@@ -48,9 +48,16 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pop_data = data.load_population(model_inputs_root)
     
     logger.info('Loading epi report data.')
-    cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'deaths')
-    cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'hospitalizations')
-    cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(model_inputs_root, hierarchy, 'cases')
+    em_data = data.load_em_scalars(infection_fatality_root)
+    cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
+        model_inputs_root, hierarchy, 'deaths'
+    )
+    cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
+        model_inputs_root, hierarchy, 'hospitalizations'
+    )
+    cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
+        model_inputs_root, hierarchy, 'cases'
+    )
     app_metadata.update({'data_manipulation': {
         'deaths':deaths_manipulation_metadata,
         'hospitalizations':hospital_manipulation_metadata,
@@ -285,7 +292,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
 
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
         if estimated_ratio == 'ifr':
-            ratio_draws = ratio_draws.join(ifr_risk_data, on='location_id')
+            ratio_draws = ratio_draws.join(ifr_risk_data)
             ratio_draws = ratio_draws.sort_index()
             ifr_risk_data = ratio_draws[['lr_adj', 'hr_adj']].copy()
         else:
@@ -304,7 +311,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
         with multiprocessing.Pool(MP_THREADS) as p:
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
             
-    logger.info('Writing serology data for grid plots.')
+    logger.info('Writing serology data and EM scaling factor data.')
+    em_path = output_root / 'em_data.csv'
+    em_data.to_csv(em_path, index=False)
     sero_data['included'] = 1 - sero_data['manual_outlier']
     sero_data = sero_data.rename(columns={'seroprev_mean':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
@@ -312,4 +321,3 @@ def make_infections(app_metadata: cli_tools.Metadata,
     sero_data.reset_index().to_csv(sero_path, index=False)
         
     logger.info(f'Model run complete -- {str(output_root)}.')
-    
