@@ -260,7 +260,7 @@ def load_testing_data(infection_detection_root: Path):
 
 
 def load_em_scalars(infection_fatality_root: Path) -> pd.DataFrame:
-        data_path = infection_fatality_root / 'excess_mortalilty.csv'
+        data_path = infection_fatality_root / 'excess_mortality.csv'
         data = pd.read_csv(data_path)
         
         return data

@@ -49,8 +49,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Loading epi report data.')
     em_data = data.load_em_scalars(infection_fatality_root)
+    excess_mortality = em_data['scaled'].unique().item()
+    del em_data['scaled']
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths'
+        model_inputs_root, hierarchy, 'deaths', excess_mortality
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
         model_inputs_root, hierarchy, 'hospitalizations'
