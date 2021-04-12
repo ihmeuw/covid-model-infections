@@ -32,6 +32,7 @@ def plotter(plot_dir, location_id, location_name,
             sero_data, ratio_model_inputs,
             output_data, smooth_infections, output_draws, population,
             measures=['cases', 'hospitalizations', 'deaths']):
+    breakpoint()
     start_date, end_date = get_dates(input_data, output_data)
     
     n_cols = 3
@@ -164,6 +165,8 @@ def plotter(plot_dir, location_id, location_name,
         outerax.set_facecolor('none')
     
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
+    breakpoint()
+    plt.tight_layout()
     if plot_dir is not None:
         fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
         plt.close(fig)

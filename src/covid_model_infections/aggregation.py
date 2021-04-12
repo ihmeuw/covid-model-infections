@@ -133,6 +133,7 @@ def plot_aggregate(location_id: int,
                    ihr_model_data: pd.DataFrame,
                    idr_model_data: pd.DataFrame,
                    plot_dir: Path):
+    breakpoint()
     sero_data = sero_data.reset_index()
     sero_data = (sero_data
                  .loc[sero_data['location_id'] == location_id]
@@ -157,6 +158,7 @@ def plot_aggregate(location_id: int,
                             .set_index('date'))
         ratio_model_inputs.update({measure:ratio_model_data})
 
+    breakpoint()
     plotter.plotter(
         plot_dir, location_id, location_name,
         model_data, sero_data, ratio_model_inputs,
