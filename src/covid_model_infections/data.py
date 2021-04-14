@@ -96,23 +96,24 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # data = data.loc[~is_bc].reset_index(drop=True)
         # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
         
-        is_arkansas = data['location_id'] == 526
-        is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-        data = data.loc[~(is_arkansas & is_pre_mar1)].reset_index(drop=True)
-        manipulation_metadata['arkansas'] = 'dropped leading 0s in admissions from Arkansas (pre March 1)'
+#         is_arkansas = data['location_id'] == 526
+#         is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
+#         data = data.loc[~(is_arkansas & is_pre_mar1)].reset_index(drop=True)
+#         manipulation_metadata['arkansas'] = 'dropped leading 0s in admissions from Arkansas (pre March 1)'
     
     elif input_measure == 'deaths':
-        uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
-                                                  'location_id'].to_list()
-        is_uk = data['location_id'].isin(uk_location_ids)
-        is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-        data = data.loc[~(is_uk & is_pre_mar1)].reset_index(drop=True)
-        manipulation_metadata['uk'] = 'dropped leading 0s in deaths from UK (pre March 1)'
+#         uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
+#                                                   'location_id'].to_list()
+#         is_uk = data['location_id'].isin(uk_location_ids)
+#         is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
+#         data = data.loc[~(is_uk & is_pre_mar1)].reset_index(drop=True)
+#         manipulation_metadata['uk'] = 'dropped leading 0s in deaths from UK (pre March 1)'
         
-        is_ohio = data['location_id'] == 558
-        is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-        data = data.loc[~(is_ohio & is_pre_mar1)].reset_index(drop=True)
-        manipulation_metadata['ohio'] = 'dropped leading 0s in deaths from Ohio (pre March 1)'
+#         is_ohio = data['location_id'] == 558
+#         is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
+#         data = data.loc[~(is_ohio & is_pre_mar1)].reset_index(drop=True)
+#         manipulation_metadata['ohio'] = 'dropped leading 0s in deaths from Ohio (pre March 1)'
+        pass
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
@@ -309,6 +310,30 @@ def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     data['location_id'] = data['location_id'].astype(int)
 
     return data[['location_id', 'date'] + interp_vars]
+
+
+def trim_leading_zeros(cumul_data: List[pd.Series],
+                       daily_data: List[pd.Series],) -> Tuple[pd.Series]:
+    cumul = pd.concat(cumul_data, axis=1)
+    cumul = cumul.fillna(0)
+    cumul = cumul.sum(axis=1)
+    cumul = cumul.loc[cumul > 0]
+    start_dates = cumul.reset_index().groupby('location_id')['date'].min()
+    start_dates -= pd.Timedelta(days=14)
+    start_dates = start_dates.rename('start_date').reset_index()
+    
+    def _trim_leading_zeros(data: pd.Series, start_dates: pd.DataFrame) -> pd.Series:
+        data_name = data.name
+        data = data.reset_index().merge(start_dates, how='left')
+        data = data.loc[~(data['date'] < data['start_date'])]  # do it this way so we keep NaTs
+        del data['start_date']
+        data = data.set_index(['location_id', 'date']).loc[:, data_name]
+        
+        return data
+    
+    trimmed_data = (_trim_leading_zeros(data, start_dates) for data in cumul_data + daily_data)
+    
+    return trimmed_data
 
 
 def load_hierarchy(model_inputs_root:Path) -> pd.DataFrame:

@@ -16,6 +16,8 @@ MEASURE_COLORS = {
 DATE_LOCATOR = mdates.AutoDateLocator(maxticks=10)
 DATE_FORMATTER = mdates.ConciseDateFormatter(DATE_LOCATOR, show_offset=False)
 
+EXPOSURE_TO_SEROPOSITIVE = 15
+
 
 def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Timestamp]:
     input_dates = [v['cumul'].reset_index()['date'] for k, v in input_data.items()]
@@ -127,6 +129,9 @@ def plotter(plot_dir, location_id, location_name,
     smooth_infections = smooth_infections.cumsum()
     output_draws = output_draws.cumsum()
     if not reinfection_data.empty:
+        # these data are in sero timing
+        reinfection_data.index -= pd.Timedelta(days=EXPOSURE_TO_SEROPOSITIVE)
+        
         output_draws = output_draws.join(reinfection_data, how='left')
         output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
         output_draws = output_draws.divide(output_draws[['inflation_factor']].values)

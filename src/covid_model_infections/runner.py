@@ -24,9 +24,7 @@ MP_THREADS = 25
 
 def make_infections(app_metadata: cli_tools.Metadata,
                     model_inputs_root: Path,
-                    infection_fatality_root: Path,
-                    infection_hospitalization_root: Path,
-                    infection_detection_root: Path,
+                    rates_root: Path,
                     output_root: Path,
                     holdout_days: int,
                     n_draws: int):
@@ -48,7 +46,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pop_data = data.load_population(model_inputs_root)
     
     logger.info('Loading epi report data.')
-    em_data = data.load_em_scalars(infection_fatality_root)
+    em_data = data.load_em_scalars(rates_root)
     excess_mortality = em_data['scaled'].unique().item()
     del em_data['scaled']
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
@@ -60,6 +58,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
         model_inputs_root, hierarchy, 'cases'
     )
+    
+    cumul_deaths, cumul_hospital, cumul_cases,\
+    daily_deaths, daily_hospital, daily_cases = data.trim_leading_zeros(
+        [cumul_deaths, cumul_hospital, cumul_cases],
+        [daily_deaths, daily_hospital, daily_cases],
+    )
+    
     app_metadata.update({'data_manipulation': {
         'deaths':deaths_manipulation_metadata,
         'hospitalizations':hospital_manipulation_metadata,
@@ -68,19 +73,19 @@ def make_infections(app_metadata: cli_tools.Metadata,
     measures = ['deaths', 'hospitalizations', 'cases']
     
     logger.info('Loading estimated ratios and adding draw directories.')
-    ifr_data = data.load_ifr(infection_fatality_root)
-    ifr_model_data = data.load_ifr_data(infection_fatality_root)
-    ifr_risk_data = data.load_ifr_risk_adjustment(infection_fatality_root)
-    reinfection_data = data.load_reinfection_data(infection_fatality_root)
-    ihr_data = data.load_ihr(infection_hospitalization_root)
-    ihr_model_data = data.load_ihr_data(infection_hospitalization_root)
+    ifr_data = data.load_ifr(rates_root)
+    ifr_model_data = data.load_ifr_data(rates_root)
+    ifr_risk_data = data.load_ifr_risk_adjustment(rates_root)
+    reinfection_data = data.load_reinfection_data(rates_root)
+    ihr_data = data.load_ihr(rates_root)
+    ihr_model_data = data.load_ihr_data(rates_root)
     # Assumes IDR has estimated floor already applied
-    idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))
-    idr_model_data = data.load_idr_data(infection_detection_root)
+    idr_data = data.load_idr(rates_root, (0, IDR_UPPER_LIMIT))
+    idr_model_data = data.load_idr_data(rates_root)
     
     logger.info('Loading extra data for plotting.')
-    sero_data = data.load_sero_data(infection_detection_root)
-    test_data = data.load_testing_data(infection_detection_root)
+    sero_data = data.load_sero_data(rates_root)
+    test_data = data.load_testing_data(rates_root)
         
     logger.info('Creating model input data structure.')
     most_detailed = hierarchy['most_detailed'] == 1
@@ -317,7 +322,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     em_path = output_root / 'em_data.csv'
     em_data.to_csv(em_path, index=False)
     sero_data['included'] = 1 - sero_data['manual_outlier']
-    sero_data = sero_data.rename(columns={'seroprev_mean':'value'})
+    sero_data = sero_data.rename(columns={'seroprev_mean_no_vacc_waning':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
     sero_path = output_root / 'sero_data.csv'
     sero_data.reset_index().to_csv(sero_path, index=False)
