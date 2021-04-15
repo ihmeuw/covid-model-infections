@@ -100,11 +100,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         data = data.loc[~is_pakistan].reset_index(drop=True)
         manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
         
-        wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
-                                                  'location_id'].to_list()
-        is_wa = data['location_id'].isin(wa_location_ids)
-        data = data.loc[~is_wa].reset_index(drop=True)
-        manipulation_metadata['washington'] = 'dropped all hospitalizations'
+        # wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
+        #                                           'location_id'].to_list()
+        # is_wa = data['location_id'].isin(wa_location_ids)
+        # data = data.loc[~is_wa].reset_index(drop=True)
+        # manipulation_metadata['washington'] = 'dropped all hospitalizations'
         
         is_poland = data['location_id'] == 51
         data = data.loc[~is_poland].reset_index(drop=True)
@@ -121,6 +121,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         is_jordan = data['location_id'] == 144
         data = data.loc[~is_jordan].reset_index(drop=True)
         manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+        
+        is_bc = data['location_id'] == 43859
+        data = data.loc[~is_bc].reset_index(drop=True)
+        manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
     
     elif input_measure == 'deaths':
         for location_id, location_label in fh_col_subnats:
@@ -304,6 +308,30 @@ def fill_dates(data: pd.DataFrame, interp_vars: List[str]) -> pd.DataFrame:
     data['location_id'] = data['location_id'].astype(int)
 
     return data[['location_id', 'date'] + interp_vars]
+
+
+def trim_leading_zeros(cumul_data: List[pd.Series],
+                       daily_data: List[pd.Series],) -> Tuple[pd.Series]:
+    cumul = pd.concat(cumul_data, axis=1)
+    cumul = cumul.fillna(0)
+    cumul = cumul.sum(axis=1)
+    cumul = cumul.loc[cumul > 0]
+    start_dates = cumul.reset_index().groupby('location_id')['date'].min()
+    start_dates -= pd.Timedelta(days=14)
+    start_dates = start_dates.rename('start_date').reset_index()
+    
+    def _trim_leading_zeros(data: pd.Series, start_dates: pd.DataFrame) -> pd.Series:
+        data_name = data.name
+        data = data.reset_index().merge(start_dates, how='left')
+        data = data.loc[~(data['date'] < data['start_date'])]  # do it this way so we keep NaTs
+        del data['start_date']
+        data = data.set_index(['location_id', 'date']).loc[:, data_name]
+        
+        return data
+    
+    trimmed_data = (_trim_leading_zeros(data, start_dates) for data in cumul_data + daily_data)
+    
+    return trimmed_data
 
 
 def load_hierarchy(model_inputs_root:Path, fh_subnationals: bool = False) -> pd.DataFrame:

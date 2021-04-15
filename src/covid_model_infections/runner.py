@@ -68,6 +68,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     }})
     measures = ['deaths', 'hospitalizations', 'cases']
     
+    cumul_deaths, cumul_hospital, cumul_cases,\
+    daily_deaths, daily_hospital, daily_cases = data.trim_leading_zeros(
+        [cumul_deaths, cumul_hospital, cumul_cases],
+        [daily_deaths, daily_hospital, daily_cases],
+    )
+    
     logger.info('Loading estimated ratios and adding draw directories.')
     ifr_data = data.load_ifr(infection_fatality_root)
     ifr_model_data = data.load_ifr_data(infection_fatality_root)
@@ -77,7 +83,6 @@ def make_infections(app_metadata: cli_tools.Metadata,
     # Assumes IDR has estimated floor already applied
     idr_data = data.load_idr(infection_detection_root, (0, IDR_UPPER_LIMIT))
     idr_model_data = data.load_idr_data(infection_detection_root)
-    # TODO: centralize this information, is used elsewhere...
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(infection_detection_root)
@@ -152,10 +157,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
             })
         else:
             unmodeled_location_ids.append(location_id)
+    # TODO: centralize this information, is used elsewhere...
     estimated_ratios = {'deaths':('ifr', ifr_data.copy()),
                         'hospitalizations':('ihr', ihr_data.copy()),
                         'cases':('idr', idr_data.copy()),}
-            
+    
     logger.info('Identifying unmodeled locations.')
     app_metadata.update({'unmodeled_location_ids': unmodeled_location_ids})
     if unmodeled_location_ids:
