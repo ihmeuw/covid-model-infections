@@ -20,11 +20,13 @@ warnings.simplefilter('ignore')
               type=click.Path(file_okay=False),
               default=paths.BEST_LINK,
               help=('Which version of the IFR, IHR, and IDR data to use. '
-                    'May be a full path or relative to the standard root -- NEED TO ADD TO SHARED.'))
+                    'May be a full path or relative to the standard historical model root.'))
 @click.option('-o', '--output-root',
               type=click.Path(file_okay=False),
               default=paths.PAST_INFECTIONS_ROOT,
-              show_default=True)
+              show_default=True,
+              help=('Directory containing versioned results structure (will create structure '
+                    'if not already present).'))
 @click.option('--n-holdout-days',
               type=click.INT,
               default=0,
@@ -50,9 +52,8 @@ def run_infections(run_metadata,
     cli_tools.configure_logging_to_terminal(verbose)
     model_inputs_root = cli_tools.get_last_stage_directory(model_inputs_version,
                                                            last_stage_root=paths.MODEL_INPUTS_ROOT)
-    # rates_root = cli_tools.get_last_stage_directory(rates_version,
-    #                                                 last_stage_root=paths.INFECTION_FATALITY_RATIO_ROOT)
-    rates_root = Path(rates_version)
+    rates_root = cli_tools.get_last_stage_directory(rates_version,
+                                                    last_stage_root=paths.HISTORICAL_MODEL_ROOT)
     run_metadata.update_from_path('model_inputs_metadata', model_inputs_root / paths.METADATA_FILE_NAME)
     run_metadata.update_from_path('rates_metadata', rates_root / paths.METADATA_FILE_NAME)
 
