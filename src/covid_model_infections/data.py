@@ -93,6 +93,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
             is_pulaski = data['location_id'] == 725
             data = data.loc[~is_pulaski].reset_index(drop=True)
             manipulation_metadata['pulaski_county'] = 'dropped all hospitalizations (looks to be aggregate of multiple Pulaski Counties)'
+            
+            is_lane = data['location_id'] == 2807
+            data = data.loc[~is_lane].reset_index(drop=True)
+            manipulation_metadata['lane_county'] = 'dropped all hospitalizations'
 
         pakistan_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '165' in x.split(',')),
                                               'location_id'].to_list()
