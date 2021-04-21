@@ -117,7 +117,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                         pd.concat({location_id: ifr_data.loc[int(parent_id)]}, names=['location_id'])
                     )
                     ifr_risk_data = ifr_risk_data.append(
-                        ifr_risk_data.loc[int(parent_id)].rename(location_id)
+                        pd.concat({location_id: ifr_risk_data.loc[int(parent_id)]}, names=['location_id'])
                     )
                 else:
                     pass

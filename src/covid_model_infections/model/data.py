@@ -69,8 +69,7 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
         'cases':idr_model_data
     }
     
-<<<<<<< HEAD
-    return sero_data, ratio_model_inputs
+    return sero_data, reinfection_data, ratio_model_inputs
 
 
 def get_trimmed_dates(data: pd.DataFrame, measure: str, leading_window: int) -> pd.DataFrame:
@@ -83,6 +82,3 @@ def get_trimmed_dates(data: pd.DataFrame, measure: str, leading_window: int) -> 
     trimmed_dates = n_leading_zeros[n_leading_zeros <= leading_window].index
     
     return trimmed_dates
-=======
-    return sero_data, reinfection_data, ratio_model_inputs
->>>>>>> rmbarber/feature/new-pipeline-experiments
