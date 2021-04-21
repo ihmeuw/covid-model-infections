@@ -128,6 +128,8 @@ def plotter(plot_dir, location_id, location_name,
     output_draws = output_draws.cumsum()
     if not reinfection_data.empty:
         output_draws = output_draws.join(reinfection_data, how='left')
+        output_draws = output_draws.sort_index()
+        output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(method='ffill')
         output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
         output_draws = output_draws.divide(output_draws[['inflation_factor']].values)
         del output_draws['inflation_factor']
@@ -242,13 +244,13 @@ def model_plot(ax, title, ylabel, measure_data, sero_data, smooth_infections, ou
     if sero_data is not None:
         ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
                    sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean'] * 100,
-                   s=80, c='darkturquoise', edgecolors='darkcyan', alpha=0.3, marker='^')
+                   s=80, c='darkturquoise', edgecolors='darkcyan', alpha=0.3, marker='s')
         ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 1].index,
                    sero_data.loc[sero_data['manual_outlier'] == 1, 'seroprev_mean'] * 100,
                    s=80, c='maroon', edgecolors='maroon', alpha=0.45, marker='x')
         ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
                    sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean_no_vacc'] * 100,
-                   s=80, c='orange', edgecolors='darkorange', alpha=0.3, marker='s')
+                   s=80, c='orange', edgecolors='darkorange', alpha=0.3, marker='^')
         ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
                    sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean_no_vacc_waning'] * 100,
                    s=100, c='mediumorchid', edgecolors='darkmagenta', alpha=0.6, marker='o')

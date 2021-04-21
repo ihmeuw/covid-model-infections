@@ -16,9 +16,9 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # data = data.loc[~is_ecuador].reset_index(drop=True)
         # manipulation_metadata['ecuador'] = 'dropped all cases'
 
-        # is_kazakhstan = data['location_id'] == 36
-        # data = data.loc[~is_kazakhstan].reset_index(drop=True)
-        # manipulation_metadata['kazakhstan'] = 'dropped all cases'
+        is_kazakhstan = data['location_id'] == 36
+        data = data.loc[~is_kazakhstan].reset_index(drop=True)
+        manipulation_metadata['kazakhstan'] = 'dropped all cases'
         
         # india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
         #                                    'location_id'].to_list()
@@ -96,24 +96,8 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # is_bc = data['location_id'] == 43859
         # data = data.loc[~is_bc].reset_index(drop=True)
         # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
-        
-#         is_arkansas = data['location_id'] == 526
-#         is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-#         data = data.loc[~(is_arkansas & is_pre_mar1)].reset_index(drop=True)
-#         manipulation_metadata['arkansas'] = 'dropped leading 0s in admissions from Arkansas (pre March 1)'
     
     elif input_measure == 'deaths':
-#         uk_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '95' in x.split(',')),
-#                                                   'location_id'].to_list()
-#         is_uk = data['location_id'].isin(uk_location_ids)
-#         is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-#         data = data.loc[~(is_uk & is_pre_mar1)].reset_index(drop=True)
-#         manipulation_metadata['uk'] = 'dropped leading 0s in deaths from UK (pre March 1)'
-        
-#         is_ohio = data['location_id'] == 558
-#         is_pre_mar1 = data['date'] < pd.Timestamp('2020-03-01')
-#         data = data.loc[~(is_ohio & is_pre_mar1)].reset_index(drop=True)
-#         manipulation_metadata['ohio'] = 'dropped leading 0s in deaths from Ohio (pre March 1)'
         pass
     
     else:
