@@ -136,6 +136,7 @@ def plot_aggregate(location_id: int,
                    hierarchy: pd.DataFrame,
                    pop_data: pd.Series,
                    sero_data: pd.DataFrame,
+                   reinfection_data: pd.DataFrame,
                    ifr_model_data: pd.DataFrame,
                    ihr_model_data: pd.DataFrame,
                    idr_model_data: pd.DataFrame,
@@ -145,6 +146,11 @@ def plot_aggregate(location_id: int,
                  .loc[sero_data['location_id'] == location_id]
                  .drop('location_id', axis=1)
                  .set_index('date'))
+    
+    if location_id in reinfection_data.reset_index()['location_id'].to_list():
+        reinfection_data = reinfection_data.loc[location_id]
+    else:
+        reinfection_data = pd.DataFrame()
     
     population = pop_data[location_id]
     
@@ -166,7 +172,7 @@ def plot_aggregate(location_id: int,
 
     plotter.plotter(
         plot_dir, location_id, location_name,
-        model_data, sero_data, ratio_model_inputs,
+        model_data, sero_data, ratio_model_inputs, reinfection_data,
         outputs, infections_mean, infections_draws, population
     )
     
