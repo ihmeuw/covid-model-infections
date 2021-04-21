@@ -54,13 +54,16 @@ def make_infections(app_metadata: cli_tools.Metadata,
     excess_mortality = em_data['scaled'].unique().item()
     del em_data['scaled']
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths', excess_mortality, fh_subnationals
+        model_inputs_root, hierarchy, 'deaths', excess_mortality,
+        fh_subnationals=fh_subnationals
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'hospitalizations', fh_subnationals
+        model_inputs_root, hierarchy, 'hospitalizations',
+        fh_subnationals=fh_subnationals
     )
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'cases', fh_subnationals
+        model_inputs_root, hierarchy, 'cases',
+        fh_subnationals=fh_subnationals
     )
     
     cumul_deaths, cumul_hospital, cumul_cases,\
