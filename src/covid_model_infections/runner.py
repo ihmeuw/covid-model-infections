@@ -119,6 +119,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     ifr_risk_data = ifr_risk_data.append(
                         pd.concat({location_id: ifr_risk_data.loc[int(parent_id)]}, names=['location_id'])
                     )
+                    break
                 else:
                     pass
         if location_id in daily_deaths.reset_index()['location_id'].values:
@@ -135,6 +136,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     ihr_data = ihr_data.append(
                         pd.concat({location_id: ihr_data.loc[int(parent_id)]}, names=['location_id'])
                     )
+                    break
                 else:
                     pass
         if location_id in daily_hospital.reset_index()['location_id'].values:
@@ -151,6 +153,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     idr_data = idr_data.append(
                         pd.concat({location_id: idr_data.loc[int(parent_id)]}, names=['location_id'])
                     )
+                    break
                 else:
                     pass
         if location_id in daily_cases.reset_index()['location_id'].values:
