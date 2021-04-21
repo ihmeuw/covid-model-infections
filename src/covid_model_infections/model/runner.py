@@ -203,6 +203,8 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     residuals = residuals.dropna().sort_values('date').rename(columns={'infections':'residuals'})
     
     dates = smooth_infections.index
+    if len(dates) < rmse_radius * 3:
+        rmse_radius = int(len(dates) / 3)
     dates = dates[rmse_radius:-rmse_radius]
     
     logger.info(f'Getting MAD (using rolling {int(rmse_radius*2)} day window), translating to SD.')
