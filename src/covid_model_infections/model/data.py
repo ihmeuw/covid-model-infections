@@ -5,6 +5,7 @@ import dill as pickle
 
 import pandas as pd
 
+
 def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float]:
     hierarchy_path = model_in_dir / 'hierarchy.h5'
     hierarchy = pd.read_hdf(hierarchy_path)
@@ -31,6 +32,13 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
                  .loc[sero_data['location_id'] == location_id]
                  .drop('location_id', axis=1)
                  .set_index('date'))
+    
+    reinfection_path = model_in_dir / 'reinfection_data.h5'
+    reinfection_data = pd.read_hdf(reinfection_path)
+    if location_id in reinfection_data.reset_index()['location_id'].to_list():
+        reinfection_data = reinfection_data.loc[location_id]
+    else:
+        reinfection_data = pd.DataFrame()
     
     ifr_model_data_path = model_in_dir / 'ifr_model_data.h5'
     ifr_model_data = pd.read_hdf(ifr_model_data_path)
@@ -61,4 +69,4 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
         'cases':idr_model_data
     }
     
-    return sero_data, ratio_model_inputs
+    return sero_data, reinfection_data, ratio_model_inputs
