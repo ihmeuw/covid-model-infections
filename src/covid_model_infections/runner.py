@@ -72,6 +72,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     }})
     measures = ['deaths', 'hospitalizations', 'cases']
     
+    cumul_deaths, cumul_hospital, cumul_cases,\
+    daily_deaths, daily_hospital, daily_cases = data.trim_leading_zeros(
+        [cumul_deaths, cumul_hospital, cumul_cases],
+        [daily_deaths, daily_hospital, daily_cases],
+    )
+    
     logger.info('Loading estimated ratios and adding draw directories.')
     ifr_data = data.load_ifr(rates_root)
     ifr_model_data = data.load_ifr_data(rates_root)
