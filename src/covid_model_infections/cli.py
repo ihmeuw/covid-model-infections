@@ -16,23 +16,17 @@ warnings.simplefilter('ignore')
               default=paths.BEST_LINK,
               help=('Which version of the inputs data to gather and format. '
                     'May be a full path or relative to the standard inputs root.'))
-@click.option('-f', '--infection-fatality-version',
+@click.option('-r', '--rates-version',
               type=click.Path(file_okay=False),
               default=paths.BEST_LINK,
-              help=('Which version of the infection-fatality rate (IFR) data to use. '
-                    'May be a full path or relative to the standard IFR root.'))
-@click.option('-h', '--infection-hospitalization-version',
-              type=click.Path(file_okay=False),
-              default=paths.BEST_LINK,
-              help=('Which version of the infection-hospitalization-rate (IHR) data to use.'))
-@click.option('-d', '--infection-detection-version',
-              type=click.Path(file_okay=False),
-              default=paths.BEST_LINK,
-              help=('Which version of the infection-detection-rate (IDR) data to use.'))
+              help=('Which version of the IFR, IHR, and IDR data to use. '
+                    'May be a full path or relative to the standard historical model root.'))
 @click.option('-o', '--output-root',
               type=click.Path(file_okay=False),
               default=paths.PAST_INFECTIONS_ROOT,
-              show_default=True)
+              show_default=True,
+              help=('Directory containing versioned results structure (will create structure '
+                    'if not already present).'))
 @click.option('--n-holdout-days',
               type=click.INT,
               default=0,
@@ -50,7 +44,7 @@ warnings.simplefilter('ignore')
 @cli_tools.add_verbose_and_with_debugger
 def run_infections(run_metadata,
                    model_inputs_version,
-                   infection_fatality_version, infection_hospitalization_version, infection_detection_version,
+                   rates_version,
                    output_root, n_holdout_days, n_draws,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
@@ -58,16 +52,10 @@ def run_infections(run_metadata,
     cli_tools.configure_logging_to_terminal(verbose)
     model_inputs_root = cli_tools.get_last_stage_directory(model_inputs_version,
                                                            last_stage_root=paths.MODEL_INPUTS_ROOT)
-    infection_fatality_root = cli_tools.get_last_stage_directory(infection_fatality_version,
-                                                                 last_stage_root=paths.INFECTION_FATALITY_RATIO_ROOT)
-    infection_hospitalization_root = cli_tools.get_last_stage_directory(infection_hospitalization_version,
-                                                                        last_stage_root=paths.INFECTION_HOSPITALIZATION_RATIO_ROOT)
-    infection_detection_root = cli_tools.get_last_stage_directory(infection_detection_version,
-                                                                  last_stage_root=paths.INFECTION_DETECTION_RATE_ROOT)
+    rates_root = cli_tools.get_last_stage_directory(rates_version,
+                                                    last_stage_root=paths.HISTORICAL_MODEL_ROOT)
     run_metadata.update_from_path('model_inputs_metadata', model_inputs_root / paths.METADATA_FILE_NAME)
-    run_metadata.update_from_path('ifr_metadata', infection_fatality_root / paths.METADATA_FILE_NAME)
-    run_metadata.update_from_path('ihr_metadata', infection_hospitalization_root / paths.METADATA_FILE_NAME)
-    run_metadata.update_from_path('idr_metadata', infection_detection_root / paths.METADATA_FILE_NAME)
+    run_metadata.update_from_path('rates_metadata', rates_root / paths.METADATA_FILE_NAME)
 
     output_root = Path(output_root).resolve()
     cli_tools.setup_directory_structure(output_root, with_production=True)
@@ -77,9 +65,7 @@ def run_infections(run_metadata,
 
     main = cli_tools.monitor_application(runner.make_infections, logger, with_debugger)
     app_metadata, _ = main(model_inputs_root,
-                           infection_fatality_root,
-                           infection_hospitalization_root,
-                           infection_detection_root,
+                           rates_root,
                            run_directory, n_holdout_days, n_draws)
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
