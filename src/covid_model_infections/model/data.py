@@ -33,6 +33,13 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
                  .drop('location_id', axis=1)
                  .set_index('date'))
     
+    reinfection_path = model_in_dir / 'reinfection_data.h5'
+    reinfection_data = pd.read_hdf(reinfection_path)
+    if location_id in reinfection_data.reset_index()['location_id'].to_list():
+        reinfection_data = reinfection_data.loc[location_id]
+    else:
+        reinfection_data = pd.DataFrame()
+    
     ifr_model_data_path = model_in_dir / 'ifr_model_data.h5'
     ifr_model_data = pd.read_hdf(ifr_model_data_path)
     ifr_model_data = ifr_model_data.reset_index()
@@ -62,7 +69,7 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
         'cases':idr_model_data
     }
     
-    return sero_data, ratio_model_inputs
+    return sero_data, reinfection_data, ratio_model_inputs
 
 
 def get_trimmed_dates(data: pd.DataFrame, measure: str, leading_window: int) -> pd.DataFrame:

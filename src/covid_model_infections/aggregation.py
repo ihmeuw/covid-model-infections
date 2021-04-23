@@ -16,6 +16,7 @@ def aggregate_md_data_dict(md_data: Dict, hierarchy: pd.DataFrame, measures: Lis
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
     
     agg_data = {parent_id: create_parent_dict(md_data, parent_id, hierarchy, measures) for parent_id in parent_ids}
+    agg_data = {k: v for k, v in agg_data.items() if v is not None}
     
     return agg_data
 
@@ -33,13 +34,16 @@ def create_parent_dict(md_data: Dict, parent_id: int, hierarchy: pd.DataFrame, m
     children_data = [md_data.get(child_id, None) for child_id in child_ids]
     children_data = [cd for cd in children_data  if cd is not None]
     
-    parent_data = sum_data_from_child_dicts(children_data, measures)
+    if children_data:
+        parent_data = sum_data_from_child_dicts(children_data, measures)
+    else:
+        parent_data = None
     
     return parent_data
 
     
 def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
-    child_dict = {}
+    parent_dict = {}
     for measure in measures:
         measure_dict = {}
         metrics = [list(child_data.get(measure, {}).keys()) for child_data in children_data]
@@ -77,9 +81,9 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
                 measure_dict['ratio'] = pd.concat([ratio_data, ratio_fe_data], axis=1).dropna()
             
         if metrics:
-            child_dict.update({measure: measure_dict})
+            parent_dict.update({measure: measure_dict})
     
-    return child_dict
+    return parent_dict
 
 
 def subset_to_parent_md_draws(md_draws: pd.DataFrame, parent_id: int, hierarchy: pd.DataFrame) -> pd.DataFrame:
@@ -97,8 +101,11 @@ def aggregate_md_draws(md_draws: pd.DataFrame, hierarchy: pd.DataFrame, mp_threa
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
     
     parent_draws_list = [subset_to_parent_md_draws(md_draws, parent_id, hierarchy) for parent_id in parent_ids]
+    parent_draws_list = [i for i in parent_draws_list if not i.empty]
     with Pool(mp_threads - 1) as p:
-        agg_draws = list(tqdm(p.imap(create_parent_draws, parent_draws_list), total=len(parent_ids), file=sys.stdout))
+        agg_draws = list(tqdm(p.imap(create_parent_draws, parent_draws_list),
+                              total=len(parent_draws_list),
+                              file=sys.stdout))
     agg_draws = pd.concat(agg_draws)
     
     not_agged = [str(i) for i in parent_ids if i not in agg_draws.reset_index()['location_id'].to_list()]
@@ -140,6 +147,7 @@ def plot_aggregate(location_id: int,
                    hierarchy: pd.DataFrame,
                    pop_data: pd.Series,
                    sero_data: pd.DataFrame,
+                   reinfection_data: pd.DataFrame,
                    ifr_model_data: pd.DataFrame,
                    ihr_model_data: pd.DataFrame,
                    idr_model_data: pd.DataFrame,
@@ -149,6 +157,11 @@ def plot_aggregate(location_id: int,
                  .loc[sero_data['location_id'] == location_id]
                  .drop('location_id', axis=1)
                  .set_index('date'))
+    
+    if location_id in reinfection_data.reset_index()['location_id'].to_list():
+        reinfection_data = reinfection_data.loc[location_id]
+    else:
+        reinfection_data = pd.DataFrame()
     
     population = pop_data[location_id]
     
@@ -170,7 +183,7 @@ def plot_aggregate(location_id: int,
 
     plotter.plotter(
         plot_dir, location_id, location_name,
-        model_data, sero_data, ratio_model_inputs,
+        model_data, sero_data, ratio_model_inputs, reinfection_data,
         outputs, infections_mean, infections_draws, population
     )
     
