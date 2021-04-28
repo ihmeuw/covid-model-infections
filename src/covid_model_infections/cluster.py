@@ -15,7 +15,7 @@ QUEUE = 'all.q'
 F_MEM = '5.0G'
 F_THREAD = '6'
 OMP_NUM_THREADS = '6'
-H_RUNTIME = '04:00:00'
+H_RUNTIME = '06:00:00'
 SLEEP_TIME = 10
 
 
