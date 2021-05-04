@@ -251,7 +251,8 @@ def splice_ratios(ratio_data: pd.Series,
     return new_ratio
 
 
-def enforce_ratio_ceiling(measure: str,
+def enforce_ratio_ceiling(output_measure: str,
+                          input_measure: str,
                           obs_data: pd.Series,
                           infections_data: pd.Series,
                           lag: int,
@@ -268,7 +269,7 @@ def enforce_ratio_ceiling(measure: str,
     # needs_correction = infections_scaler > 1
     needs_correction = infections_scaler.max() > 1
     if needs_correction:
-        logger.info(f'Adjusting infections from {measure} to preserve ratio ceiling.')
+        logger.info(f'Adjusting infections from {output_measure} so they are not fewer than observed {input_measure}.')
     infections_data *= infections_scaler
 
     return infections_data
@@ -316,7 +317,8 @@ def get_infected(location_id: int,
                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
     for input_measure in input_data.keys():
-        infections_inputs = [enforce_ratio_ceiling(measure,
+        infections_inputs = [enforce_ratio_ceiling(output_measure,
+                                                   input_measure,
                                                    output_data[input_measure]['daily'],
                                                    output_data[output_measure]['infections_daily'],
                                                    input_data[input_measure]['lag'],)
