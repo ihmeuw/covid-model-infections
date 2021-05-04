@@ -319,8 +319,8 @@ def get_infected(location_id: int,
     for input_measure in input_data.keys():
         infections_inputs = [enforce_ratio_ceiling(output_measure,
                                                    input_measure,
-                                                   output_data[input_measure]['daily'],
-                                                   output_data[output_measure]['infections_daily'],
+                                                   output_data[input_measure]['daily'][1:].copy(),
+                                                   output_data[output_measure]['infections_daily'].copy(),
                                                    input_data[input_measure]['lag'],)
                              for output_measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
