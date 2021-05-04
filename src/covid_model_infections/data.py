@@ -16,9 +16,9 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # data = data.loc[~is_ecuador].reset_index(drop=True)
         # manipulation_metadata['ecuador'] = 'dropped all cases'
 
-        is_kazakhstan = data['location_id'] == 36
-        data = data.loc[~is_kazakhstan].reset_index(drop=True)
-        manipulation_metadata['kazakhstan'] = 'dropped all cases'
+        # is_kazakhstan = data['location_id'] == 36
+        # data = data.loc[~is_kazakhstan].reset_index(drop=True)
+        # manipulation_metadata['kazakhstan'] = 'dropped all cases'
         
         # india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
         #                                    'location_id'].to_list()
