@@ -6,6 +6,9 @@ import dill as pickle
 import sys
 from tqdm import tqdm
 from loguru import logger
+import multiprocessing
+import functools
+
 
 import pandas as pd
 import numpy as np
@@ -302,7 +305,8 @@ def get_infected(location_id: int,
                  plot_dir: str,
                  measure_type: str = 'daily',
                  measure_log: bool = True, measure_knot_days: int = 7,
-                 infection_log: bool = True, infection_knot_days: int = 28,):
+                 infection_log: bool = True, infection_knot_days: int = 28,
+                 mp: bool = True,):
     np.random.seed(location_id)
     logger.info('Loading data.')
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
@@ -339,13 +343,22 @@ def get_infected(location_id: int,
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
     logger.info('Fitting infection curves to draws of all available input measures.')
-    output_draws = []
-    for input_draw in tqdm(input_draws, total=n_draws, file=sys.stdout):
-        output_draws.append(model_infections(
-            input_draw,
+    if mp:
+        _model_infections = functools.partial(
+            model_infections,
             log=infection_log, knot_days=infection_knot_days, num_submodels=1,
             diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
-        ))
+        )
+        with multiprocessing.Pool(int(OMP_NUM_THREADS)) as p:
+            output_draws = list(tqdm(p.imap(_model_infections, input_draws), total=n_draws, file=sys.stdout))
+    else:
+        output_draws = []
+        for input_draw in tqdm(input_draws, total=n_draws, file=sys.stdout):
+            output_draws.append(model_infections(
+                input_draw,
+                log=infection_log, knot_days=infection_knot_days, num_submodels=1,
+                diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
+            ))
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = get_rate_transformations(infection_log)
     if infection_log:
