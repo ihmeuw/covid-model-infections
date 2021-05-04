@@ -251,13 +251,13 @@ def splice_ratios(ratio_data: pd.Series,
     return new_ratio
 
 
-def enforce_idr_ceiling(measure: str,
-                        case_data: pd.Series,
-                        infections_data: pd.Series,
-                        case_lag: int,
-                        idr_ceiling: float,):
-    infections_floor = case_data / idr_ceiling
-    infections_floor.index -= pd.Timedelta(days=case_lag)
+def enforce_ratio_ceiling(measure: str,
+                          obs_data: pd.Series,
+                          infections_data: pd.Series,
+                          lag: int,
+                          ceiling: float,):
+    infections_floor = obs_data / ceiling
+    infections_floor.index -= pd.Timedelta(days=lag)
     infections_scaler = (infections_floor / infections_data)[infections_data.index]
     infections_scaler = (infections_scaler
                          .fillna(method='ffill')
@@ -268,7 +268,7 @@ def enforce_idr_ceiling(measure: str,
     # needs_correction = infections_scaler > 1
     needs_correction = infections_scaler.max() > 1
     if needs_correction:
-        logger.info(f'Adjusting infections from {measure} to preserve IDR ceiling of {idr_ceiling}.')
+        logger.info(f'Adjusting infections from {measure} to preserve ratio ceiling.')
     infections_data *= infections_scaler
 
     return infections_data
@@ -315,18 +315,16 @@ def get_infected(location_id: int,
                                           measure_log, measure_knot_days, num_submodels=1,
                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
-    if 'cases' in input_data.keys():
-        infections_inputs = [enforce_idr_ceiling(measure,
-                                                 output_data['cases']['daily'],
-                                                 output_data[measure]['infections_daily'],
-                                                 input_data['cases']['lag'],
-                                                 IDR_UPPER_LIMIT,)
-                             for measure in output_data.keys()]
+    for input_measure in input_data.keys():
+        infections_inputs = [enforce_ratio_ceiling(measure,
+                                                   output_data[input_measure]['daily'],
+                                                   output_data[output_measure]['infections_daily'],
+                                                   input_data[input_measure]['lag'],
+                                                   ceiling=1.,)
+                             for output_measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
             output_data[measure]['infections_daily'] = new_infections
             output_data[measure]['infections_cumul'] = new_infections.cumsum()
-    else:
-        infections_inputs = [v['infections_daily'] for k, v in output_data.items()]
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
