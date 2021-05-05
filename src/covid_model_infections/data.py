@@ -80,6 +80,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_poland = data['location_id'] == 51
         data = data.loc[~is_poland].reset_index(drop=True)
         manipulation_metadata['poland'] = 'dropped all hospitalizations'
+        
+        is_lithuania = data['location_id'] == 60
+        data = data.loc[~is_lithuania].reset_index(drop=True)
+        manipulation_metadata['lithuania'] = 'dropped all hospitalizations'
 
         is_philippines = data['location_id'] == 16
         data = data.loc[~is_philippines].reset_index(drop=True)
