@@ -43,6 +43,7 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         # is_india = data['location_id'].isin(india_location_ids)
         # data = data.loc[~is_india].reset_index(drop=True)
         # manipulation_metadata['india'] = 'dropped all cases'
+        pass
         
     elif input_measure == 'hospitalizations':
         # is_oman = data['location_id'] == 150
