@@ -33,9 +33,9 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         # data = data.loc[~is_ecuador].reset_index(drop=True)
         # manipulation_metadata['ecuador'] = 'dropped all cases'
 
-        is_kazakhstan = data['location_id'] == 36
-        data = data.loc[~is_kazakhstan].reset_index(drop=True)
-        manipulation_metadata['kazakhstan'] = 'dropped all cases'
+        # is_kazakhstan = data['location_id'] == 36
+        # data = data.loc[~is_kazakhstan].reset_index(drop=True)
+        # manipulation_metadata['kazakhstan'] = 'dropped all cases'
         
         # india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
         #                                    'location_id'].to_list()
@@ -105,6 +105,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         is_poland = data['location_id'] == 51
         data = data.loc[~is_poland].reset_index(drop=True)
         manipulation_metadata['poland'] = 'dropped all hospitalizations'
+        
+        is_lithuania = data['location_id'] == 60
+        data = data.loc[~is_lithuania].reset_index(drop=True)
+        manipulation_metadata['lithuania'] = 'dropped all hospitalizations'
 
         is_philippines = data['location_id'] == 16
         data = data.loc[~is_philippines].reset_index(drop=True)
@@ -114,6 +118,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         data = data.loc[~is_portugal].reset_index(drop=True)
         manipulation_metadata['portugal'] = 'dropped all hospitalizations'
 
+        is_goa = data['location_id'] == 4850
+        data = data.loc[~is_goa].reset_index(drop=True)
+        manipulation_metadata['goa'] = 'dropped all hospitalizations'
+
         # is_jordan = data['location_id'] == 144
         # data = data.loc[~is_jordan].reset_index(drop=True)
         # manipulation_metadata['jordan'] = 'dropped all hospitalizations'
@@ -121,14 +129,15 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame,
         # is_bc = data['location_id'] == 43859
         # data = data.loc[~is_bc].reset_index(drop=True)
         # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
-    
+
     elif input_measure == 'deaths':
-        if gbd:
-            ethiopia_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '179' in x.split(',')),
-                                                  'location_id'].to_list()
-            is_ethiopia = data['location_id'].isin(ethiopia_location_ids)
-            data = data.loc[~is_ethiopia].reset_index(drop=True)
-            manipulation_metadata['ethiopia'] = 'dropped all deaths'
+        # if gbd:
+        #     ethiopia_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '179' in x.split(',')),
+        #                                           'location_id'].to_list()
+        #     is_ethiopia = data['location_id'].isin(ethiopia_location_ids)
+        #     data = data.loc[~is_ethiopia].reset_index(drop=True)
+        #     manipulation_metadata['ethiopia'] = 'dropped all deaths'
+        pass
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')

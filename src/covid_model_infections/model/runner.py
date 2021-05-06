@@ -6,6 +6,9 @@ import dill as pickle
 import sys
 from tqdm import tqdm
 from loguru import logger
+import multiprocessing
+import functools
+
 
 import pandas as pd
 import numpy as np
@@ -13,7 +16,7 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import OMP_NUM_THREADS, IDR_UPPER_LIMIT
+from covid_model_infections.utils import OMP_NUM_THREADS
 
 LOG_OFFSET = 1
 FLOOR = 1e-4
@@ -276,13 +279,14 @@ def splice_ratios(ratio_data: pd.Series,
     return new_ratio
 
 
-def enforce_idr_ceiling(measure: str,
-                        case_data: pd.Series,
-                        infections_data: pd.Series,
-                        case_lag: int,
-                        idr_ceiling: float,):
-    infections_floor = case_data / idr_ceiling
-    infections_floor.index -= pd.Timedelta(days=case_lag)
+def enforce_ratio_ceiling(output_measure: str,
+                          input_measure: str,
+                          obs_data: pd.Series,
+                          infections_data: pd.Series,
+                          lag: int,
+                          ceiling: float = 1.,):
+    infections_floor = obs_data / ceiling
+    infections_floor.index -= pd.Timedelta(days=lag)
     infections_scaler = (infections_floor / infections_data)[infections_data.index]
     infections_scaler = (infections_scaler
                          .fillna(method='ffill')
@@ -293,7 +297,7 @@ def enforce_idr_ceiling(measure: str,
     # needs_correction = infections_scaler > 1
     needs_correction = infections_scaler.max() > 1
     if needs_correction:
-        logger.info(f'Adjusting infections from {measure} to preserve IDR ceiling of {idr_ceiling}.')
+        logger.info(f'Adjusting infections from {output_measure} so they are not fewer than observed {input_measure}.')
     infections_data *= infections_scaler
 
     return infections_data
@@ -326,7 +330,8 @@ def get_infected(location_id: int,
                  plot_dir: str,
                  measure_type: str = 'daily',
                  measure_log: bool = True, measure_knot_days: int = 7,
-                 infection_log: bool = True, infection_knot_days: int = 28,):
+                 infection_log: bool = True, infection_knot_days: int = 28,
+                 mp: bool = True,):
     np.random.seed(location_id)
     logger.info('Loading data.')
     input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
@@ -341,18 +346,16 @@ def get_infected(location_id: int,
                                            measure_log, measure_knot_days, num_submodels=1,
                                            split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
-    if 'cases' in input_data.keys():
-        infections_inputs = [enforce_idr_ceiling(measure,
-                                                 output_data['cases']['daily'].copy(),
-                                                 output_data[measure]['infections_daily'].copy(),
-                                                 input_data['cases']['lag'],
-                                                 IDR_UPPER_LIMIT,)
-                             for measure in output_data.keys()]
+    for input_measure in input_data.keys():
+        infections_inputs = [enforce_ratio_ceiling(output_measure,
+                                                   input_measure,
+                                                   output_data[input_measure]['daily'][1:].copy(),
+                                                   output_data[output_measure]['infections_daily'].copy(),
+                                                   input_data[input_measure]['lag'],)
+                             for output_measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
             output_data[measure]['infections_daily'] = new_infections
             output_data[measure]['infections_cumul'] = new_infections.cumsum()
-    else:
-        infections_inputs = [v['infections_daily'] for k, v in output_data.items()]
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
@@ -367,13 +370,22 @@ def get_infected(location_id: int,
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
     logger.info('Fitting infection curves to draws of all available input measures.')
-    output_draws = []
-    for input_draw in tqdm(input_draws, total=n_draws, file=sys.stdout):
-        output_draws.append(model_infections(
-            input_draw,
+    if mp:
+        _model_infections = functools.partial(
+            model_infections,
             log=infection_log, knot_days=infection_knot_days, num_submodels=1,
             diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
-        ))
+        )
+        with multiprocessing.Pool(int(OMP_NUM_THREADS)) as p:
+            output_draws = list(tqdm(p.imap(_model_infections, input_draws), total=n_draws, file=sys.stdout))
+    else:
+        output_draws = []
+        for input_draw in tqdm(input_draws, total=n_draws, file=sys.stdout):
+            output_draws.append(model_infections(
+                input_draw,
+                log=infection_log, knot_days=infection_knot_days, num_submodels=1,
+                diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
+            ))
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = get_rate_transformations(infection_log)
     if infection_log:
