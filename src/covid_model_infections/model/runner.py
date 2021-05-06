@@ -16,7 +16,8 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import OMP_NUM_THREADS
+from covid_model_infections.utils import CEILINGS
+from covid_model_infections.cluster import OMP_NUM_THREADS
 
 LOG_OFFSET = 1
 FLOOR = 1e-4
@@ -259,7 +260,7 @@ def enforce_ratio_ceiling(output_measure: str,
                           obs_data: pd.Series,
                           infections_data: pd.Series,
                           lag: int,
-                          ceiling: float = 1.,):
+                          ceiling: float,):
     infections_floor = obs_data / ceiling
     infections_floor.index -= pd.Timedelta(days=lag)
     infections_scaler = (infections_floor / infections_data)[infections_data.index]
@@ -325,7 +326,8 @@ def get_infected(location_id: int,
                                                    input_measure,
                                                    output_data[input_measure]['daily'][1:].copy(),
                                                    output_data[output_measure]['infections_daily'].copy(),
-                                                   input_data[input_measure]['lag'],)
+                                                   input_data[input_measure]['lag'],
+                                                   CEILINGS[input_measure],)
                              for output_measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
             output_data[measure]['infections_daily'] = new_infections
