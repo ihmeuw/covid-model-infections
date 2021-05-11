@@ -96,6 +96,14 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_goa = data['location_id'] == 4850
         data = data.loc[~is_goa].reset_index(drop=True)
         manipulation_metadata['goa'] = 'dropped all hospitalizations'
+        
+        is_pr = data['location_id'] == 385
+        data = data.loc[~is_pr].reset_index(drop=True)
+        manipulation_metadata['puerto_rico'] = 'dropped all hospitalizations'
+        
+        is_ohio = data['location_id'] == 558
+        data = data.loc[~is_ohio].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped all hospitalizations'
 
         # is_jordan = data['location_id'] == 144
         # data = data.loc[~is_jordan].reset_index(drop=True)
@@ -217,15 +225,14 @@ def load_sero_data(infection_detection_root: Path) -> pd.DataFrame:
     data = (data
             .loc[:, ['location_id', 'infection_date',
                      'seroprev_mean', 'seroprev_mean_no_vacc', 'seroprev_mean_no_vacc_waning',
-                     'geo_accordance', 'manual_outlier']])
-    data.loc[data['geo_accordance'] == 0, 'manual_outlier'] == 1
+                     'is_outlier']])
     data = data.rename(columns={'infection_date':'date'})
     data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
             .loc[:, ['seroprev_mean', 'seroprev_mean_no_vacc', 'seroprev_mean_no_vacc_waning',
-                     'manual_outlier']])
+                     'is_outlier']])
     
     return data
 
