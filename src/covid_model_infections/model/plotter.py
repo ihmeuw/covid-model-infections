@@ -242,17 +242,17 @@ def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_in
 def model_plot(ax, title, ylabel, measure_data, sero_data, smooth_infections, output_draws,
                start_date, end_date, include_xticks=False):
     if sero_data is not None:
-        ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
-                   sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean'] * 100,
-                   s=80, c='darkturquoise', edgecolors='darkcyan', alpha=0.3, marker='s')
-        ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 1].index,
-                   sero_data.loc[sero_data['manual_outlier'] == 1, 'seroprev_mean'] * 100,
+        ax.scatter(sero_data.loc[sero_data['is_outlier'] == 1].index,
+                   sero_data.loc[sero_data['is_outlier'] == 1, 'seroprev_mean'] * 100,
                    s=80, c='maroon', edgecolors='maroon', alpha=0.45, marker='x')
-        ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
-                   sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean_no_vacc'] * 100,
+        ax.scatter(sero_data.loc[sero_data['is_outlier'] == 0].index,
+                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprev_mean'] * 100,
+                   s=80, c='darkturquoise', edgecolors='darkcyan', alpha=0.3, marker='s')
+        ax.scatter(sero_data.loc[sero_data['is_outlier'] == 0].index,
+                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprev_mean_no_vacc'] * 100,
                    s=80, c='orange', edgecolors='darkorange', alpha=0.3, marker='^')
-        ax.scatter(sero_data.loc[sero_data['manual_outlier'] == 0].index,
-                   sero_data.loc[sero_data['manual_outlier'] == 0, 'seroprev_mean_no_vacc_waning'] * 100,
+        ax.scatter(sero_data.loc[sero_data['is_outlier'] == 0].index,
+                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprev_mean_no_vacc_waning'] * 100,
                    s=100, c='mediumorchid', edgecolors='darkmagenta', alpha=0.6, marker='o')
 
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)
