@@ -332,7 +332,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Writing serology data and EM scaling factor data.')
     em_path = output_root / 'em_data.csv'
     em_data.to_csv(em_path, index=False)
-    sero_data['included'] = 1 - sero_data['manual_outlier']
+    sero_data['included'] = 1 - sero_data['is_outlier']
     sero_data = sero_data.rename(columns={'seroprev_mean_no_vacc_waning':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
     sero_path = output_root / 'sero_data.csv'
