@@ -96,6 +96,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_goa = data['location_id'] == 4850
         data = data.loc[~is_goa].reset_index(drop=True)
         manipulation_metadata['goa'] = 'dropped all hospitalizations'
+        
+        is_pr = data['location_id'] == 385
+        data = data.loc[~is_pr].reset_index(drop=True)
+        manipulation_metadata['puerto_rico'] = 'dropped all hospitalizations'
 
         # is_jordan = data['location_id'] == 144
         # data = data.loc[~is_jordan].reset_index(drop=True)
