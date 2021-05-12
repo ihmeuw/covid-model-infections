@@ -13,8 +13,8 @@ from loguru import logger
 PROJECT = 'proj_covid_prod'
 QUEUE = 'all.q'
 F_MEM = '5.0G'
-F_THREAD = '13'
-OMP_NUM_THREADS = '13'
+F_THREAD = '17'
+OMP_NUM_THREADS = '17'
 H_RUNTIME = '06:00:00'
 SLEEP_TIME = 10
 
