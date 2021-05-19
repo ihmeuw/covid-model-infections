@@ -118,7 +118,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         manipulation_metadata['andorra'] = 'dropped all hospitalizations'
 
     elif input_measure == 'deaths':
-        pass
+        is_ohio = data['location_id'] == 558
+        is_pre_march = data['date'] < pd.Timestamp('2020-03-01')
+        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped death before March 1'
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
@@ -290,12 +293,13 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_mea
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
 
+    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure)
+    
     data[f'daily_{input_measure}'] = (data
                                       .groupby('location_id')[f'cumulative_{input_measure}']
                                       .apply(lambda x: x.diff())
                                       .fillna(data[f'cumulative_{input_measure}']))
     data = data.dropna()
-    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure)
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index())
