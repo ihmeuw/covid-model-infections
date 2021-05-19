@@ -112,6 +112,10 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         # is_bc = data['location_id'] == 43859
         # data = data.loc[~is_bc].reset_index(drop=True)
         # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
+        
+        is_andorra = data['location_id'] == 74
+        data = data.loc[~is_andorra].reset_index(drop=True)
+        manipulation_metadata['andorra'] = 'dropped all hospitalizations'
 
     elif input_measure == 'deaths':
         pass
