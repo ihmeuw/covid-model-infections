@@ -10,8 +10,10 @@ from covid_shared import shell_tools
 from loguru import logger
 
 
-PROJECT = 'proj_covid_prod'
+# PROJECT = 'proj_covid_prod'
+PROJECT = 'proj_covid' # steve testing
 QUEUE = 'all.q'
+# QUEUE = 'd.q' # steve testing
 F_MEM = '5.0G'
 F_THREAD = '17'
 OMP_NUM_THREADS = '17'

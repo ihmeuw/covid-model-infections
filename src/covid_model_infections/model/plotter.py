@@ -177,10 +177,12 @@ def plotter(plot_dir, location_id, location_name,
                             labelbottom=0, labelleft=0)
         outerax.grid(False)
         outerax.set_facecolor('none')
-    
+
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
+    plt.tight_layout()
     if plot_dir is not None:
-        fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
+        # fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
+        fig.savefig(plot_dir / f'{location_id}.pdf') # Steve testing
         plt.close(fig)
     else:
         plt.show()
