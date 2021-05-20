@@ -181,6 +181,7 @@ def plotter(plot_dir, location_id, location_name,
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     plt.tight_layout()
     if plot_dir is not None:
+        plt.switch_backend('pdf') # steve testing
         # fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
         fig.savefig(plot_dir / f'{location_id}.pdf') # Steve testing
         plt.close(fig)
