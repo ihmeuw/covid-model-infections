@@ -159,28 +159,12 @@ def plotter(plot_dir, location_id, location_name,
     bottom = 0.
     linewidth = 2.
     
-    boxes = [
-        (vert1, left, horiz, top),   # left, top (cases)
-        (vert2, left, horiz, vert1),  # left, middle (hosp)
-        (bottom, left, horiz, vert2),  # left, bottom (deaths)
-        (bottom, horiz, right, top),  # right (infections)
-    ]
-    
-    for _bottom, _left, _right, _top in boxes:
-        outergs = gridspec.GridSpec(1, 1)
-        outergs.update(bottom=_bottom, left=_left, right=_right, top=_top)
-        outerax = fig.add_subplot(outergs[0])
-        for axis in ['top','bottom','left','right']:
-            outerax.spines[axis].set_linewidth(linewidth)
-        outerax.tick_params(axis='both',which='both',
-                            bottom=0, left=0,
-                            labelbottom=0, labelleft=0)
-        outerax.grid(False)
-        outerax.set_facecolor('none')
-    
+
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
+    plt.tight_layout()
     if plot_dir is not None:
-        fig.savefig(plot_dir / f'{location_id}.pdf', bbox_inches='tight')
+        plt.switch_backend('pdf')
+        fig.savefig(plot_dir / f'{location_id}.pdf')
         plt.close(fig)
     else:
         plt.show()
