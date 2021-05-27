@@ -19,7 +19,7 @@ MP_THREADS = 25
 ## TODO:
 ##     - holdouts
 ##     - modularize data object creation
-##     - make shared source for timeline with IDR, IFR, IHR models
+##     - maybe job holds
 
 
 def make_infections(app_metadata: cli_tools.Metadata,
@@ -34,10 +34,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
+    refit_dir = model_out_dir / 'refit_draws'
     plot_dir = output_root / 'plots'
     infections_draws_dir = output_root / 'infections_draws'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
+    shell_tools.mkdir(refit_dir)
     shell_tools.mkdir(plot_dir)
     shell_tools.mkdir(infections_draws_dir)
     
@@ -198,13 +200,28 @@ def make_infections(app_metadata: cli_tools.Metadata,
     idr_data_path = model_in_dir / 'idr_model_data.h5'
     idr_model_data.to_hdf(idr_data_path, key='data', mode='w')
     
-    logger.info('Launching models.')
+    logger.info('Launching location-specific mean infections models.')
     job_args_map = {
         location_id: [model.runner.__file__,
-                      location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir)]
+                      'fit', location_id, n_draws, str(model_in_dir), str(model_out_dir),]
         for location_id in modeled_location_ids
     }
-    cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
+    cluster.run_cluster_jobs('covid_mean_inf_loc', output_root, job_args_map)
+    
+    logger.info('Launching draw refits.')
+    job_args_map = {
+        draw: [model.runner.__file__,
+               'refit', draw, str(model_out_dir),]
+        for draw in range(n_draws)
+    }
+    cluster.run_cluster_jobs('covid_refit_draw', output_root, job_args_map)
+    
+    job_args_map = {
+        location_id: [model.runner.__file__,
+                      'store', location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
+        for location_id in modeled_location_ids
+    }
+    cluster.run_cluster_jobs('covid_compile', output_root, job_args_map)
     
     logger.info('Compiling infection draws.')
     infections_draws = []
