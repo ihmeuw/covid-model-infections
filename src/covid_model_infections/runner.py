@@ -348,12 +348,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
             
     logger.info('Writing serology data and EM scaling factor data.')
-    em_path = output_root / 'em_data.csv'
-    em_data.to_csv(em_path, index=False)
+    em_path = output_root / 'em_data.parquet'
+    em_data.to_parquet(em_path, index=False)
     sero_data['included'] = 1 - sero_data['is_outlier']
     sero_data = sero_data.rename(columns={'seroprev_mean_no_vacc_waning':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
-    sero_path = output_root / 'sero_data.csv'
-    sero_data.reset_index().to_csv(sero_path, index=False)
+    sero_path = output_root / 'sero_data.parquet'
+    sero_data.reset_index().to_parquet(sero_path, index=False)
         
     logger.info(f'Model run complete -- {str(output_root)}.')
