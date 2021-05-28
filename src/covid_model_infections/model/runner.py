@@ -352,8 +352,8 @@ def fit(location_id: int,
     
     logger.info('Writing location stage outputs.')
     input_draws = pd.concat({location_id: pd.concat(input_draws, axis=1)}, names=['location_id'])
-    input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.h5'
-    input_draws.to_hdf(input_draws_path, key='data', mode='w')
+    input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.parquet'
+    input_draws.to_parquet(input_draws_path)
     draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
     with draw_args_path.open('wb') as file:
         pickle.dump({location_id: draw_args}, file, -1)
@@ -370,14 +370,14 @@ def refit(draw: int,
           mp: bool = True,):
     np.random.seed(draw)
     location_ids = [int(str(path).split('/')[-1].split('_')[0])
-                    for path in Path(model_out_dir).iterdir() if str(path).endswith('_input_draws.h5')]
+                    for path in Path(model_out_dir).iterdir() if str(path).endswith('_input_draws.parquet')]
     location_ids = list(sorted(location_ids))
     
     input_draws = []
     draw_args_list = []
     for location_id in location_ids:
-        input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.h5'
-        input_draws.append(pd.read_hdf(input_draws_path).loc[location_id, [f'draw_{draw}']])
+        input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.parquet'
+        input_draws.append(pd.read_parquet(input_draws_path).loc[location_id, [f'draw_{draw}']])
         draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
         with draw_args_path.open('rb') as file:
             draw_args_list.append(pickle.load(file)[location_id])
@@ -400,9 +400,9 @@ def refit(draw: int,
             ))
     output_draws = [pd.concat({location_id: output_draw}, names=['location_id'])
                     for location_id, output_draw in zip(location_ids, output_draws)]
-    output_draws = pd.concat(output_draws).sort_index()
-    output_draws_path = Path(model_out_dir) / 'refit_draws' / f'{draw}_output.h5'
-    output_draws.to_hdf(output_draws_path, key='data', mode='w')
+    output_draws = pd.concat(output_draws).to_frame().sort_index()
+    output_draws_path = Path(model_out_dir) / 'refit_draws' / f'{draw}_output.parquet'
+    output_draws.to_parquet(output_draws_path)
 
 
 def store(location_id: int,
@@ -414,8 +414,8 @@ def store(location_id: int,
     # compile draws for location
     output_draws = []
     for draw in range(n_draws):
-        output_draws_path = Path(model_out_dir) / 'refit_draws' / f'{draw}_output.h5'
-        output_draws.append(pd.read_hdf(output_draws_path).loc[location_id])
+        output_draws_path = Path(model_out_dir) / 'refit_draws' / f'{draw}_output.parquet'
+        output_draws.append(pd.read_parquet(output_draws_path).loc[location_id])
     output_draws = pd.concat(output_draws, axis=1)
     draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
     with draw_args_path.open('rb') as file:
@@ -461,8 +461,8 @@ def store(location_id: int,
                        .reset_index()
                        .set_index(['location_id', 'date'])
                        .sort_index())
-        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.h5'
-        ratio_draws.to_hdf(ratio_path, key='data', mode='w')
+        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.parquet'
+        ratio_draws.to_parquet(ratio_path)
     
     logger.info('Writing output draws.')
     output_draws['location_id'] = location_id
@@ -470,8 +470,8 @@ def store(location_id: int,
                     .reset_index()
                     .set_index(['location_id', 'date'])
                     .sort_index())
-    draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.h5'
-    output_draws.to_hdf(draw_path, key='data', mode='w')
+    draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.parquet'
+    output_draws.to_parquet(draw_path)
 
 
 if __name__ == '__main__':

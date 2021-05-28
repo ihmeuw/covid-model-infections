@@ -20,6 +20,7 @@ MP_THREADS = 25
 ##     - holdouts
 ##     - modularize data object creation
 ##     - maybe job holds
+##     - maybe delete refit_draws contents at the end, to save space
 
 
 def make_infections(app_metadata: cli_tools.Metadata,
@@ -183,22 +184,22 @@ def make_infections(app_metadata: cli_tools.Metadata,
     data_path = model_in_dir / 'model_data.pkl'
     with data_path.open('wb') as file:
         pickle.dump(model_data, file, -1)
-    hierarchy_path = model_in_dir / 'hierarchy.h5'
-    hierarchy.to_hdf(hierarchy_path, key='data', mode='w')
-    pop_path = model_in_dir / 'pop_data.h5'
-    pop_data.to_hdf(pop_path, key='data', mode='w')
-    sero_path = model_in_dir / 'sero_data.h5'
-    sero_data.to_hdf(sero_path, key='data', mode='w')
-    test_path = model_in_dir / 'test_data.h5'
-    test_data.to_hdf(test_path, key='data', mode='w')
-    ifr_data_path = model_in_dir / 'ifr_model_data.h5'
-    ifr_model_data.to_hdf(ifr_data_path, key='data', mode='w')
-    reinfection_data_path = model_in_dir / 'reinfection_data.h5'
-    reinfection_data.to_hdf(reinfection_data_path, key='data', mode='w')
-    ihr_data_path = model_in_dir / 'ihr_model_data.h5'
-    ihr_model_data.to_hdf(ihr_data_path, key='data', mode='w')
-    idr_data_path = model_in_dir / 'idr_model_data.h5'
-    idr_model_data.to_hdf(idr_data_path, key='data', mode='w')
+    hierarchy_path = model_in_dir / 'hierarchy.parquet'
+    hierarchy.to_parquet(hierarchy_path)
+    pop_path = model_in_dir / 'pop_data.parquet'
+    pop_data.to_parquet(pop_path)
+    sero_path = model_in_dir / 'sero_data.parquet'
+    sero_data.to_parquet(sero_path)
+    test_path = model_in_dir / 'test_data.parquet'
+    test_data.to_parquet(test_path)
+    ifr_data_path = model_in_dir / 'ifr_model_data.parquet'
+    ifr_model_data.to_parquet(ifr_data_path)
+    reinfection_data_path = model_in_dir / 'reinfection_data.parquet'
+    reinfection_data.to_parquet(reinfection_data_path)
+    ihr_data_path = model_in_dir / 'ihr_model_data.parquet'
+    ihr_model_data.to_parquet(ihr_data_path)
+    idr_data_path = model_in_dir / 'idr_model_data.parquet'
+    idr_model_data.to_parquet(idr_data_path)
     
     logger.info('Launching location-specific mean infections models.')
     job_args_map = {
@@ -225,8 +226,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Compiling infection draws.')
     infections_draws = []
-    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.h5')]:
-        infections_draws.append(pd.read_hdf(draws_path))
+    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.parquet')]:
+        infections_draws.append(pd.read_parquet(draws_path))
     infections_draws = pd.concat(infections_draws)
     completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
     
@@ -307,8 +308,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     for measure, (estimated_ratio, ratio_prior_data) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
-        for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.h5')]:
-            ratio_draws.append(pd.read_hdf(draws_path))
+        for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.parquet')]:
+            ratio_draws.append(pd.read_parquet(draws_path))
         ratio_draws = pd.concat(ratio_draws)
         
         logger.info(f'Filling {estimated_ratio.upper()} with original model estimate where we do not have a posterior.')
