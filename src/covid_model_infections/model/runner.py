@@ -338,7 +338,7 @@ def fit(location_id: int,
     infections_weights = pd.concat([v['infections_daily'] ** 0 for k, v in output_data.items()], axis=1).sort_index()
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
-                                         diff=True, refit=False, num_submodels=1000)
+                                         diff=True, refit=False, num_submodels=500)
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     

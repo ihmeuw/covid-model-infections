@@ -373,10 +373,13 @@ def write_infections_draws(data: pd.DataFrame,
     data = data.rename(columns={draw_col:'infections_draw'})
     data['draw'] = draw
     
+    data = data.reset_index()
+    data['date'] = data['date'].astype(str)
+    
     # out_path = infections_draws_dir / f'{draw_col}.csv'
     # data.reset_index().to_csv(out_path, index=False)
     out_path = infections_draws_dir / f'{draw_col}.parquet'
-    data.reset_index().to_parquet(out_path, engine='fastparquet', compression='gzip')
+    data.to_parquet(out_path, engine='fastparquet', compression='gzip')
     
     return out_path
 
@@ -395,11 +398,14 @@ def write_ratio_draws(data: pd.DataFrame,
         del data['hr_adj']
     data['draw'] = draw
     data['duration'] = duration
+    
+    data = data.reset_index()
+    data['date'] = data['date'].astype(str)
 
     # out_path = ratio_draws_dir / f'{draw_col}.csv'
     # data.reset_index().to_csv(out_path, index=False)
     out_path = ratio_draws_dir / f'{draw_col}.parquet'
-    data.reset_index().to_parquet(out_path, engine='fastparquet', compression='gzip')
+    data.to_parquet(out_path, engine='fastparquet', compression='gzip')
     
     return out_path
 
