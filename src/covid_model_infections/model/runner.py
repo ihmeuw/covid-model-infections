@@ -440,7 +440,7 @@ def store(location_id: int,
     output_draws = output_draws[:-3]
     
     logger.info('Plot data.')
-    input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))
+    input_data, population, location_name, _ = data.load_model_inputs(location_id, Path(model_in_dir))
     sero_data, reinfection_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
