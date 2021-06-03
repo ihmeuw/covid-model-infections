@@ -489,10 +489,12 @@ if __name__ == '__main__':
     elif sys.argv[1] == 'refit':
         os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_refit_draw']['OMP_NUM_THREADS']
         refit(draw=int(sys.argv[2]), model_out_dir=sys.argv[3],)
-    if sys.argv[1] == 'store':
+    elif sys.argv[1] == 'store':
         os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_compile']['OMP_NUM_THREADS']
         store(location_id=int(sys.argv[2]),
               n_draws=int(sys.argv[3]),
               model_in_dir=sys.argv[4],
               model_out_dir=sys.argv[5],
               plot_dir=sys.argv[6],)
+    else:
+        raise ValueError(f'Invalid run type ({sys.argv[1]}) - must be fit, refit, or store.')
