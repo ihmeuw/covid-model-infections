@@ -104,10 +104,14 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_ohio = data['location_id'] == 558
         data = data.loc[~is_ohio].reset_index(drop=True)
         manipulation_metadata['ohio'] = 'dropped all hospitalizations'
+        
+        is_haiti = data['location_id'] == 114
+        data = data.loc[~is_haiti].reset_index(drop=True)
+        manipulation_metadata['haiti'] = 'dropped all hospitalizations'
 
-        # is_jordan = data['location_id'] == 144
-        # data = data.loc[~is_jordan].reset_index(drop=True)
-        # manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+        is_jordan = data['location_id'] == 144
+        data = data.loc[~is_jordan].reset_index(drop=True)
+        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
 
         # is_bc = data['location_id'] == 43859
         # data = data.loc[~is_bc].reset_index(drop=True)
