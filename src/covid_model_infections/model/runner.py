@@ -308,7 +308,7 @@ def fit(location_id: int,
         infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
     logger.info('Loading data.')
-    input_data, population, location_name = data.load_model_inputs(location_id, Path(model_in_dir))    
+    input_data, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
     
     logger.info('Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
@@ -333,9 +333,12 @@ def fit(location_id: int,
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
-    # infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * 0.29 for k, v in output_data.items()],
-    #                                axis=1).sort_index()
-    infections_weights = pd.concat([v['infections_daily'] ** 0 for k, v in output_data.items()], axis=1).sort_index()
+    if is_us:
+        infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * (1 - 0.1) for k, v in output_data.items()],
+                                       axis=1).sort_index()
+    else:
+        infections_weights = pd.concat([v['infections_daily'] ** 0 for k, v in output_data.items()], axis=1).sort_index()
+    infections_weights = np.sqrt(infections_weights)
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=100)

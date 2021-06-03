@@ -10,6 +10,8 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     hierarchy_path = model_in_dir / 'hierarchy.parquet'
     hierarchy = pd.read_parquet(hierarchy_path)
     location_name = hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item()
+    path_to_top_parent = hierarchy.loc[hierarchy['location_id'] == location_id, 'path_to_top_parent'].item()
+    is_us = '102' in path_to_top_parent.split(',')
     logger.info(f'Model location: {location_name}')
     
     data_path = model_in_dir / 'model_data.pkl'
@@ -21,7 +23,7 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     population = pd.read_parquet(pop_path)
     population = population.loc[location_id].item()
     
-    return model_data, population, location_name
+    return model_data, population, location_name, is_us
 
 
 def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
