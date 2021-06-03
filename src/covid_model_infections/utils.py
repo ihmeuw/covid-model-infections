@@ -1,6 +1,3 @@
-from pathlib import Path
-import matplotlib.pyplot as plt
-
 TIMELINE = {
     'deaths': 24,
     'cases': 11,
