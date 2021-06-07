@@ -12,9 +12,17 @@ from loguru import logger
 
 PROJECT = 'proj_covid_prod'
 QUEUE = 'all.q'
-F_MEM = '5.0G'
-F_THREAD = '17'
-OMP_NUM_THREADS = '17'
+TYPE_SPECS = {
+    'covid_mean_inf_loc': {'F_MEM': '5.0G',
+                           'F_THREAD': '6',
+                           'OMP_NUM_THREADS': '6'},
+    'covid_refit_draw': {'F_MEM': '5.0G',
+                         'F_THREAD': '13',
+                         'OMP_NUM_THREADS': '13'},
+    'covid_compile': {'F_MEM': '5.0G',
+                      'F_THREAD': '3',
+                      'OMP_NUM_THREADS': '3'},
+}
 H_RUNTIME = '06:00:00'
 SLEEP_TIME = 10
 
@@ -69,12 +77,14 @@ def do_qsub(session, job_type: str, job_name: str, output_root: Path, script_arg
     job_template.outputPath = f':{output_logs}'
     job_template.errorPath = f':{error_logs}'
     job_template.args = script_args
+    fmem = TYPE_SPECS[job_type]['F_MEM']
+    fthread = TYPE_SPECS[job_type]['F_THREAD']
     job_template.nativeSpecification = (f'-V '  # Export all environment variables
                                         f'-b y '  # Command is a binary (python)
                                         f'-P {PROJECT} '
                                         f'-q {QUEUE} '
-                                        f'-l fmem={F_MEM} '
-                                        f'-l fthread={F_THREAD} '
+                                        f'-l fmem={fmem} '
+                                        f'-l fthread={fthread} '
                                         f'-l h_rt={H_RUNTIME} '
                                         f'-N {job_name}')  # Name of the job
     job = session.runJob(job_template)
