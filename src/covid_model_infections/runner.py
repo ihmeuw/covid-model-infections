@@ -19,7 +19,8 @@ MP_THREADS = 25
 ## TODO:
 ##     - holdouts
 ##     - modularize data object creation
-##     - make shared source for timeline with IDR, IFR, IHR models
+##     - maybe job holds
+##     - maybe delete refit_draws contents at the end, to save space
 
 
 def make_infections(app_metadata: cli_tools.Metadata,
@@ -34,10 +35,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
+    refit_dir = model_out_dir / 'refit_draws'
     plot_dir = output_root / 'plots'
     infections_draws_dir = output_root / 'infections_draws'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
+    shell_tools.mkdir(refit_dir)
     shell_tools.mkdir(plot_dir)
     shell_tools.mkdir(infections_draws_dir)
     
@@ -181,35 +184,50 @@ def make_infections(app_metadata: cli_tools.Metadata,
     data_path = model_in_dir / 'model_data.pkl'
     with data_path.open('wb') as file:
         pickle.dump(model_data, file, -1)
-    hierarchy_path = model_in_dir / 'hierarchy.h5'
-    hierarchy.to_hdf(hierarchy_path, key='data', mode='w')
-    pop_path = model_in_dir / 'pop_data.h5'
-    pop_data.to_hdf(pop_path, key='data', mode='w')
-    sero_path = model_in_dir / 'sero_data.h5'
-    sero_data.to_hdf(sero_path, key='data', mode='w')
-    test_path = model_in_dir / 'test_data.h5'
-    test_data.to_hdf(test_path, key='data', mode='w')
-    ifr_data_path = model_in_dir / 'ifr_model_data.h5'
-    ifr_model_data.to_hdf(ifr_data_path, key='data', mode='w')
-    reinfection_data_path = model_in_dir / 'reinfection_data.h5'
-    reinfection_data.to_hdf(reinfection_data_path, key='data', mode='w')
-    ihr_data_path = model_in_dir / 'ihr_model_data.h5'
-    ihr_model_data.to_hdf(ihr_data_path, key='data', mode='w')
-    idr_data_path = model_in_dir / 'idr_model_data.h5'
-    idr_model_data.to_hdf(idr_data_path, key='data', mode='w')
+    hierarchy_path = model_in_dir / 'hierarchy.parquet'
+    hierarchy.to_parquet(hierarchy_path)
+    pop_path = model_in_dir / 'pop_data.parquet'
+    pop_data.to_parquet(pop_path)
+    sero_path = model_in_dir / 'sero_data.parquet'
+    sero_data.to_parquet(sero_path)
+    test_path = model_in_dir / 'test_data.parquet'
+    test_data.to_parquet(test_path)
+    ifr_data_path = model_in_dir / 'ifr_model_data.parquet'
+    ifr_model_data.to_parquet(ifr_data_path)
+    reinfection_data_path = model_in_dir / 'reinfection_data.parquet'
+    reinfection_data.to_parquet(reinfection_data_path)
+    ihr_data_path = model_in_dir / 'ihr_model_data.parquet'
+    ihr_model_data.to_parquet(ihr_data_path)
+    idr_data_path = model_in_dir / 'idr_model_data.parquet'
+    idr_model_data.to_parquet(idr_data_path)
     
-    logger.info('Launching models.')
+    logger.info('Launching location-specific mean infections models.')
     job_args_map = {
         location_id: [model.runner.__file__,
-                      location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir)]
+                      'fit', location_id, n_draws, str(model_in_dir), str(model_out_dir),]
         for location_id in modeled_location_ids
     }
-    cluster.run_cluster_jobs('covid_infection_model', output_root, job_args_map)
+    cluster.run_cluster_jobs('covid_mean_inf_loc', output_root, job_args_map)
+    
+    logger.info('Launching draw refits.')
+    job_args_map = {
+        draw: [model.runner.__file__,
+               'refit', draw, str(model_out_dir),]
+        for draw in range(n_draws)
+    }
+    cluster.run_cluster_jobs('covid_refit_draw', output_root, job_args_map)
+    
+    job_args_map = {
+        location_id: [model.runner.__file__,
+                      'store', location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
+        for location_id in modeled_location_ids
+    }
+    cluster.run_cluster_jobs('covid_compile', output_root, job_args_map)
     
     logger.info('Compiling infection draws.')
     infections_draws = []
-    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.h5')]:
-        infections_draws.append(pd.read_hdf(draws_path))
+    for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.parquet')]:
+        infections_draws.append(pd.read_parquet(draws_path))
     infections_draws = pd.concat(infections_draws)
     completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
     
@@ -290,8 +308,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     for measure, (estimated_ratio, ratio_prior_data) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
-        for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.h5')]:
-            ratio_draws.append(pd.read_hdf(draws_path))
+        for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.parquet')]:
+            ratio_draws.append(pd.read_parquet(draws_path))
         ratio_draws = pd.concat(ratio_draws)
         
         logger.info(f'Filling {estimated_ratio.upper()} with original model estimate where we do not have a posterior.')
@@ -332,10 +350,17 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Writing serology data and EM scaling factor data.')
     em_path = output_root / 'em_data.csv'
     em_data.to_csv(em_path, index=False)
+    # em_data['date'] = em_data['date'].astype(str)
+    # em_path = output_root / 'em_data.parquet'
+    # em_data.to_parquet(em_path, engine='fastparquet', compression='gzip')
     sero_data['included'] = 1 - sero_data['is_outlier']
     sero_data = sero_data.rename(columns={'seroprev_mean_no_vacc_waning':'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
     sero_path = output_root / 'sero_data.csv'
     sero_data.reset_index().to_csv(sero_path, index=False)
+    # sero_data = sero_data.reset_index()
+    # sero_data['date'] = sero_data['date'].astype(str)
+    # sero_path = output_root / 'sero_data.parquet'
+    # sero_data.to_parquet(sero_path, engine='fastparquet', compression='gzip')
         
     logger.info(f'Model run complete -- {str(output_root)}.')

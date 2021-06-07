@@ -127,7 +127,7 @@ def create_parent_draws(parent_draws: pd.DataFrame) -> pd.DataFrame:
 def plot_aggregate(location_id: int,
                    model_data: Dict, outputs: Dict, infections_draws: pd.DataFrame,
                    hierarchy: pd.DataFrame,
-                   pop_data: pd.Series,
+                   pop_data: pd.DataFrame,
                    sero_data: pd.DataFrame,
                    reinfection_data: pd.DataFrame,
                    ifr_model_data: pd.DataFrame,
@@ -145,7 +145,7 @@ def plot_aggregate(location_id: int,
     else:
         reinfection_data = pd.DataFrame()
     
-    population = pop_data[location_id]
+    population = pop_data.loc[location_id].item()
     
     location_name = hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item()
     

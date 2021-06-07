@@ -17,7 +17,7 @@ from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import CEILINGS
-from covid_model_infections.cluster import OMP_NUM_THREADS
+from covid_model_infections.cluster import TYPE_SPECS
 
 LOG_OFFSET = 1
 FLOOR = 1e-4
@@ -299,15 +299,13 @@ def get_rate_transformations(log: bool):
     return dep_trans_in, dep_se_trans_in, dep_trans_out
 
 
-def get_infected(location_id: int,
-                 n_draws: int,
-                 model_in_dir: str,
-                 model_out_dir: str,
-                 plot_dir: str,
-                 measure_type: str = 'daily',
-                 measure_log: bool = True, measure_knot_days: int = 7,
-                 infection_log: bool = True, infection_knot_days: int = 28,
-                 mp: bool = True,):
+def fit(location_id: int,
+        n_draws: int,
+        model_in_dir: str,
+        model_out_dir: str,
+        measure_type: str = 'daily',
+        measure_log: bool = True, measure_knot_days: int = 7,
+        infection_log: bool = True, infection_knot_days: int = 28,):
     np.random.seed(location_id)
     logger.info('Loading data.')
     input_data, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
@@ -347,26 +345,94 @@ def get_infected(location_id: int,
     raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
     input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
     
+    draw_args = {
+        'log': infection_log,
+        'knot_days': infection_knot_days,
+        'num_submodels': 1,
+        'diff': False,
+        'refit': True,
+    }
+    
+    logger.info('Writing location stage outputs.')
+    input_draws = pd.concat({location_id: pd.concat(input_draws, axis=1)}, names=['location_id'])
+    input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.parquet'
+    input_draws.to_parquet(input_draws_path)
+    draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
+    with draw_args_path.open('wb') as file:
+        pickle.dump({location_id: draw_args}, file, -1)
+    output_data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
+    with output_data_path.open('wb') as file:
+        pickle.dump({location_id:output_data}, file, -1)
+    input_infections_path = Path(model_out_dir) / f'{location_id}_input_infections.pkl'
+    with input_infections_path.open('wb') as file:
+        pickle.dump((raw_infections, smooth_infections), file, -1)
+
+
+def refit(draw: int,
+          model_out_dir: str,
+          mp: bool = True,):
+    np.random.seed(draw)
+    location_ids = [int(str(path).split('/')[-1].split('_')[0])
+                    for path in Path(model_out_dir).iterdir() if str(path).endswith('_input_draws.parquet')]
+    location_ids = list(sorted(location_ids))
+    
+    input_draws = []
+    draw_args_list = []
+    for location_id in location_ids:
+        input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.parquet'
+        input_draws.append(pd.read_parquet(input_draws_path).loc[location_id, [f'draw_{draw}']])
+        draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
+        with draw_args_path.open('rb') as file:
+            draw_args_list.append(pickle.load(file)[location_id])
+
     logger.info('Fitting infection curves to draws of all available input measures.')
     if mp:
+        # draw args should all be same, just take the first
         _model_infections = functools.partial(
             model_infections,
-            log=infection_log, knot_days=infection_knot_days, num_submodels=1,
-            diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
+            **draw_args_list[0]
         )
-        with multiprocessing.Pool(int(OMP_NUM_THREADS)) as p:
-            output_draws = list(tqdm(p.imap(_model_infections, input_draws), total=n_draws, file=sys.stdout))
+        with multiprocessing.Pool(int(os.environ['OMP_NUM_THREADS'])) as p:
+            output_draws = list(tqdm(p.imap(_model_infections, input_draws), total=len(location_ids), file=sys.stdout))
     else:
         output_draws = []
-        for input_draw in tqdm(input_draws, total=n_draws, file=sys.stdout):
+        for input_draw, draw_args in tqdm(zip(input_draws, draw_args_list), total=len(location_ids), file=sys.stdout):
             output_draws.append(model_infections(
                 input_draw,
-                log=infection_log, knot_days=infection_knot_days, num_submodels=1,
-                diff=False, refit=True, #spline_r_linear=True, spline_l_linear=True
+                **draw_args
             ))
+    output_draws = [pd.concat({location_id: output_draw}, names=['location_id'])
+                    for location_id, output_draw in zip(location_ids, output_draws)]
+    output_draws = pd.concat(output_draws).to_frame().sort_index()
+    output_draws_path = Path(model_out_dir) / 'refit_draws' / f'{draw}_output.parquet'
+    output_draws.to_parquet(output_draws_path)
+
+
+def store(location_id: int,
+          n_draws: int,
+          model_in_dir: str,
+          model_out_dir: str,
+          plot_dir: str,):
+    np.random.seed(location_id)
+    # compile draws for location
+    output_draws = []
+    for draw in range(n_draws):
+        output_draws_path = Path(model_out_dir) / 'refit_draws' / f'{draw}_output.parquet'
+        output_draws.append(pd.read_parquet(output_draws_path).loc[location_id])
     output_draws = pd.concat(output_draws, axis=1)
-    _, _, dep_trans_out = get_rate_transformations(infection_log)
-    if infection_log:
+    draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
+    with draw_args_path.open('rb') as file:
+        draw_args = pickle.load(file)[location_id]
+    output_data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
+    with output_data_path.open('rb') as file:
+        output_data = pickle.load(file)[location_id]
+    input_infections_path = Path(model_out_dir) / f'{location_id}_input_infections.pkl'
+    with input_infections_path.open('rb') as file:
+        raw_infections, smooth_infections = pickle.load(file)
+
+    # de-bias
+    _, _, dep_trans_out = get_rate_transformations(draw_args['log'])
+    if draw_args['log']:
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
 
@@ -374,6 +440,7 @@ def get_infected(location_id: int,
     output_draws = output_draws[:-3]
     
     logger.info('Plot data.')
+    input_data, population, location_name, _ = data.load_model_inputs(location_id, Path(model_in_dir))
     sero_data, reinfection_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     plotter.plotter(
         Path(plot_dir), location_id, location_name,
@@ -397,28 +464,37 @@ def get_infected(location_id: int,
                        .reset_index()
                        .set_index(['location_id', 'date'])
                        .sort_index())
-        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.h5'
-        ratio_draws.to_hdf(ratio_path, key='data', mode='w')
+        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.parquet'
+        ratio_draws.to_parquet(ratio_path)
     
-    logger.info('Writing outputs.')
-    output_data_path = Path(model_out_dir) / f'{location_id}_output_data.pkl'
-    with output_data_path.open('wb') as file:
-        pickle.dump({location_id:output_data}, file, -1)
+    logger.info('Writing output draws.')
     output_draws['location_id'] = location_id
     output_draws = (output_draws
                     .reset_index()
                     .set_index(['location_id', 'date'])
                     .sort_index())
-    draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.h5'
-    output_draws.to_hdf(draw_path, key='data', mode='w')
+    draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.parquet'
+    output_draws.to_parquet(draw_path)
 
 
 if __name__ == '__main__':
-    os.environ['OMP_NUM_THREADS'] = OMP_NUM_THREADS
     configure_logging_to_terminal(verbose=2)
 
-    get_infected(location_id=int(sys.argv[1]),
-                 n_draws=int(sys.argv[2]),
-                 model_in_dir=sys.argv[3],
-                 model_out_dir=sys.argv[4],
-                 plot_dir=sys.argv[5],)
+    if sys.argv[1] == 'fit':
+        os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_mean_inf_loc']['OMP_NUM_THREADS']
+        fit(location_id=int(sys.argv[2]),
+            n_draws=int(sys.argv[3]),
+            model_in_dir=sys.argv[4],
+            model_out_dir=sys.argv[5],)
+    elif sys.argv[1] == 'refit':
+        os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_refit_draw']['OMP_NUM_THREADS']
+        refit(draw=int(sys.argv[2]), model_out_dir=sys.argv[3],)
+    elif sys.argv[1] == 'store':
+        os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_compile']['OMP_NUM_THREADS']
+        store(location_id=int(sys.argv[2]),
+              n_draws=int(sys.argv[3]),
+              model_in_dir=sys.argv[4],
+              model_out_dir=sys.argv[5],
+              plot_dir=sys.argv[6],)
+    else:
+        raise ValueError(f'Invalid run type ({sys.argv[1]}) - must be fit, refit, or store.')

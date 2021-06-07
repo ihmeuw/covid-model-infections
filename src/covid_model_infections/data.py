@@ -248,14 +248,14 @@ def load_sero_data(infection_detection_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_reinfection_data(infection_fatality_root: Path) -> pd.Series:
+def load_reinfection_data(infection_fatality_root: Path) -> pd.DataFrame:
     data_path = infection_fatality_root / 'reinfection_data.csv'
     data = pd.read_csv(data_path)
     data['date'] = pd.to_datetime(data['date'])
     
     data = (data
             .set_index(['location_id', 'date'])
-            .loc[:, 'inflation_factor'])
+            .loc[:, ['inflation_factor']])
     
     return data
 
@@ -356,7 +356,7 @@ def load_hierarchy(model_inputs_root:Path) -> pd.DataFrame:
     return data
 
 
-def load_population(model_inputs_root: Path) -> pd.Series:
+def load_population(model_inputs_root: Path) -> pd.DataFrame:
     data_path = model_inputs_root / 'output_measures' / 'population' / 'all_populations.csv'
     data = pd.read_csv(data_path)
     is_2019 = data['year_id'] == 2019
@@ -365,7 +365,7 @@ def load_population(model_inputs_root: Path) -> pd.Series:
     data = (data
             .loc[is_2019 & is_bothsex & is_alllage]
             .set_index('location_id')
-            .loc[:, 'population'])
+            .loc[:, ['population']])
 
     return data
 
@@ -379,6 +379,10 @@ def write_infections_draws(data: pd.DataFrame,
     
     out_path = infections_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)
+    # data = data.reset_index()
+    # data['date'] = data['date'].astype(str)
+    # out_path = infections_draws_dir / f'{draw_col}.parquet'
+    # data.to_parquet(out_path, engine='fastparquet', compression='gzip')
     
     return out_path
 
@@ -400,5 +404,31 @@ def write_ratio_draws(data: pd.DataFrame,
 
     out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)
+    # data = data.reset_index()
+    # data['date'] = data['date'].astype(str)
+    # out_path = ratio_draws_dir / f'{draw_col}.parquet'
+    # data.to_parquet(out_path, engine='fastparquet', compression='gzip')
     
     return out_path
+
+
+# def store_df(data: pd.DataFrame, path: Path, filename: str, fmt: str,):
+#     if fmt == 'csv':
+#         full_path = path / f'{filename}.csv'
+#         data.to_csv(full_path)
+#     elif fmt == 'parquet':
+#         full_path = path / f'{filename}.parquet'
+#         data.to_parquet(full_path, engine='fastparquet', compression='gzip')
+#     else:
+#         raise ValueError(f'Invalid file format specified: {fmt}')
+
+
+# def load_df(path: Path, filename: str, fmt: str,):
+#     if fmt == 'csv':
+#         full_path = path / f'{filename}.csv'
+#         data = pd.read_csv(full_path)
+#     elif fmt == 'parquet':
+#         full_path = path / f'{filename}.parquet'
+#         data = pd.read_parquet(full_path, engine='fastparquet')
+#     else:
+#         raise ValueError(f'Invalid file format specified: {fmt}')
