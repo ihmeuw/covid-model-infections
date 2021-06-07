@@ -242,6 +242,7 @@ def splice_ratios(ratio_data: pd.Series,
     col_name = infections.name
     infections.index += pd.Timedelta(days=lag)
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
+    new_ratio = new_ratio[1:]
     start_date = new_ratio.index.min()
     end_date = new_ratio.index.max()
     pre = new_ratio[:trans_period_past].mean()
