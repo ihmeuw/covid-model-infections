@@ -15,17 +15,7 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_argentina = data['location_id'] == 97
         data = data.loc[~is_argentina].reset_index(drop=True)
         manipulation_metadata['argentina'] = 'dropped all hospitalizations'
-        
-        ## implausibly high admissions
-        is_romania = data['location_id'] == 52
-        data = data.loc[~is_romania].reset_index(drop=True)
-        manipulation_metadata['romania'] = 'dropped all hospitalizations'
-        
-        ## implausibly low admissions
-        is_slovenia = data['location_id'] == 55
-        data = data.loc[~is_slovenia].reset_index(drop=True)
-        manipulation_metadata['slovenia'] = 'dropped all hospitalizations'
-        
+                
         ## is just march-june 2020
         is_vietnam = data['location_id'] == 20
         data = data.loc[~is_vietnam].reset_index(drop=True)
@@ -44,15 +34,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         data = data.loc[~is_pakistan].reset_index(drop=True)
         manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
         
-        ## too low (ECDC)
-        is_lithuania = data['location_id'] == 60
-        data = data.loc[~is_lithuania].reset_index(drop=True)
-        manipulation_metadata['lithuania'] = 'dropped all hospitalizations'
-
-        ## too low (ECDC)
-        is_portugal = data['location_id'] == 91
-        data = data.loc[~is_portugal].reset_index(drop=True)
-        manipulation_metadata['portugal'] = 'dropped all hospitalizations'
+        ## ECDC is garbage
+        ecdc_location_ids = [77, 58, 82, 83, 59, 60, 88, 91, 52, 55]
+        is_ecdc = data['location_id'].isin(ecdc_location_ids)
+        data = data.loc[~is_ecdc].reset_index(drop=True)
+        manipulation_metadata['ecdc_countries'] = 'dropped all hospitalizations'
         
         ## CLOSE, but seems a little low... check w/ new data
         is_goa = data['location_id'] == 4850
