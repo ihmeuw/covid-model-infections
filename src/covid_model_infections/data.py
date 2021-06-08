@@ -8,125 +8,74 @@ import numpy as np
 def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str) -> Tuple[pd.DataFrame, Dict]:
     manipulation_metadata = {}
     if input_measure == 'cases':
-        # is_peru = data['location_id'] == 123
-        # data = data.loc[~is_peru].reset_index(drop=True)
-        # manipulation_metadata['peru'] = 'dropped all cases'
-
-        # is_ecuador = data['location_id'] == 122
-        # data = data.loc[~is_ecuador].reset_index(drop=True)
-        # manipulation_metadata['ecuador'] = 'dropped all cases'
-
-        # is_kazakhstan = data['location_id'] == 36
-        # data = data.loc[~is_kazakhstan].reset_index(drop=True)
-        # manipulation_metadata['kazakhstan'] = 'dropped all cases'
-        
-        # india_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '163' in x.split(',')),
-        #                                    'location_id'].to_list()
-        # india_location_ids = [i for i in india_location_ids if i not in [4842, 4862, 4863, 4864, 4869, 60896]]
-        # is_india = data['location_id'].isin(india_location_ids)
-        # data = data.loc[~is_india].reset_index(drop=True)
-        # manipulation_metadata['india'] = 'dropped all cases'
         pass
 
     elif input_measure == 'hospitalizations':
-#         # is_oman = data['location_id'] == 150
-#         # data = data.loc[~is_oman].reset_index(drop=True)
-#         # manipulation_metadata['oman'] = 'dropped all hospitalizations'
-
-#         # is_greece = data['location_id'] == 82
-#         # data = data.loc[~is_greece].reset_index(drop=True)
-#         # manipulation_metadata['greece'] = 'dropped all hospitalizations'
-
-#         # is_norway = data['location_id'] == 90
-#         # data = data.loc[~is_norway].reset_index(drop=True)
-#         # manipulation_metadata['norway'] = 'dropped all hospitalizations'
-
-#         is_argentina = data['location_id'] == 97
-#         data = data.loc[~is_argentina].reset_index(drop=True)
-#         manipulation_metadata['argentina'] = 'dropped all hospitalizations'
-
-#         is_romania = data['location_id'] == 52
-#         data = data.loc[~is_romania].reset_index(drop=True)
-#         manipulation_metadata['romania'] = 'dropped all hospitalizations'
-
-#         is_slovenia = data['location_id'] == 55
-#         data = data.loc[~is_slovenia].reset_index(drop=True)
-#         manipulation_metadata['slovenia'] = 'dropped all hospitalizations'
-
-#         is_vietnam = data['location_id'] == 20
-#         data = data.loc[~is_vietnam].reset_index(drop=True)
-#         manipulation_metadata['vietnam'] = 'dropped all hospitalizations'
-
-#         is_murcia = data['location_id'] == 60366
-#         data = data.loc[~is_murcia].reset_index(drop=True)
-#         manipulation_metadata['murcia'] = 'dropped all hospitalizations'
-
-#         is_dc = data['location_id'] == 531
-#         data = data.loc[~is_dc].reset_index(drop=True)
-#         manipulation_metadata['washington_dc'] = 'dropped all hospitalizations'
-
-#         pakistan_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '165' in x.split(',')),
-#                                               'location_id'].to_list()
-#         is_pakistan = data['location_id'].isin(pakistan_location_ids)
-#         data = data.loc[~is_pakistan].reset_index(drop=True)
-#         manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
-
-#         # wa_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '570' in x.split(',')),
-#         #                                           'location_id'].to_list()
-#         # is_wa = data['location_id'].isin(wa_location_ids)
-#         # data = data.loc[~is_wa].reset_index(drop=True)
-#         # manipulation_metadata['washington'] = 'dropped all hospitalizations'
-
-#         is_poland = data['location_id'] == 51
-#         data = data.loc[~is_poland].reset_index(drop=True)
-#         manipulation_metadata['poland'] = 'dropped all hospitalizations'
+        ## hosp/IHR == admissions too low
+        is_argentina = data['location_id'] == 97
+        data = data.loc[~is_argentina].reset_index(drop=True)
+        manipulation_metadata['argentina'] = 'dropped all hospitalizations'
         
-#         is_lithuania = data['location_id'] == 60
-#         data = data.loc[~is_lithuania].reset_index(drop=True)
-#         manipulation_metadata['lithuania'] = 'dropped all hospitalizations'
+        ## implausibly high admissions
+        is_romania = data['location_id'] == 52
+        data = data.loc[~is_romania].reset_index(drop=True)
+        manipulation_metadata['romania'] = 'dropped all hospitalizations'
+        
+        ## implausibly low admissions
+        is_slovenia = data['location_id'] == 55
+        data = data.loc[~is_slovenia].reset_index(drop=True)
+        manipulation_metadata['slovenia'] = 'dropped all hospitalizations'
+        
+        ## is just march-june 2020
+        is_vietnam = data['location_id'] == 20
+        data = data.loc[~is_vietnam].reset_index(drop=True)
+        manipulation_metadata['vietnam'] = 'dropped all hospitalizations'
 
-#         is_philippines = data['location_id'] == 16
-#         data = data.loc[~is_philippines].reset_index(drop=True)
-#         manipulation_metadata['philippines'] = 'dropped all hospitalizations'
+        ## is just march-june 2020
+        is_murcia = data['location_id'] == 60366
+        data = data.loc[~is_murcia].reset_index(drop=True)
+        manipulation_metadata['murcia'] = 'dropped all hospitalizations'
 
-#         is_portugal = data['location_id'] == 91
-#         data = data.loc[~is_portugal].reset_index(drop=True)
-#         manipulation_metadata['portugal'] = 'dropped all hospitalizations'
+        ## under-repored except for Islamabad, which we will keep
+        pakistan_location_ids = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '165' in x.split(',')),
+                                              'location_id'].to_list()
+        pakistan_location_ids = [l for l in pakistan_location_ids if l != 53618]
+        is_pakistan = data['location_id'].isin(pakistan_location_ids)
+        data = data.loc[~is_pakistan].reset_index(drop=True)
+        manipulation_metadata['pakistan'] = 'dropped all hospitalizations'
         
-#         is_goa = data['location_id'] == 4850
-#         data = data.loc[~is_goa].reset_index(drop=True)
-#         manipulation_metadata['goa'] = 'dropped all hospitalizations'
-        
-#         is_pr = data['location_id'] == 385
-#         data = data.loc[~is_pr].reset_index(drop=True)
-#         manipulation_metadata['puerto_rico'] = 'dropped all hospitalizations'
-        
-#         is_ohio = data['location_id'] == 558
-#         data = data.loc[~is_ohio].reset_index(drop=True)
-#         manipulation_metadata['ohio'] = 'dropped all hospitalizations'
-        
-#         is_haiti = data['location_id'] == 114
-#         data = data.loc[~is_haiti].reset_index(drop=True)
-#         manipulation_metadata['haiti'] = 'dropped all hospitalizations'
+        ## too low (ECDC)
+        is_lithuania = data['location_id'] == 60
+        data = data.loc[~is_lithuania].reset_index(drop=True)
+        manipulation_metadata['lithuania'] = 'dropped all hospitalizations'
 
-#         is_jordan = data['location_id'] == 144
-#         data = data.loc[~is_jordan].reset_index(drop=True)
-#         manipulation_metadata['jordan'] = 'dropped all hospitalizations'
-
-#         # is_bc = data['location_id'] == 43859
-#         # data = data.loc[~is_bc].reset_index(drop=True)
-#         # manipulation_metadata['british_columbia'] = 'dropped all hospitalizations'
+        ## too low (ECDC)
+        is_portugal = data['location_id'] == 91
+        data = data.loc[~is_portugal].reset_index(drop=True)
+        manipulation_metadata['portugal'] = 'dropped all hospitalizations'
         
-#         is_andorra = data['location_id'] == 74
-#         data = data.loc[~is_andorra].reset_index(drop=True)
-#         manipulation_metadata['andorra'] = 'dropped all hospitalizations'
-        pass
+        ## CLOSE, but seems a little low... check w/ new data
+        is_goa = data['location_id'] == 4850
+        data = data.loc[~is_goa].reset_index(drop=True)
+        manipulation_metadata['goa'] = 'dropped all hospitalizations'
+
+        ## too late, starts March 2021
+        is_haiti = data['location_id'] == 114
+        data = data.loc[~is_haiti].reset_index(drop=True)
+        manipulation_metadata['haiti'] = 'dropped all hospitalizations'
+
+        ## late, starts Jan/Feb 2021 (and is a little low, should check w/ new data)
+        is_jordan = data['location_id'] == 144
+        data = data.loc[~is_jordan].reset_index(drop=True)
+        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
+        
+        ## too low then too high? odd series
+        is_andorra = data['location_id'] == 74
+        data = data.loc[~is_andorra].reset_index(drop=True)
+        manipulation_metadata['andorra'] = 'dropped all hospitalizations'
 
     elif input_measure == 'deaths':
-        is_ohio = data['location_id'] == 558
-        is_pre_march = data['date'] < pd.Timestamp('2020-03-01')
-        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
-        manipulation_metadata['ohio'] = 'dropped death before March 1'
+        pass
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
