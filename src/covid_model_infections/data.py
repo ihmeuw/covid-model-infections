@@ -62,9 +62,9 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         
         ## false point in January (from deaths in imputation)
         is_ohio = data['location_id'] == 558
-        is_pre_march = data['date'] < pd.Timestamp('2020-03-01')
+        is_pre_march = data['date'] < pd.Timestamp('2020-02-18')
         data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
-        manipulation_metadata['ohio'] = 'dropped death before March 1'
+        manipulation_metadata['ohio'] = 'dropped death before Feb 18'
 
     elif input_measure == 'deaths':
         ## false point in January
