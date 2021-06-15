@@ -33,7 +33,7 @@ warnings.simplefilter('ignore')
               help='Number of days of data to drop.')
 @click.option('--n-draws',
               type=click.INT,
-              default=1000,
+              default=100,
               help='Number of posterior samples.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,

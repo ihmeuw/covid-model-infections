@@ -59,9 +59,19 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_andorra = data['location_id'] == 74
         data = data.loc[~is_andorra].reset_index(drop=True)
         manipulation_metadata['andorra'] = 'dropped all hospitalizations'
+        
+        ## false point in January (from deaths in imputation)
+        is_ohio = data['location_id'] == 558
+        is_pre_march = data['date'] < pd.Timestamp('2020-03-01')
+        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped death before March 1'
 
     elif input_measure == 'deaths':
-        pass
+        ## false point in January
+        is_ohio = data['location_id'] == 558
+        is_pre_march = data['date'] < pd.Timestamp('2020-03-01')
+        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped death before March 1'
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')

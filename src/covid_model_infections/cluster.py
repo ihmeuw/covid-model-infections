@@ -11,7 +11,7 @@ from loguru import logger
 
 
 PROJECT = 'proj_covid_prod'
-QUEUE = 'all.q'
+QUEUE = 'd.q'
 TYPE_SPECS = {
     'covid_mean_inf_loc': {'F_MEM': '5.0G',
                            'F_THREAD': '6',
