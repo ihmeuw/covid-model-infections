@@ -162,13 +162,21 @@ def reshape_data_long(data: pd.DataFrame, value_var: str) -> pd.DataFrame:
 
 
 def get_ensemble_knots(n_knots: int, min_interval: float, num_samples: int):
+    # if n_knots > 16:
     num_intervals = n_knots - 1
-    knot_bounds = np.array([[0, 1]] * (num_intervals - 1))
+    first_half = int((num_intervals - 1) / 2)
+    second_half = (num_intervals - 1) - first_half
+    knot_bounds = np.array([[0., 0.5]] * first_half + [[0.5, 1.]] * second_half)
     interval_sizes = np.array([[min_interval, 1]] * num_intervals)
-    #interval_sizes[0] = [1e-4, min_interval]
-    #interval_sizes[-1] = [1e-4, min_interval]
+    # else:
+    #     num_intervals = n_knots - 1
+    #     knot_bounds = np.array([[0, 1]] * (num_intervals - 1))
+    #     interval_sizes = np.array([[min_interval, 1]] * num_intervals)
+    # #interval_sizes[0] = [1e-4, min_interval]
+    # #interval_sizes[-1] = [1e-4, min_interval]
     
-    ensemble_knots = sample_knots(num_intervals, knot_bounds=knot_bounds, interval_sizes=interval_sizes, num_samples=num_samples)
+    ensemble_knots = sample_knots(num_intervals, knot_bounds=knot_bounds,
+                                  interval_sizes=interval_sizes, num_samples=num_samples)
     
     return ensemble_knots
 
