@@ -65,6 +65,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_pre_march = data['date'] < pd.Timestamp('2020-02-18')
         data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
         manipulation_metadata['ohio'] = 'dropped death before Feb 18'
+        
+        ## late, starts in Feb 2021 (also probably too low)
+        is_guinea_bissau = data['location_id'] == 209
+        data = data.loc[~is_guinea_bissau].reset_index(drop=True)
+        manipulation_metadata['guinea_bissau'] = 'dropped all hospitalizations'
 
     elif input_measure == 'deaths':
         ## false point in January
