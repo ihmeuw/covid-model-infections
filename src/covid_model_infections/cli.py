@@ -4,10 +4,11 @@ import click
 from covid_shared import paths, cli_tools
 from loguru import logger
 
-from covid_model_infections import runner
-
 import warnings
 warnings.simplefilter('ignore')
+
+from covid_model_infections import runner
+
 
 @click.command()
 @cli_tools.pass_run_metadata()
