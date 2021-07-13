@@ -70,6 +70,16 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_guinea_bissau = data['location_id'] == 209
         data = data.loc[~is_guinea_bissau].reset_index(drop=True)
         manipulation_metadata['guinea_bissau'] = 'dropped all hospitalizations'
+        
+        ## late, starts in June 2021 (also too low)
+        is_zimbabwe = data['location_id'] == 198
+        data = data.loc[~is_zimbabwe].reset_index(drop=True)
+        manipulation_metadata['zimbabwe'] = 'dropped all hospitalizations'
+        
+        ## too low
+        is_malawi = data['location_id'] == 182
+        data = data.loc[~is_malawi].reset_index(drop=True)
+        manipulation_metadata['malawi'] = 'dropped all hospitalizations'
 
     elif input_measure == 'deaths':
         ## false point in January
