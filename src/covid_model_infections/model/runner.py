@@ -264,22 +264,36 @@ def enforce_ratio_ceiling(output_measure: str,
                           ceiling: float,):
     infections_floor = obs_data / ceiling
     infections_floor.index -= pd.Timedelta(days=lag)
-    infections_scaler = (infections_floor / infections_data)[infections_data.index]
-    infections_scaler = (infections_scaler
-                         .fillna(method='ffill')
-                         .fillna(1)
-                         .clip(1, np.inf))
-    # infections_scaler.loc[infections_data < 1000] = 1
-    # infections_scaler = infections_scaler.max()
-    # needs_correction = infections_scaler > 1
-    needs_correction = infections_scaler.max() > 1
+    infections_scalar = (infections_floor / infections_data)[infections_data.index]
+    infections_scalar = infections_scalar.clip(1, np.inf)
+    
+    # backfill 1s, forward taper off of terminal scalar over a week to reduce noise
+    leading_nas = infections_scalar.ffill().isnull()
+    infections_scalar.loc[leading_nas] = 1
+    trailing_nas = infections_scalar.bfill().isnull()
+    if trailing_nas.sum():
+        # transition over either a week or until inf exceed last floor point
+        n_days_below = ((infections_data.loc[trailing_nas] > infections_floor[-1]).cumsum() == 0).sum()
+        n_transition_days = min(n_days_below, 7)
+        if n_transition_days == 0:
+            infections_scalar.loc[trailing_nas] = 1
+        else:
+            terminal_scalar = infections_scalar.dropna()[-1]
+            transition_scalar = infections_scalar.dropna()[-14:].median()
+            delta = (terminal_scalar - transition_scalar) / n_transition_days
+            transition = trailing_nas.cumsum().clip(0, n_transition_days).replace(0, np.nan).dropna()
+            transition *= -delta
+            transition += terminal_scalar
+            infections_scalar.loc[trailing_nas] = transition
+
+    needs_correction = infections_scalar.max() > 1
     if needs_correction:
         logger.info(f'Adjusting infections from {output_measure} so they are not fewer than observed {input_measure}.')
-    infections_data *= infections_scaler
+    infections_data *= infections_scalar
 
     return infections_data
 
-    
+
 def determine_n_knots(data: pd.Series, knot_days: int, min_k: int = 4) -> int:
     n_days = (data.reset_index()['date'].max() - data.reset_index()['date'].min()).days
     n_knots = int(np.ceil(n_days / knot_days))
