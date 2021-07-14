@@ -7,4 +7,5 @@ cd covid-model-infections
 make install_env ENV_NAME='jeffrey'
 conda activate jeffrey
 make clean
+run_infections --help
 ```
