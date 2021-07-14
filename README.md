@@ -4,7 +4,8 @@ IHME COVID-19 past infections model
 ```
 git clone https://github.com/ihmeuw/covid-model-infections.git
 cd covid-model-infections
-bash install_env.sh -n jeffrey
+make install_env ENV_NAME='jeffrey'
 conda activate jeffrey
 make clean
+run_infections --help
 ```
