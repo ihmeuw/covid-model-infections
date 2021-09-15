@@ -241,14 +241,14 @@ def load_em_scalars(infection_fatality_root: Path) -> pd.DataFrame:
 
 def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,
                       excess_mortality: bool = True,) -> Tuple[pd.Series, pd.Series, Dict]:
-    data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+    if input_measure == 'deaths' and not excess_mortality:
+        data_path = model_inputs_root / 'full_data_unscaled.csv'
+    else:
+        data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Confirmed':'cumulative_cases',
-                                'Hospitalizations':'cumulative_hospitalizations',})
-    if input_measure == 'deaths' and excess_mortality:
-        data = data.rename(columns={'Deaths':'cumulative_deaths',})
-    else:
-        data = data.rename(columns={'UNSCALED Deaths':'cumulative_deaths',})
+                                'Hospitalizations':'cumulative_hospitalizations',
+                                'Deaths':'cumulative_deaths',})
     data['date'] = pd.to_datetime(data['Date'])
     keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
     data = data.loc[:, keep_cols].dropna()
