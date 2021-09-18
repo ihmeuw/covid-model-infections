@@ -14,21 +14,21 @@ def compile_input_data_object(location_id: int,
     location_model_data = {}
     modeled_location = False
     # DEATHS
-    if location_id in daily_deaths.reset_index()['location_id'].values:
+    if location_id in daily_deaths.reset_index()['location_id'].unique().tolist():
         modeled_location = True
         location_model_data.update({'deaths':{'daily': daily_deaths.loc[location_id],
                                               'cumul': cumul_deaths.loc[location_id],
                                               'ratio': ifr.loc[location_id],
                                               'lag': timeline['deaths'],},})
     # HOSPITAL ADMISSIONS
-    if location_id in daily_hospital.reset_index()['location_id'].values:
+    if location_id in daily_hospital.reset_index()['location_id'].unique().tolist():
         modeled_location = True
         location_model_data.update({'hospitalizations':{'daily': daily_hospital.loc[location_id],
                                                         'cumul': cumul_hospital.loc[location_id],
                                                         'ratio': ihr.loc[location_id],
                                                         'lag': timeline['hospitalizations'],},})
     # CASES
-    if location_id in daily_cases.reset_index()['location_id'].values:
+    if location_id in daily_cases.reset_index()['location_id'].unique().tolist():
         modeled_location = True
         location_model_data.update({'cases':{'daily': daily_cases.loc[location_id],
                                              'cumul': cumul_cases.loc[location_id],

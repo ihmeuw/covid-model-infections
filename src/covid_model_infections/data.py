@@ -362,12 +362,13 @@ def write_ratio_draws(data_list: List[pd.Series],
             raise ValueError('IFR, but not 3 elements in data list.')
         data = data_list[0]
         data_lr = data_list[1]
-        data_lr = data_list[2]
+        data_hr = data_list[2]
     else:
         if len(data_list) != 1:
             raise ValueError('Not IFR, but multiple elements in data list.')
         data = data_list[0]
-    draw = int(data.name.split('_')[-1])
+    draw_col = data.name
+    draw = int(draw_col.split('_')[-1])
     data = data.rename(f'{estimated_ratio}_draw')
     data = data.to_frame()
     if estimated_ratio == 'ifr':

@@ -170,28 +170,13 @@ def make_infections(app_metadata: cli_tools.Metadata,
     idr_model_data_path = model_in_dir / 'idr_model_data.parquet'
     idr_model_data.to_parquet(idr_model_data_path)
     
-    logger.info('Launching location-specific mean infections models.')
+    logger.info('Launching location-specific models.')
     job_args_map = {
         location_id: [model.runner.__file__,
-                      'fit', location_id, n_draws, str(model_in_dir), str(model_out_dir),]
+                      location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
         for location_id in location_ids
     }
-    cluster.run_cluster_jobs('covid_mean_inf_loc', output_root, job_args_map)
-    
-    logger.info('Launching draw refits.')
-    job_args_map = {
-        draw: [model.runner.__file__,
-               'refit', draw, str(model_out_dir),]
-        for draw in range(n_draws)
-    }
-    cluster.run_cluster_jobs('covid_refit_draw', output_root, job_args_map)
-    
-    job_args_map = {
-        location_id: [model.runner.__file__,
-                      'store', location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
-        for location_id in location_ids
-    }
-    cluster.run_cluster_jobs('covid_compile', output_root, job_args_map)
+    cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map)
     
     logger.info('Compiling infection draws.')
     infections_draws = []
@@ -206,39 +191,43 @@ def make_infections(app_metadata: cli_tools.Metadata,
     if failed_model_location_ids:
         logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
     
-    logger.info('Compiling other model outputs.')
+    logger.info('Compiling other model data.')
+    inputs = {}
+    for inputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_input_data.pkl')]:
+        with inputs_path.open('rb') as inputs_file:
+            inputs.update(pickle.load(inputs_file))
     outputs = {}
-    outputs_paths = [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]
-    for outputs_path in tqdm(outputs_paths, total=len(outputs_paths), file=sys.stdout):
+    for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_output_data.pkl')]:
         with outputs_path.open('rb') as outputs_file:
             outputs.update(pickle.load(outputs_file))
-    output_path = output_root / 'output_data.pkl'
-    with output_path.open('wb') as file:
-        pickle.dump(outputs, file, -1)
         
-#     logger.info('Aggregating data.')
-#     agg_model_data = aggregation.aggregate_md_data_dict(model_data.copy(), hierarchy, measures)
-#     agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures)
-#     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
+    logger.info('Aggregating inputs.')
+    agg_inputs = aggregation.aggregate_md_data_dict(inputs.copy(), hierarchy, measures, 1)
+
+    logger.info('Aggregating outputs.')
+    agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures, 1)
+
+    logger.info('Aggregating final infecions draws.')
+    agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
     
-#     logger.info('Plotting aggregates.')
-#     plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
-#     for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
-#         aggregation.plot_aggregate(
-#             plot_parent_id,
-#             agg_model_data[plot_parent_id],
-#             agg_outputs[plot_parent_id],
-#             agg_infections_draws.loc[plot_parent_id],
-#             hierarchy,
-#             pop_data,
-#             sero_data,
-#             reinfection_data,
-#             ifr_model_data,
-#             ihr_model_data,
-#             idr_model_data,
-#             plot_dir
-#         )
-    
+    logger.info('Plotting aggregates.')
+    plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
+    for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
+        aggregation.plot_aggregate(
+            plot_parent_id,
+            agg_inputs[plot_parent_id].copy(),
+            agg_outputs[plot_parent_id].copy(),
+            agg_infections_draws.loc[plot_parent_id].copy(),
+            hierarchy,
+            pop_data,
+            sero_data,
+            daily_reinfection_rr,
+            ifr_model_data,
+            ihr_model_data,
+            idr_model_data,
+            plot_dir
+        )
+
     logger.info('Merging PDFs.')
     possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
     existing_pdfs = [str(x).split('/')[-1] for x in plot_dir.iterdir() if x.is_file()]
@@ -332,7 +321,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
         )
         with multiprocessing.Pool(MP_THREADS) as p:
             ratio_draws_paths = list(tqdm(p.imap(_ratio_writer, ratio_draws), total=n_draws, file=sys.stdout))
-            
+
     logger.info('Writing serology data and EM scaling factor data.')
     em_path = output_root / 'em_data.csv'
     em_data.to_csv(em_path, index=False)
@@ -340,7 +329,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     # em_path = output_root / 'em_data.parquet'
     # em_data.to_parquet(em_path, engine='fastparquet', compression='gzip')
     sero_data['included'] = 1 - sero_data['is_outlier']
-    sero_data = sero_data.rename(columns={'seroprev_mean_no_vacc_waning':'value'})
+    sero_data = sero_data.rename(columns={'sero_sample_mean': 'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]
     sero_path = output_root / 'sero_data.csv'
     sero_data.reset_index().to_csv(sero_path, index=False)

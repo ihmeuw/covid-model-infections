@@ -8,13 +8,26 @@ from multiprocessing import Pool
 import pandas as pd
 import numpy as np
 
-from covid_model_infections.model import plotter
+from covid_model_infections import model
 
 
-def aggregate_md_data_dict(md_data: Dict, hierarchy: pd.DataFrame, measures: List[str]) -> Dict:
+def aggregate_md_data_dict(md_data: Dict, hierarchy: pd.DataFrame, measures: List[str], mp_threads: int) -> Dict:
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
-    
-    agg_data = {parent_id: create_parent_dict(md_data, parent_id, hierarchy, measures) for parent_id in parent_ids}
+
+    if mp_threads > 1:
+        _cpd = partial(
+            create_parent_dict,
+            md_data=md_data, hierarchy=hierarchy, measures=measures,
+        )
+        with Pool(mp_threads - 1) as p:
+            agg_data = list(tqdm(p.imap(_cpd, parent_ids), total=len(parent_ids), file=sys.stdout))
+        
+    else:
+        agg_data = []
+        for parent_id in tqdm(parent_ids, total=len(parent_ids), file=sys.stdout):
+            agg_data.append(create_parent_dict(parent_id, md_data, hierarchy, measures))
+
+    agg_data = {parent_id: ad for parent_id, ad in zip(parent_ids, agg_data)}
     
     return agg_data
 
@@ -27,7 +40,7 @@ def get_child_ids(parent_id: int, hierarchy: pd.DataFrame) -> List:
     return child_ids
 
     
-def create_parent_dict(md_data: Dict, parent_id: int, hierarchy: pd.DataFrame, measures: str) -> Dict:
+def create_parent_dict(parent_id: int, md_data: Dict, hierarchy: pd.DataFrame, measures: str) -> Dict:
     child_ids = get_child_ids(parent_id, hierarchy)
     children_data = [md_data.get(child_id, None) for child_id in child_ids]
     children_data = [cd for cd in children_data  if cd is not None]
@@ -42,7 +55,7 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
     for measure in measures:
         measure_dict = {}
         metrics = [list(child_data.get(measure, {}).keys()) for child_data in children_data]
-        if not all([bool(m) for m in metrics]):
+        if not all([bool(m) for m in metrics]) or not metrics:
             metrics = []
         else:
             metrics = metrics[0]
@@ -53,18 +66,30 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
                     ratio_data = (child_data[measure]['daily'] / child_data[measure][metric]['ratio']).rename('ratio')
                     ratio_fe_data = (child_data[measure]['daily'] / child_data[measure][metric]['ratio_fe']).rename('ratio_fe')
                     metric_data.append(pd.concat([ratio_data, ratio_fe_data], axis=1).dropna())
+                if isinstance(child_data[measure][metric], list):
+                    metric_data.append(pd.concat(child_data[measure][metric]).groupby(level=0).mean())
                 else:
                     metric_data.append(child_data[measure][metric])
             if isinstance(metric_data[0], int):
                 metric_data = metric_data[0]
             else:
                 metric_data = pd.concat(metric_data)
-                if metric_data.index.names != ['date']:
-                    raise ValueError('Cannot aggregate multi-index.')
-                metric_data_count = metric_data.groupby(level=0).count()
-                keep_idx = metric_data_count[metric_data_count == len(children_data)].index
-                metric_data = metric_data.groupby(level=0).sum()
-                metric_data = metric_data.loc[keep_idx]
+                if metric_data.index.names[0] == 'draw':
+                    if metric_data.index.names[1] != 'date':
+                        raise ValueError('If draw in index, date should be second level.')
+                    metric_data_count = metric_data.groupby(level=1).count()
+                    metric_data_count /= metric_data.reset_index()['draw'].max() + 1
+                    keep_idx = metric_data_count[metric_data_count == len(children_data)].index
+                    metric_data = metric_data.groupby(level=[1, 0]).sum()
+                    metric_data = metric_data.loc[keep_idx]
+                    metric_data = metric_data.groupby(level=[1, 0]).sum()
+                else:
+                    if metric_data.index.names != ['date']:
+                        raise ValueError('Cannot aggregate multi-index.')
+                    metric_data_count = metric_data.groupby(level=0).count()
+                    keep_idx = metric_data_count[metric_data_count == len(children_data)].index
+                    metric_data = metric_data.groupby(level=0).sum()
+                    metric_data = metric_data.loc[keep_idx]
             measure_dict.update({metric: metric_data})
         
         if 'ratio' in metrics:
@@ -125,11 +150,11 @@ def create_parent_draws(parent_draws: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_aggregate(location_id: int,
-                   model_data: Dict, outputs: Dict, infections_draws: pd.DataFrame,
+                   inputs: Dict, outputs: Dict, infections_draws: pd.DataFrame,
                    hierarchy: pd.DataFrame,
                    pop_data: pd.DataFrame,
                    sero_data: pd.DataFrame,
-                   reinfection_data: pd.DataFrame,
+                   daily_reinfection_rr: pd.DataFrame,
                    ifr_model_data: pd.DataFrame,
                    ihr_model_data: pd.DataFrame,
                    idr_model_data: pd.DataFrame,
@@ -140,10 +165,10 @@ def plot_aggregate(location_id: int,
                  .drop('location_id', axis=1)
                  .set_index('date'))
     
-    if location_id in reinfection_data.reset_index()['location_id'].to_list():
-        reinfection_data = reinfection_data.loc[location_id]
+    if location_id in daily_reinfection_rr.reset_index()['location_id'].to_list():
+        daily_reinfection_rr = daily_reinfection_rr.loc[location_id]
     else:
-        reinfection_data = pd.DataFrame()
+        daily_reinfection_rr = pd.DataFrame()
     
     population = pop_data.loc[location_id].item()
     
@@ -161,11 +186,15 @@ def plot_aggregate(location_id: int,
                             .loc[ratio_model_data['location_id'] == location_id]
                             .drop('location_id', axis=1)
                             .set_index('date'))
-        ratio_model_inputs.update({measure:ratio_model_data})
+        ratio_model_inputs.update({measure: ratio_model_data})
+        
+    for measure in outputs.keys():
+        outputs[measure]['infections_daily'] = [outputs[measure]['infections_daily']]
+        outputs[measure]['infections_cumul'] = [outputs[measure]['infections_cumul']]
 
-    plotter.plotter(
+    model.plotter.plotter(
         plot_dir, location_id, location_name,
-        model_data, sero_data, ratio_model_inputs, reinfection_data,
+        inputs, sero_data, ratio_model_inputs, daily_reinfection_rr,
         outputs, infections_mean, infections_draws, population
     )
     
