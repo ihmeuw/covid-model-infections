@@ -208,7 +208,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     
     logger.info('Compiling other model outputs.')
     outputs = {}
-    for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]:
+    outputs_paths = [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_data.pkl')]
+    for outputs_path in tqdm(outputs_paths, total=len(outputs_paths), file=sys.stdout):
         with outputs_path.open('rb') as outputs_file:
             outputs.update(pickle.load(outputs_file))
     output_path = output_root / 'output_data.pkl'
@@ -315,12 +316,12 @@ def make_infections(app_metadata: cli_tools.Metadata,
                                        columns='draw',
                                        values='ifr_hr_rr',)
             ifr_hr_rr.columns = ratio_draws_cols
-            ratio_draws = [(ratio_draws[[ratio_draws_col]].copy(),
-                            ifr_lr_rr[[ratio_draws_col]].copy(),
-                            ifr_hr_rr[[ratio_draws_col]].copy(),)
+            ratio_draws = [(ratio_draws[ratio_draws_col].copy(),
+                            ifr_lr_rr[ratio_draws_col].copy(),
+                            ifr_hr_rr[ratio_draws_col].copy(),)
                            for ratio_draws_col in ratio_draws_cols]
         else:
-            ratio_draws = [[ratio_draws[[ratio_draws_col]].copy()] for ratio_draws_col in ratio_draws_cols]
+            ratio_draws = [[ratio_draws[ratio_draws_col].copy()] for ratio_draws_col in ratio_draws_cols]
         ratio_draws_dir = output_root / f'{estimated_ratio}_draws'
         shell_tools.mkdir(ratio_draws_dir)
         _ratio_writer = functools.partial(

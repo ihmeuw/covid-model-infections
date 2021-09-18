@@ -353,12 +353,12 @@ def write_infections_draws(data: pd.DataFrame,
     return out_path
 
 
-def write_ratio_draws(data_list: List[pd.DataFrame],
+def write_ratio_draws(data_list: List[pd.Series],
                       estimated_ratio: str,
                       ratio_draws_dir: Path,
                       duration: int,):
     if estimated_ratio == 'ifr':
-        if len(data_list) != 1:
+        if len(data_list) != 3:
             raise ValueError('IFR, but not 3 elements in data list.')
         data = data_list[0]
         data_lr = data_list[1]
@@ -369,6 +369,7 @@ def write_ratio_draws(data_list: List[pd.DataFrame],
         data = data_list[0]
     draw = int(data.name.split('_')[-1])
     data = data.rename(f'{estimated_ratio}_draw')
+    data = data.to_frame()
     if estimated_ratio == 'ifr':
         data['ifr_lr_draw'] = data['ifr_draw'] * data_lr
         data['ifr_hr_draw'] = data['ifr_draw'] * data_hr
