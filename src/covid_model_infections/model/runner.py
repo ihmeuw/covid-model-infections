@@ -1,6 +1,6 @@
 import sys
 import os
-from typing import Dict
+from typing import Dict, List
 from pathlib import Path
 import dill as pickle
 import sys
@@ -8,7 +8,7 @@ from tqdm import tqdm
 from loguru import logger
 import multiprocessing
 import functools
-
+import itertools
 
 import pandas as pd
 import numpy as np
@@ -97,16 +97,26 @@ def model_measure(measure: str, measure_type: str,
         smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
-    raw_infections = pd.concat([input_data, ratio], axis=1)
-    raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name]).rename('infections').dropna()
-    raw_infections.index -= pd.Timedelta(days=lag)
-    smooth_infections = pd.concat([smooth_data, ratio], axis=1)
-    smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
-    smooth_infections.index -= pd.Timedelta(days=lag)
+    
+    raw_infections = []
+    smooth_infections = []
+    for draw in range(n_draws):
+        # raw_infections = pd.concat([input_data, ratio.loc[draw]], axis=1)
+        # raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name])
+        _raw_infections = (input_data / ratio.loc[draw]).rename('infections').dropna()
+        _raw_infections.index -= pd.Timedelta(days=lag)
+        raw_infections.append(_raw_infections)
+        # smooth_infections = pd.concat([smooth_data, ratio.loc[draw]], axis=1)
+        # smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
+        _smooth_infections = (smooth_data / ratio.loc[draw]).rename('infections').dropna()
+        _smooth_infections.index -= pd.Timedelta(days=lag)
+        smooth_infections.append(_smooth_infections)
 
-    return {'daily':smooth_data, 'cumul':smooth_data.cumsum(),
-            'infections_daily_raw':raw_infections, 'infections_cumul_raw':raw_infections.cumsum(),
-            'infections_daily':smooth_infections, 'infections_cumul':smooth_infections.cumsum(),}
+    return {'daily': smooth_data, 'cumul': smooth_data.cumsum(),
+            'infections_daily_raw': raw_infections,
+            'infections_cumul_raw': [ri.cumsum() for ri in raw_infections],
+            'infections_daily': smooth_infections,
+            'infections_cumul': [si.cumsum() for si in smooth_infections],}
 
 
 def model_infections(inputs: pd.DataFrame,
@@ -195,10 +205,10 @@ def model_infections(inputs: pd.DataFrame,
 
 
 def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd.DataFrame,
-                                n_draws: int, rmse_radius: int = 90):
+                                rmse_radius: int = 90):
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log=True)
     
-    logger.info('Calculating residuals.')
+    # logger.info('Calculating residuals.')
     smooth_infections = dep_trans_in(smooth_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)    
     residuals = dep_trans_in(raw_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)
     
@@ -211,7 +221,7 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
         rmse_radius = int(len(dates) / 3)
     dates = dates[rmse_radius:-rmse_radius]
     
-    logger.info(f'Getting MAD (using rolling {int(rmse_radius*2)} day window), translating to SD.')
+    # logger.info(f'Getting MAD (using rolling {int(rmse_radius*2)} day window), translating to SD.')
     sigmas = []
     for date in dates:
         avg_dates = pd.date_range(date - pd.Timedelta(days=rmse_radius), date + pd.Timedelta(days=rmse_radius), freq=None)
@@ -224,13 +234,14 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     smooth_infections['sigma'] = smooth_infections['sigma'].fillna(method='bfill')
     smooth_infections['sigma'] = smooth_infections['sigma'].fillna(method='ffill')
     
-    logger.info('Sampling residuals.')
-    draws = np.random.normal(smooth_infections['infections'].values, smooth_infections['sigma'].values,
-                             (n_draws, len(smooth_infections)))
-    draws = [pd.DataFrame({f'draw_{d}':(dep_trans_out(draw) - LOG_OFFSET).clip(FLOOR, np.inf)},
-                          index=smooth_infections.index) for d, draw in enumerate(draws)]
+    # logger.info('Sampling residuals.')
+    draw = np.random.normal(smooth_infections['infections'].values, smooth_infections['sigma'].values,
+                            len(smooth_infections))
+    draw = pd.Series((dep_trans_out(draw) - LOG_OFFSET).clip(FLOOR, np.inf),
+                     name='noisy_infections',
+                     index=smooth_infections.index)
     
-    return draws
+    return draw
 
 
 def splice_ratios(ratio_data: pd.Series,
@@ -259,39 +270,42 @@ def splice_ratios(ratio_data: pd.Series,
 def enforce_ratio_ceiling(output_measure: str,
                           input_measure: str,
                           obs_data: pd.Series,
-                          infections_data: pd.Series,
+                          infections_data_list: List[pd.Series],
                           lag: int,
                           ceiling: float,):
-    infections_floor = obs_data / ceiling
-    infections_floor.index -= pd.Timedelta(days=lag)
-    infections_scalar = (infections_floor / infections_data)[infections_data.index]
-    infections_scalar = infections_scalar.clip(1, np.inf)
-    
-    # backfill 1s, forward taper off of terminal scalar over a week to reduce noise
-    leading_nas = infections_scalar.ffill().isnull()
-    infections_scalar.loc[leading_nas] = 1
-    trailing_nas = infections_scalar.bfill().isnull()
-    if trailing_nas.sum():
-        # transition over either a week or until inf exceed last floor point
-        n_days_below = ((infections_data.loc[trailing_nas] > infections_floor[-1]).cumsum() == 0).sum()
-        n_transition_days = min(n_days_below, 7)
-        if n_transition_days == 0:
-            infections_scalar.loc[trailing_nas] = 1
-        else:
-            terminal_scalar = infections_scalar.dropna()[-1]
-            transition_scalar = infections_scalar.dropna()[-14:].median()
-            delta = (terminal_scalar - transition_scalar) / n_transition_days
-            transition = trailing_nas.cumsum().clip(0, n_transition_days).replace(0, np.nan).dropna()
-            transition *= -delta
-            transition += terminal_scalar
-            infections_scalar.loc[trailing_nas] = transition
+    adj_infections_data_list = []
+    for infections_data in infections_data_list:
+        infections_floor = obs_data / ceiling
+        infections_floor.index -= pd.Timedelta(days=lag)
+        infections_scalar = (infections_floor / infections_data)[infections_data.index]
+        infections_scalar = infections_scalar.clip(1, np.inf)
 
-    needs_correction = infections_scalar.max() > 1
-    if needs_correction:
-        logger.info(f'Adjusting infections from {output_measure} so they are not fewer than observed {input_measure}.')
-    infections_data *= infections_scalar
+        # backfill 1s, forward taper off of terminal scalar over a week to reduce noise
+        leading_nas = infections_scalar.ffill().isnull()
+        infections_scalar.loc[leading_nas] = 1
+        trailing_nas = infections_scalar.bfill().isnull()
+        if trailing_nas.sum():
+            # transition over either a week or until inf exceed last floor point
+            n_days_below = ((infections_data.loc[trailing_nas] > infections_floor[-1]).cumsum() == 0).sum()
+            n_transition_days = min(n_days_below, 7)
+            if n_transition_days == 0:
+                infections_scalar.loc[trailing_nas] = 1
+            else:
+                terminal_scalar = infections_scalar.dropna()[-1]
+                transition_scalar = infections_scalar.dropna()[-14:].median()
+                delta = (terminal_scalar - transition_scalar) / n_transition_days
+                transition = trailing_nas.cumsum().clip(0, n_transition_days).replace(0, np.nan).dropna()
+                transition *= -delta
+                transition += terminal_scalar
+                infections_scalar.loc[trailing_nas] = transition
 
-    return infections_data
+        needs_correction = infections_scalar.max() > 1
+        if needs_correction:
+            logger.info(f'Adjusting infections from {output_measure} so they are not fewer than observed {input_measure}.')
+        infections_data *= infections_scalar
+        adj_infections_data_list.append(infections_data)
+
+    return adj_infections_data_list
 
 
 def determine_n_knots(data: pd.Series, knot_days: int, min_k: int = 4) -> int:
@@ -314,16 +328,40 @@ def get_rate_transformations(log: bool):
     return dep_trans_in, dep_se_trans_in, dep_trans_out
 
 
+def triangulate_infections(infections_inputs: pd.DataFrame, output_data: Dict, is_us: bool,
+                           infection_log: bool, infection_knot_days: int,):
+    infections_inputs = infections_inputs.copy()
+    n = infections_inputs['draw'].unique().item()
+    del infections_inputs['draw']
+    
+    if is_us:
+        infections_weights = pd.concat([v['infections_daily'][n] ** 0 - (k == 'hospitalizations') * (1 - 0.1) for k, v in output_data.items()],
+                                       axis=1).sort_index()
+    else:
+        infections_weights = pd.concat([v['infections_daily'][n] ** 0 for k, v in output_data.items()], axis=1).sort_index()
+    infections_weights = np.sqrt(infections_weights)
+    smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
+                                         log=infection_log, knot_days=infection_knot_days,
+                                         diff=True, refit=False, num_submodels=1,)
+    raw_infections = pd.concat([v['infections_daily_raw'][n] for k, v in output_data.items()], axis=1).sort_index()
+    input_draw = sample_infections_residuals(smooth_infections, raw_infections,)
+    
+    return smooth_infections, raw_infections, input_draw
+
+
 def fit(location_id: int,
         n_draws: int,
         model_in_dir: str,
         model_out_dir: str,
         measure_type: str = 'daily',
         measure_log: bool = True, measure_knot_days: int = 7,
-        infection_log: bool = True, infection_knot_days: int = 28,):
-    np.random.seed(location_id)
+        infection_log: bool = True, infection_knot_days: int = 28,
+        mp: bool = True,):
+    np.random.seed(15243 + location_id)
     logger.info('Loading data.')
-    input_data, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
+    input_data, modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
+    if not modeled_location:
+        raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
     
     logger.info('Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
@@ -344,21 +382,40 @@ def fit(location_id: int,
                              for output_measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
             output_data[measure]['infections_daily'] = new_infections
-            output_data[measure]['infections_cumul'] = new_infections.cumsum()
+            output_data[measure]['infections_cumul'] = [ni.cumsum() for ni in new_infections]
+    infections_inputs = list(map(list, itertools.zip_longest(*infections_inputs, fillvalue=None)))
+    infections_inputs = [pd.concat(ii, axis=1).sort_index() for ii in infections_inputs]
+    infections_inputs = [pd.concat([ii, pd.DataFrame({'draw': n}, index=ii.index)], axis=1)
+                         for n, ii in enumerate(infections_inputs)]
     
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
-    infections_inputs = pd.concat(infections_inputs, axis=1).sort_index()
-    if is_us:
-        infections_weights = pd.concat([v['infections_daily'] ** 0 - (k == 'hospitalizations') * (1 - 0.1) for k, v in output_data.items()],
-                                       axis=1).sort_index()
+    if mp:
+        _triangulate_infections = functools.partial(
+            triangulate_infections,
+            output_data=output_data, is_us=is_us,
+            infection_log=infection_log, infection_knot_days=infection_knot_days,
+        )
+        with multiprocessing.Pool(int(os.environ['OMP_NUM_THREADS'])) as p:
+            si_ri_id = list(tqdm(p.imap(_triangulate_infections, infections_inputs),
+                                 total=n_draws, file=sys.stdout))
     else:
-        infections_weights = pd.concat([v['infections_daily'] ** 0 for k, v in output_data.items()], axis=1).sort_index()
-    infections_weights = np.sqrt(infections_weights)
-    smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
-                                         log=infection_log, knot_days=infection_knot_days,
-                                         diff=True, refit=False, num_submodels=100)
-    raw_infections = pd.concat([v['infections_daily_raw'] for k, v in output_data.items()], axis=1).sort_index()
-    input_draws = sample_infections_residuals(smooth_infections, raw_infections, n_draws)
+        si_ri_id = []
+        for ii in tqdm(infections_inputs, total=n_draws, file=sys.stdout):
+            si_ri_id.append(triangulate_infections(
+                ii,
+                output_data=output_data, is_us=is_us,
+                infection_log=infection_log, infection_knot_days=infection_knot_days,
+            ))
+
+    smooth_infections = [i[0] for i in si_ri_id]
+    raw_infections = [i[1] for i in si_ri_id]
+    input_draws = [i[2] for i in si_ri_id]
+    del si_ri_id
+    
+    smooth_infections = pd.concat(smooth_infections).groupby(level=0).mean()
+    raw_infections = pd.concat(raw_infections).groupby(level=0).mean()
+    input_draws = [i.rename(f'draw_{n}') for n, i in enumerate(input_draws)]
+    input_draws = pd.concat(input_draws, axis=1)
     
     draw_args = {
         'log': infection_log,
@@ -369,7 +426,7 @@ def fit(location_id: int,
     }
     
     logger.info('Writing location stage outputs.')
-    input_draws = pd.concat({location_id: pd.concat(input_draws, axis=1)}, names=['location_id'])
+    input_draws = pd.concat({location_id: input_draws}, names=['location_id'])
     input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.parquet'
     input_draws.to_parquet(input_draws_path)
     draw_args_path = Path(model_out_dir) / f'{location_id}_draw_args.pkl'
@@ -386,7 +443,7 @@ def fit(location_id: int,
 def refit(draw: int,
           model_out_dir: str,
           mp: bool = True,):
-    np.random.seed(draw)
+    np.random.seed(15243 + draw)
     location_ids = [int(str(path).split('/')[-1].split('_')[0])
                     for path in Path(model_out_dir).iterdir() if str(path).endswith('_input_draws.parquet')]
     location_ids = list(sorted(location_ids))
@@ -428,7 +485,7 @@ def store(location_id: int,
           model_in_dir: str,
           model_out_dir: str,
           plot_dir: str,):
-    np.random.seed(location_id)
+    np.random.seed(15243 + location_id)
     # compile draws for location
     output_draws = []
     for draw in range(n_draws):
@@ -455,24 +512,25 @@ def store(location_id: int,
     output_draws = output_draws[:-3]
     
     logger.info('Plot data.')
-    input_data, population, location_name, _ = data.load_model_inputs(location_id, Path(model_in_dir))
-    sero_data, reinfection_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
+    input_data, _, population, location_name, _ = data.load_model_inputs(location_id, Path(model_in_dir))
+    sero_data, daily_reinfection_rr, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     plotter.plotter(
-        Path(plot_dir), location_id, location_name,
-        input_data, sero_data, ratio_model_inputs, reinfection_data,
+        Path(plot_dir),
+        location_id, location_name,
+        input_data, sero_data, ratio_model_inputs, daily_reinfection_rr,
         output_data.copy(), smooth_infections.copy(), output_draws.copy(), population
     )
-    
+
     logger.info('Create and writing ratios.')
     ratio_measure_map = {
         'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
     }
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     for measure in input_data.keys():
-        ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].copy(),
+        ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].loc[n].copy(),
                                      smooth_data=output_data[measure]['daily'].copy(),
-                                     infections=output_draw.copy(),
-                                     lag=input_data[measure]['lag'],) for output_draw in output_draws_list]
+                                     infections=output_draws_list[n].copy(),
+                                     lag=input_data[measure]['lag'],) for n in range(n_draws)]
         ratio_draws = pd.concat(ratio_draws, axis=1)
         ratio_draws['location_id'] = location_id
         ratio_draws = (ratio_draws

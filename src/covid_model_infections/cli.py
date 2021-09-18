@@ -32,10 +32,10 @@ from covid_model_infections import runner
               type=click.INT,
               default=0,
               help='Number of days of data to drop.')
-@click.option('--n-draws',
-              type=click.INT,
-              default=100,
-              help='Number of posterior samples.')
+# @click.option('--n-draws',
+#               type=click.INT,
+#               default=100,
+#               help='Number of posterior samples.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,
               help='Marks the new outputs as best in addition to marking them as latest.')
@@ -46,7 +46,7 @@ from covid_model_infections import runner
 def run_infections(run_metadata,
                    model_inputs_version,
                    rates_version,
-                   output_root, n_holdout_days, n_draws,
+                   output_root, n_holdout_days,  # n_draws,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
     """Run infections model."""
@@ -67,7 +67,8 @@ def run_infections(run_metadata,
     main = cli_tools.monitor_application(runner.make_infections, logger, with_debugger)
     app_metadata, _ = main(model_inputs_root,
                            rates_root,
-                           run_directory, n_holdout_days, n_draws)
+                           run_directory, n_holdout_days,  # n_draws,
+                          )
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
                                  mark_dir_as_best, production_tag)

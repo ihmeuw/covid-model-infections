@@ -28,7 +28,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     rates_root: Path,
                     output_root: Path,
                     holdout_days: int,
-                    n_draws: int):
+                    # n_draws: int,
+                   ):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
     
@@ -71,114 +72,82 @@ def make_infections(app_metadata: cli_tools.Metadata,
     )
     
     app_metadata.update({'data_manipulation': {
-        'deaths':deaths_manipulation_metadata,
-        'hospitalizations':hospital_manipulation_metadata,
-        'cases':cases_manipulation_metadata,
+        'deaths': deaths_manipulation_metadata,
+        'hospitalizations': hospital_manipulation_metadata,
+        'cases': cases_manipulation_metadata,
     }})
     measures = ['deaths', 'hospitalizations', 'cases']
     
-    cumul_deaths, cumul_hospital, cumul_cases,\
-    daily_deaths, daily_hospital, daily_cases = data.trim_leading_zeros(
-        [cumul_deaths, cumul_hospital, cumul_cases],
-        [daily_deaths, daily_hospital, daily_cases],
-    )
-    
     logger.info('Loading estimated ratios and adding draw directories.')
-    ifr_data = data.load_ifr(rates_root)
+    ifr, n_draws = data.load_ifr(rates_root)
+    ifr_rr = data.load_ifr_rr(rates_root)
     ifr_model_data = data.load_ifr_data(rates_root)
-    ifr_risk_data = data.load_ifr_risk_adjustment(rates_root)
-    reinfection_data = data.load_reinfection_data(rates_root)
-    ihr_data = data.load_ihr(rates_root)
+    daily_reinfection_rr = data.load_daily_reinfection_rr(rates_root)
+    ihr = data.load_ihr(rates_root)
     ihr_model_data = data.load_ihr_data(rates_root)
     # Assumes IDR has estimated floor already applied
-    idr_data = data.load_idr(rates_root, (0., 1.))
+    idr = data.load_idr(rates_root, (0., 1.))
     idr_model_data = data.load_idr_data(rates_root)
     
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(rates_root)
-    test_data = data.load_testing_data(rates_root)
-        
-    logger.info('Creating model input data structure.')
+    test_data = data.load_test_data(rates_root)
+
+    logger.info('Filling missing locations and creating model input data structure.')
     most_detailed = hierarchy['most_detailed'] == 1
     location_ids = hierarchy.loc[most_detailed, 'location_id'].to_list()
     path_to_top_parents = hierarchy.loc[most_detailed, 'path_to_top_parent'].to_list()
     location_names = hierarchy.loc[most_detailed, 'location_name'].to_list()
-    model_data = {}
-    unmodeled_location_ids = []
-    modeled_location_ids = []
+    baseline_ifr_locations = ifr.reset_index()['location_id'].unique().tolist()
+    baseline_ihr_locations = ihr.reset_index()['location_id'].unique().tolist()
+    baseline_idr_locations = idr.reset_index()['location_id'].unique().tolist()
     for location_id, path_to_top_parent, location_name in zip(location_ids, path_to_top_parents, location_names):
-        location_model_data = {}
-        modeled_location = False
         # DEATHS
-        if location_id not in ifr_data.reset_index()['location_id'].values:
+        if location_id not in baseline_ifr_locations:
             for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
-                if int(parent_id) in ifr_data.reset_index()['location_id'].values:
+                if int(parent_id) in baseline_ifr_locations:
                     logger.info(f'Using parent IFR for {location_name}.')
-                    ifr_data = ifr_data.append(
-                        pd.concat({location_id: ifr_data.loc[int(parent_id)]}, names=['location_id'])
+                    ifr = ifr.append(
+                        pd.concat({location_id: ifr.loc[int(parent_id)]}, names=['location_id'])
                     )
-                    ifr_risk_data = ifr_risk_data.append(
-                        pd.concat({location_id: ifr_risk_data.loc[int(parent_id)]}, names=['location_id'])
+                    ifr_rr = ifr_rr.append(
+                        pd.concat({location_id: ifr_rr.loc[int(parent_id)]}, names=['location_id'])
                     )
                     break
                 else:
                     pass
-        if location_id in daily_deaths.reset_index()['location_id'].values:
-            modeled_location = True
-            location_model_data.update({'deaths':{'daily': daily_deaths.loc[location_id],
-                                                  'cumul': cumul_deaths.loc[location_id],
-                                                  'ratio': ifr_data.loc[location_id],
-                                                  'lag': TIMELINE['deaths'],},})
         # HOSPITAL ADMISSIONS
-        if location_id not in ihr_data.reset_index()['location_id'].values:
+        if location_id not in baseline_ihr_locations:
             for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
-                if int(parent_id) in ihr_data.reset_index()['location_id'].values:
+                if int(parent_id) in baseline_ihr_locations:
                     logger.info(f'Using parent IHR for {location_name}.')
-                    ihr_data = ihr_data.append(
-                        pd.concat({location_id: ihr_data.loc[int(parent_id)]}, names=['location_id'])
+                    ihr = ihr.append(
+                        pd.concat({location_id: ihr.loc[int(parent_id)]}, names=['location_id'])
                     )
                     break
                 else:
                     pass
-        if location_id in daily_hospital.reset_index()['location_id'].values:
-            modeled_location = True
-            location_model_data.update({'hospitalizations':{'daily': daily_hospital.loc[location_id],
-                                                            'cumul': cumul_hospital.loc[location_id],
-                                                            'ratio': ihr_data.loc[location_id],
-                                                            'lag': TIMELINE['hospitalizations'],},})
         # CASES
-        if location_id not in idr_data.reset_index()['location_id'].values:
+        if location_id not in baseline_idr_locations:
             for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
-                if int(parent_id) in idr_data.reset_index()['location_id'].values:
+                if int(parent_id) in baseline_idr_locations:
                     logger.info(f'Using parent IDR for {location_name}.')
-                    idr_data = idr_data.append(
-                        pd.concat({location_id: idr_data.loc[int(parent_id)]}, names=['location_id'])
+                    idr = idr.append(
+                        pd.concat({location_id: idr.loc[int(parent_id)]}, names=['location_id'])
                     )
                     break
                 else:
                     pass
-        if location_id in daily_cases.reset_index()['location_id'].values:
-            modeled_location = True
-            location_model_data.update({'cases':{'daily': daily_cases.loc[location_id],
-                                                 'cumul': cumul_cases.loc[location_id],
-                                                 'ratio': idr_data.loc[location_id],
-                                                 'lag': TIMELINE['cases'],},})
-        if modeled_location:
-            modeled_location_ids.append(location_id)
-            model_data.update({
-                location_id:location_model_data
-            })
-        else:
-            unmodeled_location_ids.append(location_id)
+    model_data = {
+        'timeline': TIMELINE,
+        'daily_deaths': daily_deaths, 'cumul_deaths': cumul_deaths, 'ifr': ifr,
+        'daily_hospital': daily_hospital, 'cumul_hospital': cumul_hospital, 'ihr': ihr,
+        'daily_cases': daily_cases, 'cumul_cases': cumul_cases, 'idr': idr,
+    }
     # TODO: centralize this information, is used elsewhere...
-    estimated_ratios = {'deaths':('ifr', ifr_data.copy()),
-                        'hospitalizations':('ihr', ihr_data.copy()),
-                        'cases':('idr', idr_data.copy()),}
-    
-    logger.info('Identifying unmodeled locations.')
-    app_metadata.update({'unmodeled_location_ids': unmodeled_location_ids})
-    if unmodeled_location_ids:
-        logger.debug(f'Insufficent data exists for the following location_ids: {", ".join([str(l) for l in unmodeled_location_ids])}')
+    estimated_ratios = {'deaths': ('ifr', ifr.copy()),
+                        'hospitalizations': ('ihr', ihr.copy()),
+                        'cases': ('idr', idr.copy()),}
     
     logger.info('Writing intermediate files.')
     data_path = model_in_dir / 'model_data.pkl'
@@ -192,20 +161,20 @@ def make_infections(app_metadata: cli_tools.Metadata,
     sero_data.to_parquet(sero_path)
     test_path = model_in_dir / 'test_data.parquet'
     test_data.to_parquet(test_path)
-    ifr_data_path = model_in_dir / 'ifr_model_data.parquet'
-    ifr_model_data.to_parquet(ifr_data_path)
-    reinfection_data_path = model_in_dir / 'reinfection_data.parquet'
-    reinfection_data.to_parquet(reinfection_data_path)
-    ihr_data_path = model_in_dir / 'ihr_model_data.parquet'
-    ihr_model_data.to_parquet(ihr_data_path)
-    idr_data_path = model_in_dir / 'idr_model_data.parquet'
-    idr_model_data.to_parquet(idr_data_path)
+    ifr_model_data_path = model_in_dir / 'ifr_model_data.parquet'
+    ifr_model_data.to_parquet(ifr_model_data_path)
+    daily_reinfection_rr_path = model_in_dir / 'daily_reinfection_rr.parquet'
+    daily_reinfection_rr.to_parquet(daily_reinfection_rr_path)
+    ihr_model_data_path = model_in_dir / 'ihr_model_data.parquet'
+    ihr_model_data.to_parquet(ihr_model_data_path)
+    idr_model_data_path = model_in_dir / 'idr_model_data.parquet'
+    idr_model_data.to_parquet(idr_model_data_path)
     
     logger.info('Launching location-specific mean infections models.')
     job_args_map = {
         location_id: [model.runner.__file__,
                       'fit', location_id, n_draws, str(model_in_dir), str(model_out_dir),]
-        for location_id in modeled_location_ids
+        for location_id in location_ids
     }
     cluster.run_cluster_jobs('covid_mean_inf_loc', output_root, job_args_map)
     
@@ -220,7 +189,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     job_args_map = {
         location_id: [model.runner.__file__,
                       'store', location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
-        for location_id in modeled_location_ids
+        for location_id in location_ids
     }
     cluster.run_cluster_jobs('covid_compile', output_root, job_args_map)
     
@@ -232,7 +201,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
     
     logger.info('Identifying failed models.')
-    failed_model_location_ids = list(set(modeled_location_ids) - set(completed_modeled_location_ids))
+    failed_model_location_ids = list(set(location_ids) - set(completed_modeled_location_ids))
     app_metadata.update({'failed_model_location_ids': failed_model_location_ids})
     if failed_model_location_ids:
         logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
@@ -246,28 +215,28 @@ def make_infections(app_metadata: cli_tools.Metadata,
     with output_path.open('wb') as file:
         pickle.dump(outputs, file, -1)
         
-    logger.info('Aggregating data.')
-    agg_model_data = aggregation.aggregate_md_data_dict(model_data.copy(), hierarchy, measures)
-    agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures)
-    agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
+#     logger.info('Aggregating data.')
+#     agg_model_data = aggregation.aggregate_md_data_dict(model_data.copy(), hierarchy, measures)
+#     agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures)
+#     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
     
-    logger.info('Plotting aggregates.')
-    plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
-    for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
-        aggregation.plot_aggregate(
-            plot_parent_id,
-            agg_model_data[plot_parent_id],
-            agg_outputs[plot_parent_id],
-            agg_infections_draws.loc[plot_parent_id],
-            hierarchy,
-            pop_data,
-            sero_data,
-            reinfection_data,
-            ifr_model_data,
-            ihr_model_data,
-            idr_model_data,
-            plot_dir
-        )
+#     logger.info('Plotting aggregates.')
+#     plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
+#     for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
+#         aggregation.plot_aggregate(
+#             plot_parent_id,
+#             agg_model_data[plot_parent_id],
+#             agg_outputs[plot_parent_id],
+#             agg_infections_draws.loc[plot_parent_id],
+#             hierarchy,
+#             pop_data,
+#             sero_data,
+#             reinfection_data,
+#             ifr_model_data,
+#             ihr_model_data,
+#             idr_model_data,
+#             plot_dir
+#         )
     
     logger.info('Merging PDFs.')
     possible_pdfs = [f'{l}.pdf' for l in hierarchy['location_id']]
@@ -314,28 +283,44 @@ def make_infections(app_metadata: cli_tools.Metadata,
         
         logger.info(f'Filling {estimated_ratio.upper()} with original model estimate where we do not have a posterior.')
         ratio_draws_cols = ratio_draws.columns
-        ratio_prior_data = ratio_prior_data.reset_index()
-        is_missing = ~ratio_prior_data['location_id'].isin(ratio_draws.reset_index()['location_id'].unique())
-        is_model_loc = ratio_prior_data['location_id'].isin(completed_modeled_location_ids)
-        ratio_prior_data = ratio_prior_data.loc[is_missing & is_model_loc]
         ratio_prior_data = (ratio_prior_data
-                            .set_index(['location_id', 'date'])
-                            .loc[:, 'ratio'])
-        ratio_draws = ratio_draws.join(ratio_prior_data, how='outer')
-        ratio_draws[ratio_draws_cols] = (ratio_draws[ratio_draws_cols]
-                                         .apply(lambda x: x.fillna(ratio_draws['ratio'])))
-        del ratio_draws['ratio']
+                            .reset_index()
+                            .loc[:, ['location_id', 'draw', 'date', 'ratio']])
+        ratio_prior_data = pd.pivot_table(ratio_prior_data,
+                                          index=['location_id', 'date'],
+                                          columns='draw',
+                                          values='ratio',)
+        ratio_prior_data.columns = ratio_draws_cols
+        ratio_locations = ratio_draws.reset_index()['location_id'].unique()
+        missing_locations = [l for l in ratio_locations if l not in completed_modeled_location_ids]
+        ratio_prior_data = ratio_prior_data.loc[missing_locations]
+        ratio_draws = ratio_draws.append(ratio_prior_data)
 
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
+        ratio_draws = ratio_draws.sort_index()
         if estimated_ratio == 'ifr':
-            ratio_draws = ratio_draws.join(ifr_risk_data)
-            ratio_draws = ratio_draws.sort_index()
-            ifr_risk_data = ratio_draws[['lr_adj', 'hr_adj']].copy()
+            ifr_lr_rr = (ifr_rr
+                        .reset_index()
+                        .loc[:, ['location_id', 'draw', 'date', 'ifr_lr_rr']])
+            ifr_lr_rr = pd.pivot_table(ifr_lr_rr,
+                                       index=['location_id', 'date'],
+                                       columns='draw',
+                                       values='ifr_lr_rr',)
+            ifr_lr_rr.columns = ratio_draws_cols
+            ifr_hr_rr = (ifr_rr
+                        .reset_index()
+                        .loc[:, ['location_id', 'draw', 'date', 'ifr_hr_rr']])
+            ifr_hr_rr = pd.pivot_table(ifr_hr_rr,
+                                       index=['location_id', 'date'],
+                                       columns='draw',
+                                       values='ifr_hr_rr',)
+            ifr_hr_rr.columns = ratio_draws_cols
+            ratio_draws = [(ratio_draws[[ratio_draws_col]].copy(),
+                            ifr_lr_rr[[ratio_draws_col]].copy(),
+                            ifr_hr_rr[[ratio_draws_col]].copy(),)
+                           for ratio_draws_col in ratio_draws_cols]
         else:
-            ratio_draws = ratio_draws.sort_index()
-        ratio_draws = [ratio_draws[[ratio_draws_col]].copy() for ratio_draws_col in ratio_draws_cols]
-        if estimated_ratio == 'ifr':
-            ratio_draws = [pd.concat([ratio_draw, ifr_risk_data], axis=1) for ratio_draw in ratio_draws]
+            ratio_draws = [[ratio_draws[[ratio_draws_col]].copy()] for ratio_draws_col in ratio_draws_cols]
         ratio_draws_dir = output_root / f'{estimated_ratio}_draws'
         shell_tools.mkdir(ratio_draws_dir)
         _ratio_writer = functools.partial(

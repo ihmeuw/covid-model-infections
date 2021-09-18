@@ -1,4 +1,6 @@
 from typing import Dict, Tuple
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 
@@ -19,7 +21,7 @@ DATE_FORMATTER = mdates.ConciseDateFormatter(DATE_LOCATOR, show_offset=False)
 
 def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Timestamp]:
     input_dates = [v['cumul'].reset_index()['date'] for k, v in input_data.items()]
-    output_dates = [v['infections_cumul'].reset_index()['date'] for k, v in output_data.items()]
+    output_dates = [v['infections_cumul'][0].reset_index()['date'] for k, v in output_data.items()]
     dates = pd.concat(input_dates + output_dates)
     start_date = dates.min() - pd.Timedelta(days=7)
     end_date = dates.max() + pd.Timedelta(days=7)
@@ -27,10 +29,11 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
     return start_date, end_date
 
 
-def plotter(plot_dir, location_id, location_name,
-            input_data,
-            sero_data, ratio_model_inputs, reinfection_data,
-            output_data, smooth_infections, output_draws, population,
+def plotter(plot_dir: Path, location_id: int, location_name: str,
+            input_data: Dict,
+            sero_data: pd.DataFrame, ratio_model_inputs: Dict, daily_reinfection_rr: pd.DataFrame,
+            output_data: Dict, smooth_infections: pd.Series, output_draws: pd.DataFrame,
+            population: float,
             measures=['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)
     
@@ -81,9 +84,11 @@ def plotter(plot_dir, location_id, location_name,
             adj_ratio.index += pd.Timedelta(days=input_data[measure]['lag'])
             adj_ratio = output_data[measure]['daily'] / adj_ratio
             adj_ratio = adj_ratio.dropna()
-            ratio_data = pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio'].dropna()
-            ratio_data_fe = pd.concat([input_data[measure]['ratio'], input_data[measure]['daily']], axis=1)['ratio_fe'].dropna()
-            ratio_plot_range = pd.concat([ratio_data, ratio_data_fe, ratio_model_inputs[measure]['ratio']])
+            ratio_data = pd.concat([input_data[measure]['ratio'].groupby(level=1).mean(),
+                                    input_data[measure]['daily']], axis=1)['ratio'].dropna()
+            ratio_data_fe = pd.concat([input_data[measure]['ratio'].groupby(level=1).mean(),
+                                       input_data[measure]['daily']], axis=1)['ratio_fe'].dropna()
+            ratio_plot_range = pd.concat([ratio_data, ratio_data_fe, ratio_model_inputs[measure]['ratio_mean']])
             ratio_plot_range = ratio_plot_range.replace((-np.inf, np.inf), np.nan).dropna()
             ratio_plot_range_min = ratio_plot_range.min()
             ratio_plot_range_max = ratio_plot_range.max()
@@ -117,7 +122,7 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_top = fig.add_subplot(gs[0:1, 2])
     whitespace_top.axis('off')
     dailymodel_ax = fig.add_subplot(gs[1:5, 2])
-    infection_daily_data = {mm: output_data[mm]['infections_daily'][1:] for mm in model_measures}
+    infection_daily_data = {mm: pd.concat(output_data[mm]['infections_daily']).groupby(level=0).mean()[1:] for mm in model_measures}
     model_plot(dailymodel_ax, 'Infections', 'Daily', infection_daily_data, None,
                smooth_infections[1:],
                output_draws[1:], start_date, end_date, False)
@@ -125,21 +130,22 @@ def plotter(plot_dir, location_id, location_name,
     whitespace_mid.axis('off')
     
     smooth_infections = smooth_infections.cumsum()
+    if not daily_reinfection_rr.empty:
+        for n in range(len(output_draws.columns)):
+            output_draws = output_draws.join(daily_reinfection_rr.loc[n], how='left')
+            output_draws = output_draws.sort_index()
+            output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(method='ffill')
+            output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
+            output_draws[f'draw_{n}'] /= output_draws['inflation_factor']
+            del output_draws['inflation_factor']
+#         sero_data = sero_data.join(daily_reinfection_rr, how='left')
+#         sero_data['inflation_factor'] = sero_data['inflation_factor'].fillna(1)
+#         sero_data['seroprev_mean_no_vacc_waning'] /= sero_data['inflation_factor']
+#         del sero_data['inflation_factor']
     output_draws = output_draws.cumsum()
-    if not reinfection_data.empty:
-        output_draws = output_draws.join(reinfection_data, how='left')
-        output_draws = output_draws.sort_index()
-        output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(method='ffill')
-        output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
-        output_draws = output_draws.divide(output_draws[['inflation_factor']].values)
-        del output_draws['inflation_factor']
-        sero_data = sero_data.join(reinfection_data, how='left')
-        sero_data['inflation_factor'] = sero_data['inflation_factor'].fillna(1)
-        sero_data['seroprev_mean_no_vacc_waning'] /= sero_data['inflation_factor']
-        del sero_data['inflation_factor']
     
     cumulmodel_ax = fig.add_subplot(gs[7:11, 2])
-    infection_cumul_data = {mm: (output_data[mm]['infections_cumul'] / population) * 100 for mm in model_measures}
+    infection_cumul_data = {mm: (pd.concat(output_data[mm]['infections_cumul']).groupby(level=0).mean() / population) * 100 for mm in model_measures}
     model_plot(cumulmodel_ax, None, 'Cumulative (%)', infection_cumul_data, sero_data,
                (smooth_infections / population) * 100,
                (output_draws / population) * 100, start_date, end_date, True)
@@ -199,10 +205,10 @@ def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_in
     ax.plot(adj_ratio, color=clight, alpha=0.8)
     
     ax.scatter(ratio_input_data.loc[ratio_input_data['is_outlier'] == 0].index,
-               ratio_input_data.loc[ratio_input_data['is_outlier'] == 0, 'ratio'],
+               ratio_input_data.loc[ratio_input_data['is_outlier'] == 0, 'ratio_mean'],
                color=cdark, alpha=0.8, marker='o', facecolors='none')
     ax.scatter(ratio_input_data.loc[ratio_input_data['is_outlier'] == 1].index,
-               ratio_input_data.loc[ratio_input_data['is_outlier'] == 1, 'ratio'],
+               ratio_input_data.loc[ratio_input_data['is_outlier'] == 1, 'ratio_mean'],
                color=cdark, alpha=0.8, marker='x')
     
     ax.set_ylabel(ylabel)
@@ -227,16 +233,16 @@ def model_plot(ax, title, ylabel, measure_data, sero_data, smooth_infections, ou
                start_date, end_date, include_xticks=False):
     if sero_data is not None:
         ax.scatter(sero_data.loc[sero_data['is_outlier'] == 1].index,
-                   sero_data.loc[sero_data['is_outlier'] == 1, 'seroprev_mean'] * 100,
+                   sero_data.loc[sero_data['is_outlier'] == 1, 'seroprevalence'] * 100,
                    s=80, c='maroon', edgecolors='maroon', alpha=0.45, marker='x')
         ax.scatter(sero_data.loc[sero_data['is_outlier'] == 0].index,
-                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprev_mean'] * 100,
+                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprevalence'] * 100,
                    s=80, c='darkturquoise', edgecolors='darkcyan', alpha=0.3, marker='s')
         ax.scatter(sero_data.loc[sero_data['is_outlier'] == 0].index,
-                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprev_mean_no_vacc'] * 100,
+                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprevalence_no_vacc'] * 100,
                    s=80, c='orange', edgecolors='darkorange', alpha=0.3, marker='^')
         ax.scatter(sero_data.loc[sero_data['is_outlier'] == 0].index,
-                   sero_data.loc[sero_data['is_outlier'] == 0, 'seroprev_mean_no_vacc_waning'] * 100,
+                   sero_data.loc[sero_data['is_outlier'] == 0, 'sero_sample_mean'] * 100,
                    s=100, c='mediumorchid', edgecolors='darkmagenta', alpha=0.6, marker='o')
 
     ax.plot(output_draws.mean(axis=1), color='black', alpha=0.8)

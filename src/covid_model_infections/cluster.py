@@ -14,8 +14,8 @@ PROJECT = 'proj_covid_prod'
 QUEUE = 'd.q'
 TYPE_SPECS = {
     'covid_mean_inf_loc': {'F_MEM': '5.0G',
-                           'F_THREAD': '3',
-                           'OMP_NUM_THREADS': '3'},
+                           'F_THREAD': '6',
+                           'OMP_NUM_THREADS': '6'},
     'covid_refit_draw': {'F_MEM': '5.0G',
                          'F_THREAD': '6',
                          'OMP_NUM_THREADS': '6'},
