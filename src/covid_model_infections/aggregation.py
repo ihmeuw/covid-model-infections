@@ -121,8 +121,14 @@ def aggregate_md_draws(md_draws: pd.DataFrame, hierarchy: pd.DataFrame, mp_threa
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
     
     parent_draws_list = [subset_to_parent_md_draws(md_draws, parent_id, hierarchy) for parent_id in parent_ids]
-    with Pool(mp_threads - 1) as p:
-        agg_draws = list(tqdm(p.imap(create_parent_draws, parent_draws_list), total=len(parent_ids), file=sys.stdout))
+    
+    if mp_threads > 1:
+        with Pool(mp_threads - 1) as p:
+            agg_draws = list(tqdm(p.imap(create_parent_draws, parent_draws_list), total=len(parent_ids), file=sys.stdout))
+    else:
+        agg_draws = []
+        for parent_draws in tqdm(parent_draws_list, total=len(parent_ids), file=sys.stdout):
+            agg_draws.append(create_parent_draws(parent_draws))
     agg_draws = pd.concat(agg_draws)
     
     return agg_draws

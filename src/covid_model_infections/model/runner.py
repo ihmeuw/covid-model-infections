@@ -461,11 +461,7 @@ def run_model(location_id: int,
     )
     
     logger.info('Writing intermediate datasets.')
-    input_draws['location_id'] = location_id
-    input_draws = (input_draws
-                   .reset_index()
-                   .set_index(['location_id', 'date'])
-                   .sort_index())
+    input_draws = pd.concat({location_id: input_draws.sort_index()}, names=['location_id'])
     input_draws_path = Path(model_out_dir) / f'{location_id}_input_draws.parquet'
     input_draws.to_parquet(input_draws_path)
     input_data_path = Path(model_out_dir) / f'{location_id}_input_data.pkl'
@@ -498,11 +494,7 @@ def run_model(location_id: int,
         ratio_draws.to_parquet(ratio_path)
     
     logger.info('Writing output draws.')
-    output_draws['location_id'] = location_id
-    output_draws = (output_draws
-                    .reset_index()
-                    .set_index(['location_id', 'date'])
-                    .sort_index())
+    output_draws = pd.concat({location_id: output_draws.sort_index()}, names=['location_id'])
     draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.parquet'
     output_draws.to_parquet(draw_path)
 
