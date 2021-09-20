@@ -264,7 +264,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
         
-    for measure, (estimated_ratio, ratio_prior_data) in estimated_ratios.items():
+    for measure, (estimated_ratio, ratio_prior_estimates) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
         for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.parquet')]:
@@ -273,18 +273,19 @@ def make_infections(app_metadata: cli_tools.Metadata,
         
         logger.info(f'Filling {estimated_ratio.upper()} with original model estimate where we do not have a posterior.')
         ratio_draws_cols = ratio_draws.columns
-        ratio_prior_data = (ratio_prior_data
-                            .reset_index()
-                            .loc[:, ['location_id', 'draw', 'date', 'ratio']])
-        ratio_prior_data = pd.pivot_table(ratio_prior_data,
-                                          index=['location_id', 'date'],
-                                          columns='draw',
-                                          values='ratio',)
-        ratio_prior_data.columns = ratio_draws_cols
+        ratio_prior_estimates = (ratio_prior_estimates
+                                 .reset_index()
+                                 .loc[:, ['location_id', 'draw', 'date', 'ratio']])
+        ratio_prior_estimates = pd.pivot_table(ratio_prior_estimates,
+                                               index=['location_id', 'date'],
+                                               columns='draw',
+                                               values='ratio',)
+        ratio_prior_estimates.columns = ratio_draws_cols
         ratio_locations = ratio_draws.reset_index()['location_id'].unique()
-        missing_locations = [l for l in ratio_locations if l not in completed_modeled_location_ids]
-        ratio_prior_data = ratio_prior_data.loc[missing_locations]
-        ratio_draws = ratio_draws.append(ratio_prior_data)
+        ratio_prior_locations = ratio_prior_estimates.reset_index()['location_id'].unique()
+        missing_locations = [l for l in ratio_prior_locations if l not in ratio_locations]
+        ratio_prior_estimates = ratio_prior_estimates.loc[missing_locations]
+        ratio_draws = ratio_draws.append(ratio_prior_estimates)
 
         logger.info(f'Writing SEIR inputs - {estimated_ratio.upper()} draw files.')
         ratio_draws = ratio_draws.sort_index()

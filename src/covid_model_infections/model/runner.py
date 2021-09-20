@@ -22,6 +22,7 @@ from covid_model_infections.cluster import TYPE_SPECS
 LOG_OFFSET = 1
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
+NUM_SUBMODELS = 7
 
 
 def model_measure(measure: str, measure_type: str,
@@ -342,7 +343,7 @@ def triangulate_infections(infections_inputs: pd.DataFrame, output_data: Dict, i
     infections_weights = np.sqrt(infections_weights)
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
-                                         diff=True, refit=False, num_submodels=5,)
+                                         diff=True, refit=False, num_submodels=NUM_SUBMODELS,)
     raw_infections = pd.concat([v['infections_daily_raw'][n] for k, v in output_data.items()], axis=1).sort_index()
     input_draw = sample_infections_residuals(smooth_infections, raw_infections,)
     
@@ -420,7 +421,7 @@ def run_model(location_id: int,
     draw_args = {
         'log': infection_log,
         'knot_days': infection_knot_days,
-        'num_submodels': 5,
+        'num_submodels': NUM_SUBMODELS,
         'diff': False,
         'refit': True,
     }
