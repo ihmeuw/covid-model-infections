@@ -226,7 +226,9 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     sigmas = []
     for date in dates:
         avg_dates = pd.date_range(date - pd.Timedelta(days=rmse_radius), date + pd.Timedelta(days=rmse_radius), freq=None)
-        mad = np.abs(residuals.loc[residuals['date'].isin(avg_dates), 'residuals']).median()
+        date_residuals = residuals.loc[residuals['date'].isin(avg_dates), 'residuals'].copy()
+        date_residuals -= date_residuals.mean()
+        mad = np.abs(date_residuals).median()
         sigma = mad * 1.4826
         sigmas.append(pd.Series(sigma, index=pd.Index([date], name='date'), name='sigma'))
     sigma = pd.concat(sigmas)
@@ -347,7 +349,8 @@ def triangulate_infections(infections_inputs: Dict, output_data: Dict,
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=NUM_SUBMODELS,)
-    raw_infections = pd.concat([v['infections_daily_raw'][n] for k, v in output_data.items()], axis=1).sort_index()
+    raw_infections = pd.concat([v['infections_daily_raw'][n] for k, v in output_data.items() if k == measure],
+                               axis=1).sort_index()
     input_draw = sample_infections_residuals(smooth_infections, raw_infections,)
     
     return smooth_infections, raw_infections, input_draw
@@ -401,8 +404,9 @@ def run_model(location_id: int,
     else:
         measures = [str(measure) for measure in np.random.choice(measures, n_draws)]
     measure_variances = np.random.uniform(0.1, 0.9, n_draws)
-    weights = pd.DataFrame({'measures': measures, 'measure_variances': measure_variances})
-    logger.info('Weights:/n')
+    weights = pd.DataFrame({'measure': measures, 'avg_variance': measure_variances, 'n': 1,})
+    logger.info(f"Weights: \n:{weights.groupby('measure').agg({'n': pd.Series.count, 'avg_variance': pd.Series.mean})}")
+    del weights
     infections_inputs = [
         {'infections_inputs': ii,
          'measure': m,
