@@ -249,16 +249,16 @@ def splice_ratios(ratio_data: pd.Series,
                   smooth_data: pd.Series,
                   infections: pd.Series,
                   lag: int,
-                  trans_period_past: int = 60,
-                  trans_period_future: int = 60,) -> pd.Series:
+                  trans_period_past: int = 30,
+                  trans_period_future: int = 30,) -> pd.Series:
     col_name = infections.name
     infections.index += pd.Timedelta(days=lag)
     new_ratio = (smooth_data / infections).dropna().rename('new_ratio')
     new_ratio = new_ratio[1:]  # don't start at day0, is problematic for delayed cumul series
     start_date = new_ratio.index.min()
     end_date = new_ratio.index.max()
-    pre = new_ratio[:trans_period_past].mean()
-    post = new_ratio[-trans_period_future:].mean()
+    pre = new_ratio[:trans_period_past * 2].mean()
+    post = new_ratio[-trans_period_future * 2:].mean()
     new_ratio = pd.concat([ratio_data, new_ratio], axis=1)
     new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = pre  # new_ratio[ratio_data.name]
     new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = post  # new_ratio[ratio_data.name]
