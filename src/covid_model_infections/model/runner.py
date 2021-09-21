@@ -329,17 +329,20 @@ def get_rate_transformations(log: bool):
     return dep_trans_in, dep_se_trans_in, dep_trans_out
 
 
-def triangulate_infections(infections_inputs: pd.DataFrame, output_data: Dict, is_us: bool,
+def triangulate_infections(infections_inputs: Dict, output_data: Dict,
                            infection_log: bool, infection_knot_days: int,):
-    infections_inputs = infections_inputs.copy()
+    measure = infections_inputs['measure']
+    measure_variance = infections_inputs['measure_variance']
+    infections_inputs = infections_inputs['infections_inputs'].copy()
+    
     n = infections_inputs['draw'].unique().item()
     del infections_inputs['draw']
     
-    if is_us:
-        infections_weights = pd.concat([v['infections_daily'][n] ** 0 - (k == 'hospitalizations') * (1 - 0.1) for k, v in output_data.items()],
-                                       axis=1).sort_index()
-    else:
-        infections_weights = pd.concat([v['infections_daily'][n] ** 0 for k, v in output_data.items()], axis=1).sort_index()
+    infections_weights = pd.concat([pd.Series(np.ones(v['infections_daily'][n].size),
+                                              name=v['infections_daily'][n].name,
+                                              index=v['infections_daily'][n].index) - (k == measure) * (1 - measure_variance) 
+                                    for k, v in output_data.items()],
+                                   axis=1).sort_index()
     infections_weights = np.sqrt(infections_weights)
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
@@ -390,11 +393,28 @@ def run_model(location_id: int,
     infections_inputs = [pd.concat([ii, pd.DataFrame({'draw': n}, index=ii.index)], axis=1)
                          for n, ii in enumerate(infections_inputs)]
     
+    logger.info('Determining weighting scheme.')
+    measures = list(output_data.keys())
+    if is_us and 'hospitalizations' in measures:
+        measures += ['hospitalizations']
+        measures = [str(measure) for measure in np.random.choice(measures, n_draws)]
+    else:
+        measures = [str(measure) for measure in np.random.choice(measures, n_draws)]
+    measure_variances = np.random.uniform(0.1, 0.9, n_draws)
+    weights = pd.DataFrame({'measures': measures, 'measure_variances': measure_variances})
+    logger.info('Weights:/n')
+    infections_inputs = [
+        {'infections_inputs': ii,
+         'measure': m,
+         'measure_variance': mv,}
+        for ii, m, mv in zip(infections_inputs, measures, measure_variances)
+    ]
+    
     logger.info('Fitting infection curve (w/ random knots) based on all available input measures.')
     if mp:
         _triangulate_infections = functools.partial(
             triangulate_infections,
-            output_data=output_data, is_us=is_us,
+            output_data=output_data,
             infection_log=infection_log, infection_knot_days=infection_knot_days,
         )
         with multiprocessing.Pool(int(os.environ['OMP_NUM_THREADS'])) as p:
@@ -405,7 +425,7 @@ def run_model(location_id: int,
         for ii in tqdm(infections_inputs, total=n_draws, file=sys.stdout):
             si_ri_id.append(triangulate_infections(
                 ii,
-                output_data=output_data, is_us=is_us,
+                output_data=output_data,
                 infection_log=infection_log, infection_knot_days=infection_knot_days,
             ))
 
