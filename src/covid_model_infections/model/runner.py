@@ -23,6 +23,7 @@ LOG_OFFSET = 1
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 NUM_SUBMODELS = 7
+CEILING = 0.9
 
 
 def model_measure(measure: str, measure_type: str,
@@ -206,7 +207,7 @@ def model_infections(inputs: pd.DataFrame,
 
 
 def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd.DataFrame,
-                                rmse_radius: int = 180):
+                                rmse_radius: int = 180,):
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log=True)
     
     # logger.info('Calculating residuals.')
@@ -349,11 +350,57 @@ def triangulate_infections(infections_inputs: Dict, output_data: Dict,
     smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=NUM_SUBMODELS,)
-    raw_infections = pd.concat([v['infections_daily_raw'][n] for k, v in output_data.items() if k == measure],
+    raw_infections = pd.concat([v['infections_daily_raw'][n][1:] for k, v in output_data.items() if k == measure],
                                axis=1).sort_index()
+    ## ALTERNATIVELY (no k == measure for this):
+    # measure_weight = 1 / np.array([1 - ((k == measure) * (1 - measure_variance)) for k in output_data.keys()])
+    # ri_diff = raw_infections.diff().mean(axis=1).fillna(raw_infections.mean(axis=1))
+    # raw_infections = raw_infections.diff().fillna(raw_infections).apply(lambda x: x.fillna(ri_diff)).cumsum()
+    # raw_infections = (raw_infections
+    #                   .apply(lambda x: np.average(x, weights=measure_weight), axis=1).dropna()
+    #                   .rename('infections'))
+    # raw_infections = pd.concat([raw_infections, smooth_infections.rename('smoothed')], axis=1)
+    # raw_infections = raw_infections['infections'].fillna(raw_infections['smoothed']).to_frame()
     input_draw = sample_infections_residuals(smooth_infections, raw_infections,)
     
     return smooth_infections, raw_infections, input_draw
+
+
+def squeeze(daily_infections: pd.Series,
+            population: pd.Series,
+            daily_reinfection_inflation_factor: pd.Series,
+            vaccine_coverage: pd.DataFrame,
+            ceiling: float = CEILING,) -> pd.Series:
+    draw_name = daily_infections.name
+    daily_infections = pd.concat([daily_infections.rename('infections'),
+                                  daily_reinfection_inflation_factor], axis=1)
+    daily_infections = daily_infections.sort_index()
+    daily_infections['inflation_factor'] = (daily_infections['inflation_factor']
+                                            .groupby(level=0).apply(lambda x: x.fillna(method='ffill')))
+    daily_infections['inflation_factor'] = daily_infections['inflation_factor'].fillna(1)
+    daily_infections['seroprevalence'] = daily_infections['infections'] / daily_infections['inflation_factor']
+    
+    cumul_infections = (daily_infections['infections'].dropna()
+                        .groupby(level=0).cumsum())
+    seroprevalence = (daily_infections['seroprevalence'].dropna()
+                      .groupby(level=0).cumsum())
+    
+    vaccinations = vaccine_coverage.join(daily_infections, how='right')['cumulative_all_effective'].fillna(0)
+    daily_vaccinations = vaccinations.groupby(level=0).diff().fillna(vaccinations)
+    eff_daily_vaccinations = daily_vaccinations * (1 - seroprevalence / population).clip(0, 1)
+    eff_vaccinations = eff_daily_vaccinations.groupby(level=0).cumsum()
+    
+    immune = seroprevalence + eff_vaccinations
+    max_immune = immune.max()
+
+    limits = population * ceiling
+    
+    excess = (max_immune - limits).clip(0, np.inf)
+    excess_scaling_factor = (max_immune - excess) / max_immune
+    
+    daily_infections *= excess_scaling_factor
+        
+    return daily_infections['infections'].rename(draw_name).dropna()
 
 
 def run_model(location_id: int,
@@ -367,7 +414,8 @@ def run_model(location_id: int,
               mp: bool = True,):
     np.random.seed(15243 + location_id)
     logger.info('Loading data.')
-    input_data, modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
+    input_data, vaccine_data, daily_reinfection_rr, \
+    modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
     
@@ -472,12 +520,20 @@ def run_model(location_id: int,
         output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
     output_draws = dep_trans_out(output_draws)
 
-    logger.warning('Droppping last three days of infections for stability.')
-    output_draws = output_draws[:-3]
+    ## SHOULD NOT HAVE TO DO THIS ANY MORE
+    # logger.warning('Droppping last three days of infections for stability.')
+    # output_draws = output_draws[:-3]
+    
+    logger.info('Ensure we do not run out of susceptibles.')
+    output_draws = enumerate([output_draws[dc] for dc in output_draws.columns])
+    _od = []
+    for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
+        _od.append(squeeze(output_draw, population, daily_reinfection_rr.loc[n], vaccine_data,))
+    output_draws = pd.concat(_od, axis=1)
+    del _od
     
     logger.info('Plot data.')
-    input_data, _, population, location_name, _ = data.load_model_inputs(location_id, Path(model_in_dir))
-    sero_data, daily_reinfection_rr, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
+    sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
     plotter.plotter(
         Path(plot_dir),
         location_id, location_name,

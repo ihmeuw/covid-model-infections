@@ -56,7 +56,19 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     population = pd.read_parquet(pop_path)
     population = population.loc[location_id].item()
     
-    return model_data, modeled_location, population, location_name, is_us
+    vaccine_path = model_in_dir / 'vaccine_data.parquet'
+    vaccine_data = pd.read_parquet(vaccine_path)
+    vaccine_data = vaccine_data.loc[location_id]
+    
+    daily_reinfection_rr_path = model_in_dir / 'daily_reinfection_rr.parquet'
+    daily_reinfection_rr = pd.read_parquet(daily_reinfection_rr_path)
+    if location_id in daily_reinfection_rr.reset_index()['location_id'].to_list():
+        daily_reinfection_rr = daily_reinfection_rr.loc[location_id]
+    else:
+        daily_reinfection_rr = pd.DataFrame()
+
+
+    return model_data, vaccine_data, daily_reinfection_rr, modeled_location, population, location_name, is_us
 
 
 def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
@@ -67,14 +79,7 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
                  .loc[sero_data['location_id'] == location_id]
                  .drop('location_id', axis=1)
                  .set_index('date'))
-    
-    daily_reinfection_rr_path = model_in_dir / 'daily_reinfection_rr.parquet'
-    daily_reinfection_rr = pd.read_parquet(daily_reinfection_rr_path)
-    if location_id in daily_reinfection_rr.reset_index()['location_id'].to_list():
-        daily_reinfection_rr = daily_reinfection_rr.loc[location_id]
-    else:
-        daily_reinfection_rr = pd.DataFrame()
-    
+        
     ifr_model_data_path = model_in_dir / 'ifr_model_data.parquet'
     ifr_model_data = pd.read_parquet(ifr_model_data_path)
     ifr_model_data = ifr_model_data.reset_index()
@@ -104,4 +109,4 @@ def load_extra_plot_inputs(location_id: int, model_in_dir: Path):
         'cases': idr_model_data,
     }
     
-    return sero_data, daily_reinfection_rr, ratio_model_inputs
+    return sero_data, ratio_model_inputs

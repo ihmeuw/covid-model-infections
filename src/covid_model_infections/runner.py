@@ -92,6 +92,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(rates_root)
     test_data = data.load_test_data(rates_root)
+    vaccine_data = data.load_vaccine_data(rates_root)
 
     logger.info('Filling missing locations and creating model input data structure.')
     most_detailed = hierarchy['most_detailed'] == 1
@@ -161,6 +162,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     sero_data.to_parquet(sero_path)
     test_path = model_in_dir / 'test_data.parquet'
     test_data.to_parquet(test_path)
+    vaccine_path = model_in_dir / 'vaccine_data.parquet'
+    vaccine_data.to_parquet(vaccine_path)
     ifr_model_data_path = model_in_dir / 'ifr_model_data.parquet'
     ifr_model_data.to_parquet(ifr_model_data_path)
     daily_reinfection_rr_path = model_in_dir / 'daily_reinfection_rr.parquet'

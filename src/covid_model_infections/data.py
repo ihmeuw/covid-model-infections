@@ -94,9 +94,9 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
     return data, manipulation_metadata
 
 
-def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
+def load_ifr(rates_root: Path) -> pd.DataFrame:
     # also get number of draws from here
-    data_path = infection_fatality_root / 'ifr_draws.parquet'
+    data_path = rates_root / 'ifr_draws.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ifr': 'ratio',
@@ -110,8 +110,8 @@ def load_ifr(infection_fatality_root: Path) -> pd.DataFrame:
     return data, n_draws
 
 
-def load_ifr_rr(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'ifr_rr_draws.parquet'
+def load_ifr_rr(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'ifr_rr_draws.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = (data
@@ -122,8 +122,8 @@ def load_ifr_rr(infection_fatality_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'ifr_model_data.parquet'
+def load_ifr_data(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'ifr_model_data.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ifr_mean': 'ratio_mean',
@@ -134,10 +134,22 @@ def load_ifr_data(infection_fatality_root: Path) -> pd.DataFrame:
             .loc[:, ['ratio_mean', 'ratio_std', 'is_outlier']])
     
     return data
+
+
+def load_vaccine_data(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'vaccine_coverage.parquet'
+    data = pd.read_parquet(data_path)
+    data['date'] = pd.to_datetime(data['date'])
+    data = (data
+            .loc[:, ['location_id', 'date', 'cumulative_all_effective',]]
+            .set_index(['location_id', 'date'])
+            .sort_index())
+    
+    return data
     
 
-def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / 'ihr_draws.parquet'
+def load_ihr(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'ihr_draws.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ihr': 'ratio',
@@ -150,8 +162,8 @@ def load_ihr(infection_hospitalization_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_ihr_data(infection_hospitalization_root: Path) -> pd.DataFrame:
-    data_path = infection_hospitalization_root / 'ihr_model_data.parquet'
+def load_ihr_data(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'ihr_model_data.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ihr_mean': 'ratio_mean',
@@ -165,8 +177,8 @@ def load_ihr_data(infection_hospitalization_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_idr(infection_detection_root: Path, limits: Tuple[float, float]) -> pd.DataFrame:
-    data_path = infection_detection_root / 'idr_draws.parquet'
+def load_idr(rates_root: Path, limits: Tuple[float, float]) -> pd.DataFrame:
+    data_path = rates_root / 'idr_draws.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'idr': 'ratio',
@@ -180,8 +192,8 @@ def load_idr(infection_detection_root: Path, limits: Tuple[float, float]) -> pd.
     return data
 
 
-def load_idr_data(infection_detection_root: Path) -> pd.DataFrame:
-    data_path = infection_detection_root / 'idr_model_data.parquet'
+def load_idr_data(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'idr_model_data.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'idr_mean': 'ratio_mean',
@@ -195,9 +207,11 @@ def load_idr_data(infection_detection_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_sero_data(infection_detection_root: Path) -> pd.DataFrame:
-    data_path = infection_detection_root / 'seroprevalence_data.parquet'
-    data = pd.read_parquet(data_path)
+def load_sero_data(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'sero_data.csv'
+    data = pd.read_csv(data_path)
+    # data_path = rates_root / 'seroprevalence_data.parquet'
+    # data = pd.read_parquet(data_path)
     data = (data
             .loc[:, ['location_id', 'infection_date',
                      'seroprevalence', 'seroprevalence_no_vacc',
@@ -212,8 +226,8 @@ def load_sero_data(infection_detection_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_daily_reinfection_rr(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'reinfection_inflation_factor_draws.parquet'
+def load_daily_reinfection_rr(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'reinfection_inflation_factor_draws.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     
@@ -225,8 +239,8 @@ def load_daily_reinfection_rr(infection_fatality_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_test_data(infection_detection_root: Path):
-    data_path = infection_detection_root / 'testing.parquet'
+def load_test_data(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'testing.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
     data = (data
@@ -236,8 +250,8 @@ def load_test_data(infection_detection_root: Path):
     return data
 
 
-def load_em_scalars(infection_fatality_root: Path) -> pd.DataFrame:
-    data_path = infection_fatality_root / 'excess_mortality.parquet'
+def load_em_scalars(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'excess_mortality.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
 
@@ -246,14 +260,14 @@ def load_em_scalars(infection_fatality_root: Path) -> pd.DataFrame:
 
 def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,
                       excess_mortality: bool = True,) -> Tuple[pd.Series, pd.Series, Dict]:
-    data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+    if input_measure == 'deaths' and not excess_mortality:
+        data_path = model_inputs_root / 'full_data_unscaled.csv'
+    else:
+        data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Confirmed':'cumulative_cases',
-                                'Hospitalizations':'cumulative_hospitalizations',})
-    if input_measure == 'deaths' and excess_mortality:
-        data = data.rename(columns={'Deaths':'cumulative_deaths',})
-    else:
-        data = data.rename(columns={'UNSCALED Deaths':'cumulative_deaths',})
+                                'Hospitalizations':'cumulative_hospitalizations',
+                                'Deaths':'cumulative_deaths',})
     data['date'] = pd.to_datetime(data['Date'])
     keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
     data = data.loc[:, keep_cols].dropna()
