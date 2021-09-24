@@ -380,10 +380,8 @@ def squeeze(daily_infections: pd.Series,
     daily_infections['inflation_factor'] = daily_infections['inflation_factor'].fillna(1)
     daily_infections['seroprevalence'] = daily_infections['infections'] / daily_infections['inflation_factor']
     
-    cumul_infections = (daily_infections['infections'].dropna()
-                        .groupby(level=0).cumsum())
-    seroprevalence = (daily_infections['seroprevalence'].dropna()
-                      .groupby(level=0).cumsum())
+    cumul_infections = (daily_infections['infections'].dropna().cumsum())
+    seroprevalence = (daily_infections['seroprevalence'].dropna().cumsum())
     
     vaccinations = vaccine_coverage.join(daily_infections, how='right')['cumulative_all_effective'].fillna(0)
     daily_vaccinations = vaccinations.groupby(level=0).diff().fillna(vaccinations)
