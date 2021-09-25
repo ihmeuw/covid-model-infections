@@ -11,7 +11,6 @@ import pandas as pd
 from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model, aggregation
-from covid_model_infections.utils import TIMELINE
 from covid_model_infections.pdf_merger import pdf_merger
 
 MP_THREADS = 25
@@ -89,6 +88,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
     idr = data.load_idr(rates_root, (0., 1.))
     idr_model_data = data.load_idr_data(rates_root)
     
+    logger.info('Loading durations for each draw.')
+    durations = data.load_durations(rates_root)
+    
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(rates_root)
     test_data = data.load_test_data(rates_root)
@@ -140,15 +142,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
                 else:
                     pass
     model_data = {
-        'timeline': TIMELINE,
+        'durations': durations,
         'daily_deaths': daily_deaths, 'cumul_deaths': cumul_deaths, 'ifr': ifr,
         'daily_hospital': daily_hospital, 'cumul_hospital': cumul_hospital, 'ihr': ihr,
         'daily_cases': daily_cases, 'cumul_cases': cumul_cases, 'idr': idr,
     }
     # TODO: centralize this information, is used elsewhere...
-    estimated_ratios = {'deaths': ('ifr', ifr.copy()),
-                        'hospitalizations': ('ihr', ihr.copy()),
-                        'cases': ('idr', idr.copy()),}
+    estimated_ratios = {'deaths': ('ifr', [d['exposure_to_death'] for d in durations], ifr.copy()),
+                        'hospitalizations': ('ihr', [d['exposure_to_admission'] for d in durations], ihr.copy()),
+                        'cases': ('idr', [d['exposure_to_case'] for d in durations], idr.copy()),}
     
     logger.info('Writing intermediate files.')
     data_path = model_in_dir / 'model_data.pkl'
@@ -267,7 +269,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
         
-    for measure, (estimated_ratio, ratio_prior_estimates) in estimated_ratios.items():
+    for measure, (estimated_ratio, measure_durations, ratio_prior_estimates) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
         for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.parquet')]:
@@ -320,7 +322,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
         _ratio_writer = functools.partial(
             data.write_ratio_draws,
             estimated_ratio=estimated_ratio,
-            duration=TIMELINE[measure],
+            durations=measure_durations,
             ratio_draws_dir=ratio_draws_dir,
         )
         with multiprocessing.Pool(MP_THREADS) as p:

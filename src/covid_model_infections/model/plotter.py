@@ -1,5 +1,6 @@
 from typing import Dict, Tuple
 from pathlib import Path
+from loguru import logger
 
 import pandas as pd
 import numpy as np
@@ -81,7 +82,7 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
         ratio_ax = fig.add_subplot(gs[i*4+2:i*4+4, 1])
         if measure in list(input_data.keys()):
             adj_ratio = smooth_infections.copy()
-            adj_ratio.index += pd.Timedelta(days=input_data[measure]['lag'])
+            adj_ratio.index += pd.Timedelta(days=int(np.mean(input_data[measure]['lags'])))
             adj_ratio = output_data[measure]['daily'] / adj_ratio
             adj_ratio = adj_ratio.dropna()
             ratio_data = pd.concat([input_data[measure]['ratio'].groupby(level=1).mean(),
@@ -131,6 +132,7 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
     
     smooth_infections = smooth_infections.cumsum()
     if not daily_reinfection_rr.empty:
+        logger.warning('Not scaling infections; need cumulative reinfection.')
         for n in range(len(output_draws.columns)):
             output_draws = output_draws.join(daily_reinfection_rr.loc[n], how='left')
             output_draws = output_draws.sort_index()

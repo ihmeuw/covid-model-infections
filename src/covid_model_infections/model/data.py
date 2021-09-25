@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import List, Tuple, Dict
 from pathlib import Path
 from loguru import logger
 import dill as pickle
@@ -7,7 +7,7 @@ import pandas as pd
 
 
 def compile_input_data_object(location_id: int,
-                              timeline: Dict,
+                              durations: List[Dict[str, int]],
                               daily_deaths: pd.Series, cumul_deaths: pd.Series, ifr: pd.Series,
                               daily_hospital: pd.Series, cumul_hospital: pd.Series, ihr: pd.Series,
                               daily_cases: pd.Series, cumul_cases: pd.Series, idr: pd.Series,):
@@ -19,21 +19,21 @@ def compile_input_data_object(location_id: int,
         location_model_data.update({'deaths':{'daily': daily_deaths.loc[location_id],
                                               'cumul': cumul_deaths.loc[location_id],
                                               'ratio': ifr.loc[location_id],
-                                              'lag': timeline['deaths'],},})
+                                              'lags': [d['exposure_to_death'] for d in durations],},})
     # HOSPITAL ADMISSIONS
     if location_id in daily_hospital.reset_index()['location_id'].unique().tolist():
         modeled_location = True
         location_model_data.update({'hospitalizations':{'daily': daily_hospital.loc[location_id],
                                                         'cumul': cumul_hospital.loc[location_id],
                                                         'ratio': ihr.loc[location_id],
-                                                        'lag': timeline['hospitalizations'],},})
+                                                        'lags': [d['exposure_to_admission'] for d in durations],},})
     # CASES
     if location_id in daily_cases.reset_index()['location_id'].unique().tolist():
         modeled_location = True
         location_model_data.update({'cases':{'daily': daily_cases.loc[location_id],
                                              'cumul': cumul_cases.loc[location_id],
                                              'ratio': idr.loc[location_id],
-                                             'lag': timeline['cases'],},})
+                                             'lags': [d['exposure_to_case'] for d in durations],},})
         
     return location_model_data, modeled_location
 

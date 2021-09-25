@@ -66,11 +66,11 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
                     ratio_data = (child_data[measure]['daily'] / child_data[measure][metric]['ratio']).rename('ratio')
                     ratio_fe_data = (child_data[measure]['daily'] / child_data[measure][metric]['ratio_fe']).rename('ratio_fe')
                     metric_data.append(pd.concat([ratio_data, ratio_fe_data], axis=1).dropna())
-                if isinstance(child_data[measure][metric], list):
+                elif isinstance(child_data[measure][metric], list) and metric != 'lags':
                     metric_data.append(pd.concat(child_data[measure][metric]).groupby(level=0).mean())
                 else:
                     metric_data.append(child_data[measure][metric])
-            if isinstance(metric_data[0], int):
+            if isinstance(metric_data[0], int) or isinstance(metric_data[0], list):
                 metric_data = metric_data[0]
             else:
                 metric_data = pd.concat(metric_data)

@@ -1,5 +1,6 @@
 from typing import List, Tuple, Dict
 from pathlib import Path
+import dill as pickle
 
 import pandas as pd
 import numpy as np
@@ -258,6 +259,14 @@ def load_em_scalars(rates_root: Path) -> pd.DataFrame:
     return data
 
 
+def load_durations(rates_root: Path) -> List[Dict[str, int]]:
+    data_path = rates_root / 'durations.pkl'
+    with data_path.open('rb') as file:
+        durations = pickle.load(file)
+        
+    return durations
+
+
 def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,
                       excess_mortality: bool = True,) -> Tuple[pd.Series, pd.Series, Dict]:
     if input_measure == 'deaths' and not excess_mortality:
@@ -370,7 +379,7 @@ def write_infections_draws(data: pd.DataFrame,
 def write_ratio_draws(data_list: List[pd.Series],
                       estimated_ratio: str,
                       ratio_draws_dir: Path,
-                      duration: int,):
+                      durations: List[int],):
     if estimated_ratio == 'ifr':
         if len(data_list) != 3:
             raise ValueError('IFR, but not 3 elements in data list.')
@@ -389,7 +398,7 @@ def write_ratio_draws(data_list: List[pd.Series],
         data['ifr_lr_draw'] = data['ifr_draw'] * data_lr
         data['ifr_hr_draw'] = data['ifr_draw'] * data_hr
     data['draw'] = draw
-    data['duration'] = duration
+    data['duration'] = durations[draw]
 
     out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)

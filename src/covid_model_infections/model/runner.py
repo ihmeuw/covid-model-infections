@@ -28,7 +28,7 @@ CEILING = 0.9
 
 def model_measure(measure: str, measure_type: str,
                   input_data: pd.Series, ratio: pd.Series, population: float,
-                  n_draws: int, lag: int,
+                  n_draws: int, lags: List[int],
                   log: bool, knot_days: int,
                   num_submodels: int,
                   split_l_interval: bool,
@@ -106,12 +106,12 @@ def model_measure(measure: str, measure_type: str,
         # raw_infections = pd.concat([input_data, ratio.loc[draw]], axis=1)
         # raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name])
         _raw_infections = (input_data / ratio.loc[draw]).rename('infections').dropna()
-        _raw_infections.index -= pd.Timedelta(days=lag)
+        _raw_infections.index -= pd.Timedelta(days=lags[draw])
         raw_infections.append(_raw_infections)
         # smooth_infections = pd.concat([smooth_data, ratio.loc[draw]], axis=1)
         # smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
         _smooth_infections = (smooth_data / ratio.loc[draw]).rename('infections').dropna()
-        _smooth_infections.index -= pd.Timedelta(days=lag)
+        _smooth_infections.index -= pd.Timedelta(days=lags[draw])
         smooth_infections.append(_smooth_infections)
 
     return {'daily': smooth_data, 'cumul': smooth_data.cumsum(),
@@ -275,10 +275,10 @@ def enforce_ratio_ceiling(output_measure: str,
                           input_measure: str,
                           obs_data: pd.Series,
                           infections_data_list: List[pd.Series],
-                          lag: int,
+                          lags: List[int],
                           ceiling: float,):
     adj_infections_data_list = []
-    for infections_data in infections_data_list:
+    for infections_data, lag in zip(infections_data_list, lags):
         infections_floor = obs_data / ceiling
         infections_floor.index -= pd.Timedelta(days=lag)
         infections_scalar = (infections_floor / infections_data)[infections_data.index]
@@ -422,7 +422,7 @@ def run_model(location_id: int,
                                           measure_type,
                                           measure_data[measure_type].copy(),
                                           measure_data['ratio']['ratio'].copy(),
-                                          population, n_draws, measure_data['lag'],
+                                          population, n_draws, measure_data['lags'],
                                           measure_log, measure_knot_days, num_submodels=1,
                                           split_l_interval=False, split_r_interval=False,)
                    for measure, measure_data in input_data.items()}
@@ -431,7 +431,7 @@ def run_model(location_id: int,
                                                    input_measure,
                                                    output_data[input_measure]['daily'][1:].copy(),
                                                    output_data[output_measure]['infections_daily'].copy(),
-                                                   input_data[input_measure]['lag'],
+                                                   input_data[input_measure]['lags'],
                                                    CEILINGS[input_measure],)
                              for output_measure in output_data.keys()]
         for measure, new_infections in zip(output_data.keys(), infections_inputs):
@@ -484,8 +484,10 @@ def run_model(location_id: int,
     input_draws = [i[2] for i in si_ri_id]
     del si_ri_id
 
-    smooth_infections = pd.concat(smooth_infections).groupby(level=0).mean()
-    raw_infections = pd.concat(raw_infections).groupby(level=0).mean()
+    # smooth_infections = pd.concat(smooth_infections).groupby(level=0).mean()
+    smooth_infections = pd.concat(smooth_infections, axis=1).dropna().mean(axis=1)
+    # raw_infections = pd.concat(raw_infections).groupby(level=0).mean()
+    raw_infections = pd.concat(raw_infections, axis=1).dropna().mean(axis=1)
     input_draws = [i.rename(f'draw_{n}').to_frame() for n, i in enumerate(input_draws)]
     
     draw_args = {
@@ -515,7 +517,12 @@ def run_model(location_id: int,
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = get_rate_transformations(draw_args['log'])
     if draw_args['log']:
-        output_draws -= np.var(output_draws.values, axis=1, keepdims=True) / 2
+        variance_offset = np.var(output_draws.values, axis=1, keepdims=True) / 2
+        variance_offset = (pd.DataFrame(variance_offset)
+                           .fillna(method='ffill')
+                           .fillna(method='bfill')
+                           .values)
+        output_draws -= variance_offset
     output_draws = dep_trans_out(output_draws)
 
     ## SHOULD NOT HAVE TO DO THIS ANY MORE
@@ -536,7 +543,7 @@ def run_model(location_id: int,
         Path(plot_dir),
         location_id, location_name,
         input_data, sero_data, ratio_model_inputs, daily_reinfection_rr,
-        output_data.copy(), smooth_infections.copy(), output_draws.copy(), population
+        output_data.copy(), smooth_infections.copy(), output_draws.dropna().copy(), population
     )
     
     logger.info('Writing intermediate datasets.')
@@ -562,7 +569,7 @@ def run_model(location_id: int,
         ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].loc[n].copy(),
                                      smooth_data=output_data[measure]['daily'].copy(),
                                      infections=output_draws_list[n].copy(),
-                                     lag=input_data[measure]['lag'],) for n in range(n_draws)]
+                                     lag=input_data[measure]['lags'][n],) for n in range(n_draws)]
         ratio_draws = pd.concat(ratio_draws, axis=1)
         ratio_draws['location_id'] = location_id
         ratio_draws = (ratio_draws
