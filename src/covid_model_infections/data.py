@@ -211,8 +211,6 @@ def load_idr_data(rates_root: Path) -> pd.DataFrame:
 def load_sero_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'sero_data.csv'
     data = pd.read_csv(data_path)
-    # data_path = rates_root / 'seroprevalence_data.parquet'
-    # data = pd.read_parquet(data_path)
     data = (data
             .loc[:, ['location_id', 'infection_date',
                      'seroprevalence', 'seroprevalence_no_vacc',
@@ -227,15 +225,22 @@ def load_sero_data(rates_root: Path) -> pd.DataFrame:
     return data
 
 
-def load_daily_reinfection_rr(rates_root: Path) -> pd.DataFrame:
-    data_path = rates_root / 'reinfection_inflation_factor_draws.parquet'
+def load_cross_variant_immunity(rates_root: Path) -> List:
+    data_path = rates_root / 'cross_variant_immunity.pkl'
+    with data_path.open('rb') as file:
+        data = pickle.load(file)
+    
+    return data
+
+
+def load_escape_variant_prevalence(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'variants.parquet'
     data = pd.read_parquet(data_path)
     data['date'] = pd.to_datetime(data['date'])
-    
     data = (data
-            .set_index(['location_id', 'draw', 'date'])
+            .set_index(['location_id', 'date'])
             .sort_index()
-            .loc[:, ['inflation_factor']])
+            .loc[:, ['escape_variant_prevalence']])
     
     return data
 
@@ -262,9 +267,9 @@ def load_em_scalars(rates_root: Path) -> pd.DataFrame:
 def load_durations(rates_root: Path) -> List[Dict[str, int]]:
     data_path = rates_root / 'durations.pkl'
     with data_path.open('rb') as file:
-        durations = pickle.load(file)
+        data = pickle.load(file)
         
-    return durations
+    return data
 
 
 def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,

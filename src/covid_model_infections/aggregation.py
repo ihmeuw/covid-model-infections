@@ -160,7 +160,8 @@ def plot_aggregate(location_id: int,
                    hierarchy: pd.DataFrame,
                    pop_data: pd.DataFrame,
                    sero_data: pd.DataFrame,
-                   daily_reinfection_rr: pd.DataFrame,
+                   cross_variant_immunity: List,
+                   escape_variant_prevalence: pd.DataFrame,
                    ifr_model_data: pd.DataFrame,
                    ihr_model_data: pd.DataFrame,
                    idr_model_data: pd.DataFrame,
@@ -171,10 +172,10 @@ def plot_aggregate(location_id: int,
                  .drop('location_id', axis=1)
                  .set_index('date'))
     
-    if location_id in daily_reinfection_rr.reset_index()['location_id'].to_list():
-        daily_reinfection_rr = daily_reinfection_rr.loc[location_id]
+    if location_id in escape_variant_prevalence.reset_index()['location_id'].to_list():
+        escape_variant_prevalence = escape_variant_prevalence.loc[location_id]
     else:
-        daily_reinfection_rr = pd.DataFrame()
+        escape_variant_prevalence = pd.DataFrame()
     
     population = pop_data.loc[location_id].item()
     
@@ -200,7 +201,7 @@ def plot_aggregate(location_id: int,
 
     model.plotter.plotter(
         plot_dir, location_id, location_name,
-        inputs, sero_data, ratio_model_inputs, daily_reinfection_rr,
+        inputs, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
         outputs, infections_mean, infections_draws, population
     )
     

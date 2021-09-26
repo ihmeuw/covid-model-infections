@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from pathlib import Path
 from loguru import logger
 
@@ -32,7 +32,8 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 def plotter(plot_dir: Path, location_id: int, location_name: str,
             input_data: Dict,
-            sero_data: pd.DataFrame, ratio_model_inputs: Dict, daily_reinfection_rr: pd.DataFrame,
+            sero_data: pd.DataFrame, ratio_model_inputs: Dict,
+            cross_variant_immunity: List[int], escape_variant_prevalence: pd.Series,
             output_data: Dict, smooth_infections: pd.Series, output_draws: pd.DataFrame,
             population: float,
             measures=['cases', 'hospitalizations', 'deaths']):
@@ -131,15 +132,15 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
     whitespace_mid.axis('off')
     
     smooth_infections = smooth_infections.cumsum()
-    if not daily_reinfection_rr.empty:
-        logger.warning('Not scaling infections; need cumulative reinfection.')
-        for n in range(len(output_draws.columns)):
-            output_draws = output_draws.join(daily_reinfection_rr.loc[n], how='left')
-            output_draws = output_draws.sort_index()
-            output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(method='ffill')
-            output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
-            output_draws[f'draw_{n}'] /= output_draws['inflation_factor']
-            del output_draws['inflation_factor']
+    logger.warning('Not showing infected; need to work out w/ new inputs.')
+#     if not daily_reinfection_rr.empty:
+#         for n in range(len(output_draws.columns)):
+#             output_draws = output_draws.join(daily_reinfection_rr.loc[n], how='left')
+#             output_draws = output_draws.sort_index()
+#             output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(method='ffill')
+#             output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
+#             output_draws[f'draw_{n}'] /= output_draws['inflation_factor']
+#             del output_draws['inflation_factor']
 #         sero_data = sero_data.join(daily_reinfection_rr, how='left')
 #         sero_data['inflation_factor'] = sero_data['inflation_factor'].fillna(1)
 #         sero_data['seroprev_mean_no_vacc_waning'] /= sero_data['inflation_factor']

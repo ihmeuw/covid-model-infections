@@ -81,7 +81,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr, n_draws = data.load_ifr(rates_root)
     ifr_rr = data.load_ifr_rr(rates_root)
     ifr_model_data = data.load_ifr_data(rates_root)
-    daily_reinfection_rr = data.load_daily_reinfection_rr(rates_root)
+    cross_variant_immunity = data.load_cross_variant_immunity(rates_root)
+    escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
     ihr = data.load_ihr(rates_root)
     ihr_model_data = data.load_ihr_data(rates_root)
     # Assumes IDR has estimated floor already applied
@@ -153,8 +154,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
                         'cases': ('idr', [d['exposure_to_case'] for d in durations], idr.copy()),}
     
     logger.info('Writing intermediate files.')
-    data_path = model_in_dir / 'model_data.pkl'
-    with data_path.open('wb') as file:
+    model_data_path = model_in_dir / 'model_data.pkl'
+    with model_data_path.open('wb') as file:
         pickle.dump(model_data, file, -1)
     hierarchy_path = model_in_dir / 'hierarchy.parquet'
     hierarchy.to_parquet(hierarchy_path)
@@ -168,8 +169,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
     vaccine_data.to_parquet(vaccine_path)
     ifr_model_data_path = model_in_dir / 'ifr_model_data.parquet'
     ifr_model_data.to_parquet(ifr_model_data_path)
-    daily_reinfection_rr_path = model_in_dir / 'daily_reinfection_rr.parquet'
-    daily_reinfection_rr.to_parquet(daily_reinfection_rr_path)
+    cross_variant_immunity_path = model_in_dir / 'cross_variant_immunity.pkl'
+    with cross_variant_immunity_path.open('wb') as file:
+        pickle.dump(cross_variant_immunity, file, -1)
+    escape_variant_prevalence_path = model_in_dir / 'escape_variant_prevalence.parquet'
+    escape_variant_prevalence.to_parquet(escape_variant_prevalence_path)
     ihr_model_data_path = model_in_dir / 'ihr_model_data.parquet'
     ihr_model_data.to_parquet(ihr_model_data_path)
     idr_model_data_path = model_in_dir / 'idr_model_data.parquet'
@@ -226,7 +230,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
             hierarchy,
             pop_data,
             sero_data,
-            daily_reinfection_rr,
+            cross_variant_immunity,
+            escape_variant_prevalence,
             ifr_model_data,
             ihr_model_data,
             idr_model_data,

@@ -46,8 +46,8 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     is_us = '102' in path_to_top_parent.split(',')
     logger.info(f'Model location: {location_name}')
     
-    data_path = model_in_dir / 'model_data.pkl'
-    with data_path.open('rb') as file:
+    model_data_path = model_in_dir / 'model_data.pkl'
+    with model_data_path.open('rb') as file:
         model_data = pickle.load(file)
     model_data, modeled_location = compile_input_data_object(location_id=location_id,
                                                              **model_data)
@@ -60,15 +60,19 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     vaccine_data = pd.read_parquet(vaccine_path)
     vaccine_data = vaccine_data.loc[location_id]
     
-    daily_reinfection_rr_path = model_in_dir / 'daily_reinfection_rr.parquet'
-    daily_reinfection_rr = pd.read_parquet(daily_reinfection_rr_path)
-    if location_id in daily_reinfection_rr.reset_index()['location_id'].to_list():
-        daily_reinfection_rr = daily_reinfection_rr.loc[location_id]
+    cross_variant_immunity_path = model_in_dir / 'cross_variant_immunity.pkl'
+    with cross_variant_immunity_path.open('rb') as file:
+        cross_variant_immunity = pickle.load(file)
+    
+    escape_variant_prevalence_path = model_in_dir / 'escape_variant_prevalence.parquet'
+    escape_variant_prevalence = pd.read_parquet(escape_variant_prevalence_path)
+    if location_id in escape_variant_prevalence.reset_index()['location_id'].to_list():
+        escape_variant_prevalence = escape_variant_prevalence.loc[location_id, 'escape_variant_prevalence']
     else:
-        daily_reinfection_rr = pd.DataFrame()
+        escape_variant_prevalence = pd.Series()
 
-
-    return model_data, vaccine_data, daily_reinfection_rr, modeled_location, population, location_name, is_us
+    return model_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
+           modeled_location, population, location_name, is_us
 
 
 def load_extra_plot_inputs(location_id: int, model_in_dir: Path):

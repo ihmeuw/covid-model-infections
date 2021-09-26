@@ -367,21 +367,23 @@ def triangulate_infections(infections_inputs: Dict, output_data: Dict,
 
 
 def squeeze(daily_infections: pd.Series,
-            population: pd.Series,
-            daily_reinfection_inflation_factor: pd.Series,
+            population: float,
+            cross_variant_immunity: float,
+            escape_variant_prevalence: pd.Series,
             vaccine_coverage: pd.DataFrame,
             ceiling: float = CEILING,) -> pd.Series:
-    draw_name = daily_infections.name
-    daily_infections = pd.concat([daily_infections.rename('infections'),
-                                  daily_reinfection_inflation_factor], axis=1)
-    daily_infections = daily_infections.sort_index()
-    daily_infections['inflation_factor'] = (daily_infections['inflation_factor']
-                                            .groupby(level=0).apply(lambda x: x.fillna(method='ffill')))
-    daily_infections['inflation_factor'] = daily_infections['inflation_factor'].fillna(1)
-    daily_infections['seroprevalence'] = daily_infections['infections'] / daily_infections['inflation_factor']
+    escape_variant_prevalence = (pd.concat([daily_infections,
+                                            escape_variant_prevalence], axis=1))
+    escape_variant_prevalence = escape_variant_prevalence.fillna(0)
+    escape_variant_prevalence = (escape_variant_prevalence
+                                 .loc[daily_infections.index, 'escape_variant_prevalence'])
     
-    cumul_infections = (daily_infections['infections'].dropna().cumsum())
-    seroprevalence = (daily_infections['seroprevalence'].dropna().cumsum())
+    non_ev_infections = (daily_infections * (1 - escape_variant_prevalence)).rename('infections')
+    ev_infections = (daily_infections * escape_variant_prevalence).rename('infections')
+    repeat_infections = (1 - cross_variant_immunity) * (non_ev_infections.cumsum() / population).clip(0, 1) * ev_infections
+    first_infections = (daily_infections - repeat_infections).rename('infections')
+    cumul_infections = daily_infections.dropna().cumsum()
+    seroprevalence = first_infections.dropna().cumsum()
     
     vaccinations = vaccine_coverage.join(daily_infections, how='right')['cumulative_all_effective'].fillna(0)
     daily_vaccinations = vaccinations.groupby(level=0).diff().fillna(vaccinations)
@@ -398,7 +400,7 @@ def squeeze(daily_infections: pd.Series,
     
     daily_infections *= excess_scaling_factor
         
-    return daily_infections['infections'].rename(draw_name).dropna()
+    return daily_infections
 
 
 def run_model(location_id: int,
@@ -412,7 +414,7 @@ def run_model(location_id: int,
               mp: bool = True,):
     np.random.seed(15243 + location_id)
     logger.info('Loading data.')
-    input_data, vaccine_data, daily_reinfection_rr, \
+    input_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
     modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
@@ -533,7 +535,8 @@ def run_model(location_id: int,
     output_draws = enumerate([output_draws[dc] for dc in output_draws.columns])
     _od = []
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
-        _od.append(squeeze(output_draw, population, daily_reinfection_rr.loc[n], vaccine_data,))
+        _od.append(squeeze(output_draw, population, cross_variant_immunity[n],
+                           escape_variant_prevalence.copy(), vaccine_data.copy(),))
     output_draws = pd.concat(_od, axis=1)
     del _od
     
@@ -542,7 +545,7 @@ def run_model(location_id: int,
     plotter.plotter(
         Path(plot_dir),
         location_id, location_name,
-        input_data, sero_data, ratio_model_inputs, daily_reinfection_rr,
+        input_data, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
         output_data.copy(), smooth_infections.copy(), output_draws.dropna().copy(), population
     )
     
