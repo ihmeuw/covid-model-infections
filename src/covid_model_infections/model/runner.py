@@ -378,12 +378,12 @@ def squeeze(daily_infections: pd.Series,
     escape_variant_prevalence = (escape_variant_prevalence
                                  .loc[daily_infections.index, 'escape_variant_prevalence'])
     
-    non_ev_infections = (daily_infections * (1 - escape_variant_prevalence)).rename('infections')
-    ev_infections = (daily_infections * escape_variant_prevalence).rename('infections')
+    non_ev_infections = (daily_infections * (1 - escape_variant_prevalence))
+    ev_infections = (daily_infections * escape_variant_prevalence)
     repeat_infections = (1 - cross_variant_immunity) * (non_ev_infections.cumsum() / population).clip(0, 1) * ev_infections
-    first_infections = (daily_infections - repeat_infections).rename('infections')
-    cumul_infections = daily_infections.dropna().cumsum()
-    seroprevalence = first_infections.dropna().cumsum()
+    first_infections = (daily_infections - repeat_infections)
+    cumul_infections = daily_infections.cumsum()
+    seroprevalence = first_infections.cumsum()
     
     vaccinations = vaccine_coverage.join(daily_infections, how='right')['cumulative_all_effective'].fillna(0)
     daily_vaccinations = vaccinations.groupby(level=0).diff().fillna(vaccinations)
@@ -392,15 +392,15 @@ def squeeze(daily_infections: pd.Series,
     
     immune = seroprevalence + eff_vaccinations
     max_immune = immune.max()
+    max_infec = seroprevalence.max()
 
     limits = population * ceiling
     
-    excess = (max_immune - limits).clip(0, np.inf)
-    excess_scaling_factor = (max_immune - excess) / max_immune
-    
-    daily_infections *= excess_scaling_factor
+    excess_immune = (max_immune - limits).clip(0, np.inf)
+    excess_scaling_factor = (max_infec - excess_immune) / max_infec
+    excess_scaling_factor = max(excess_scaling_factor, 0)
         
-    return daily_infections
+    return daily_infections * excess_scaling_factor
 
 
 def run_model(location_id: int,
@@ -526,10 +526,9 @@ def run_model(location_id: int,
                            .values)
         output_draws -= variance_offset
     output_draws = dep_trans_out(output_draws)
-
-    ## SHOULD NOT HAVE TO DO THIS ANY MORE
-    # logger.warning('Droppping last three days of infections for stability.')
-    # output_draws = output_draws[:-3]
+    
+    logger.warning('Droppping last three days of infections for stability.')
+    output_draws = output_draws[:-3]
     
     logger.info('Ensure we do not run out of susceptibles.')
     output_draws = enumerate([output_draws[dc] for dc in output_draws.columns])
