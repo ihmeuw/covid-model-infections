@@ -378,10 +378,10 @@ def squeeze(daily_infections: pd.Series,
     escape_variant_prevalence = (escape_variant_prevalence
                                  .loc[daily_infections.index, 'escape_variant_prevalence'])
     
-    non_ev_infections = (daily_infections * (1 - escape_variant_prevalence))
-    ev_infections = (daily_infections * escape_variant_prevalence)
+    non_ev_infections = daily_infections * (1 - escape_variant_prevalence)
+    ev_infections = daily_infections * escape_variant_prevalence
     repeat_infections = (1 - cross_variant_immunity) * (non_ev_infections.cumsum() / population).clip(0, 1) * ev_infections
-    first_infections = (daily_infections - repeat_infections)
+    first_infections = daily_infections - repeat_infections
     cumul_infections = daily_infections.cumsum()
     seroprevalence = first_infections.cumsum()
     
@@ -526,16 +526,26 @@ def run_model(location_id: int,
                            .values)
         output_draws -= variance_offset
     output_draws = dep_trans_out(output_draws)
+    if draw_args['log']:
+        output_draws -= LOG_OFFSET
+        output_draws = output_draws.clip(FLOOR, np.inf)
     
     logger.info('Ensure we do not run out of susceptibles.')
     logger.warning('Droppping last three days of infections for stability.')
     output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
-    _od = []
+    _od1 = []
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
-        _od.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                           escape_variant_prevalence.copy(), vaccine_data.copy(),))
-    output_draws = pd.concat(_od, axis=1)
-    del _od
+        _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
+                            escape_variant_prevalence.copy(), vaccine_data.copy(),))
+#     _od2 = []
+#     _od1 = enumerate(_od1)
+#     for n, output_draw in tqdm(_od1, total=n_draws, file=sys.stdout):
+#         _od2.append(squeeze(output_draw, population, cross_variant_immunity[n],
+#                             escape_variant_prevalence.copy(), vaccine_data.copy(),))
+#     output_draws = pd.concat(_od2, axis=1)
+#     del _od1, _od2
+    output_draws = pd.concat(_od1, axis=1)
+    del _od1
     
     logger.info('Plot data.')
     sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
