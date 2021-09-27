@@ -527,11 +527,9 @@ def run_model(location_id: int,
         output_draws -= variance_offset
     output_draws = dep_trans_out(output_draws)
     
-    logger.warning('Droppping last three days of infections for stability.')
-    output_draws = output_draws[:-3]
-    
     logger.info('Ensure we do not run out of susceptibles.')
-    output_draws = enumerate([output_draws[dc] for dc in output_draws.columns])
+    logger.warning('Droppping last three days of infections for stability.')
+    output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
     _od = []
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
         _od.append(squeeze(output_draw, population, cross_variant_immunity[n],
