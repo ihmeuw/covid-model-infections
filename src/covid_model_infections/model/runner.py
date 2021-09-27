@@ -390,14 +390,14 @@ def squeeze(daily_infections: pd.Series,
     eff_daily_vaccinations = daily_vaccinations * (1 - seroprevalence / population).clip(0, 1)
     eff_vaccinations = eff_daily_vaccinations.groupby(level=0).cumsum()
     
-    immune = seroprevalence + eff_vaccinations
-    max_immune = immune.max()
-    max_infec = seroprevalence.max()
+    non_suscept = seroprevalence + eff_vaccinations
+    max_non_suscept = non_suscept.max()
+    max_sero = seroprevalence.max()
 
     limits = population * ceiling
     
-    excess_immune = (max_immune - limits).clip(0, np.inf)
-    excess_scaling_factor = (max_infec - excess_immune) / max_infec
+    excess_non_suscept = (max_non_suscept - limits).clip(0, np.inf)
+    excess_scaling_factor = (max_sero - excess_non_suscept) / max_sero
     excess_scaling_factor = max(excess_scaling_factor, 0)
         
     return daily_infections * excess_scaling_factor
