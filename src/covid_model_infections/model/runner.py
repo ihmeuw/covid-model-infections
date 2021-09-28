@@ -377,6 +377,7 @@ def squeeze(daily_infections: pd.Series,
     escape_variant_prevalence = escape_variant_prevalence.fillna(0)
     escape_variant_prevalence = (escape_variant_prevalence
                                  .loc[daily_infections.index, 'escape_variant_prevalence'])
+#     escape_variant_prevalence.loc[escape_variant_prevalence > 0.01] = 1
     
     non_ev_infections = daily_infections * (1 - escape_variant_prevalence)
     ev_infections = daily_infections * escape_variant_prevalence
@@ -537,15 +538,15 @@ def run_model(location_id: int,
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
         _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
                             escape_variant_prevalence.copy(), vaccine_data.copy(),))
-#     _od2 = []
-#     _od1 = enumerate(_od1)
-#     for n, output_draw in tqdm(_od1, total=n_draws, file=sys.stdout):
-#         _od2.append(squeeze(output_draw, population, cross_variant_immunity[n],
-#                             escape_variant_prevalence.copy(), vaccine_data.copy(),))
-#     output_draws = pd.concat(_od2, axis=1)
-#     del _od1, _od2
-    output_draws = pd.concat(_od1, axis=1)
-    del _od1
+    _od2 = []
+    _od1 = enumerate(_od1)
+    for n, output_draw in tqdm(_od1, total=n_draws, file=sys.stdout):
+        _od2.append(squeeze(output_draw, population, cross_variant_immunity[n],
+                            escape_variant_prevalence.copy(), vaccine_data.copy(),))
+    output_draws = pd.concat(_od2, axis=1)
+    del _od1, _od2
+#     output_draws = pd.concat(_od1, axis=1)
+#     del _od1
     
     logger.info('Plot data.')
     sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
