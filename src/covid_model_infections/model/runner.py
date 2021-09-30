@@ -153,8 +153,8 @@ def model_infections(inputs: pd.DataFrame,
         # spline_options.update({'spline_l_linear':True,
         #                        'spline_r_linear':True,})
     elif not diff:
-        spline_options.update({'prior_spline_funval_uniform':np.array([0, np.inf]),
-                               'prior_spline_num_constraint_points':CONSTRAINT_POINTS,})
+        spline_options.update({'prior_spline_funval_uniform': np.array([0, np.inf]),
+                               'prior_spline_num_constraint_points': CONSTRAINT_POINTS,})
     
     if diff:
         # force start to be increasing
@@ -519,17 +519,24 @@ def run_model(location_id: int,
     input_draws = pd.concat(input_draws, axis=1)
     output_draws = pd.concat(output_draws, axis=1)
     _, _, dep_trans_out = get_rate_transformations(draw_args['log'])
-    if draw_args['log']:
-        variance_offset = np.var(output_draws.values, axis=1, keepdims=True) / 2
-        variance_offset = (pd.DataFrame(variance_offset)
-                           .fillna(method='ffill')
-                           .fillna(method='bfill')
-                           .values)
-        output_draws -= variance_offset
+#     if draw_args['log']:
+#         variance_offset = np.var(output_draws.values, axis=1, keepdims=True) / 2
+#         variance_offset = (pd.DataFrame(variance_offset)
+#                            .fillna(method='ffill')
+#                            .fillna(method='bfill')
+#                            .values)
+#         output_draws -= variance_offset
     output_draws = dep_trans_out(output_draws)
     if draw_args['log']:
         output_draws -= LOG_OFFSET
         output_draws = output_draws.clip(FLOOR, np.inf)
+        mean_scalar = smooth_infections / output_draws.mean(axis=1)
+        mean_scalar = (mean_scalar
+                       .fillna(method='ffill')
+                       .fillna(method='bfill')
+                       .to_frame()
+                       .values)
+        output_draws *= mean_scalar
     
     logger.info('Ensure we do not run out of susceptibles.')
     logger.warning('Droppping last three days of infections for stability.')

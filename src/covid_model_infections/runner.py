@@ -105,6 +105,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     baseline_ifr_locations = ifr.reset_index()['location_id'].unique().tolist()
     baseline_ihr_locations = ihr.reset_index()['location_id'].unique().tolist()
     baseline_idr_locations = idr.reset_index()['location_id'].unique().tolist()
+    baseline_evp_locations = escape_variant_prevalence.reset_index()['location_id'].unique().tolist()
     for location_id, path_to_top_parent, location_name in zip(location_ids, path_to_top_parents, location_names):
         # DEATHS
         if location_id not in baseline_ifr_locations:
@@ -138,6 +139,17 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     logger.info(f'Using parent IDR for {location_name}.')
                     idr = idr.append(
                         pd.concat({location_id: idr.loc[int(parent_id)]}, names=['location_id'])
+                    )
+                    break
+                else:
+                    pass
+        # ESCAPE VARIANT PREVALENCE
+        if location_id not in baseline_evp_locations:
+            for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
+                if int(parent_id) in baseline_evp_locations:
+                    logger.info(f'Using parent escape variant prevalence for {location_name}.')
+                    escape_variant_prevalence = escape_variant_prevalence.append(
+                        pd.concat({location_id: escape_variant_prevalence.loc[int(parent_id)]}, names=['location_id'])
                     )
                     break
                 else:
