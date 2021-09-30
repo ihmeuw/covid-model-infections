@@ -530,13 +530,13 @@ def run_model(location_id: int,
     if draw_args['log']:
         output_draws -= LOG_OFFSET
         output_draws = output_draws.clip(FLOOR, np.inf)
-        mean_scalar = smooth_infections / output_draws.mean(axis=1)
-        mean_scalar = (mean_scalar
-                       .fillna(method='ffill')
-                       .fillna(method='bfill')
-                       .to_frame()
-                       .values)
-        output_draws *= mean_scalar
+    mean_scalar = smooth_infections / output_draws.mean(axis=1)
+    mean_scalar = (mean_scalar
+                   .fillna(method='ffill')
+                   .fillna(method='bfill')
+                   .to_frame()
+                   .values)
+    output_draws *= mean_scalar
     
     logger.info('Ensure we do not run out of susceptibles.')
     logger.warning('Droppping last three days of infections for stability.')
