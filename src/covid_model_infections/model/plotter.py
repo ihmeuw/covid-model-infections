@@ -124,10 +124,11 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
     whitespace_top = fig.add_subplot(gs[0:1, 2])
     whitespace_top.axis('off')
     dailymodel_ax = fig.add_subplot(gs[1:5, 2])
-    infection_daily_data = {mm: pd.concat(output_data[mm]['infections_daily']).groupby(level=0).mean()[1:] for mm in model_measures}
+    infection_daily_data = {mm: pd.concat(output_data[mm]['infections_daily'], axis=1).dropna().mean(axis=1)[1:] 
+                            for mm in model_measures}
     model_plot(dailymodel_ax, 'Infections', 'Daily', infection_daily_data, None,
                smooth_infections[1:],
-               output_draws[1:], start_date, end_date, False)
+               output_draws.dropna()[1:], start_date, end_date, False)
     whitespace_mid = fig.add_subplot(gs[5:7, 2])
     whitespace_mid.axis('off')
     
@@ -148,10 +149,11 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
     output_draws = output_draws.cumsum()
     
     cumulmodel_ax = fig.add_subplot(gs[7:11, 2])
-    infection_cumul_data = {mm: (pd.concat(output_data[mm]['infections_cumul']).groupby(level=0).mean() / population) * 100 for mm in model_measures}
+    infection_cumul_data = {mm: (pd.concat(output_data[mm]['infections_cumul'], axis=1).dropna().mean(axis=1) / population) * 100 
+                            for mm in model_measures}
     model_plot(cumulmodel_ax, None, 'Cumulative (%)', infection_cumul_data, sero_data,
                (smooth_infections / population) * 100,
-               (output_draws / population) * 100, start_date, end_date, True)
+               (output_draws.dropna() / population) * 100, start_date, end_date, True)
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
     whitespace_bottom.axis('off')
     

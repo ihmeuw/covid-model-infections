@@ -561,7 +561,7 @@ def run_model(location_id: int,
         Path(plot_dir),
         location_id, location_name,
         input_data, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
-        output_data.copy(), smooth_infections.copy(), output_draws.dropna().copy(), population
+        output_data.copy(), smooth_infections.copy(), output_draws.copy(), population
     )
     
     logger.info('Writing intermediate datasets.')
@@ -607,6 +607,7 @@ if __name__ == '__main__':
     configure_logging_to_terminal(verbose=2)
 
     os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_loc_inf']['OMP_NUM_THREADS']
+    os.environ['MKL_NUM_THREADS'] = TYPE_SPECS['covid_loc_inf']['MKL_NUM_THREADS']
     
     run_model(location_id=int(sys.argv[1]),
               n_draws=int(sys.argv[2]),

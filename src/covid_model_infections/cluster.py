@@ -15,7 +15,8 @@ QUEUE = 'd.q'
 TYPE_SPECS = {
     'covid_loc_inf': {'F_MEM': '8.0G',
                       'F_THREAD': '3',
-                      'OMP_NUM_THREADS': '3',},
+                      'OMP_NUM_THREADS': '3',
+                      'MKL_NUM_THREADS': '3',},
 }
 H_RUNTIME = '06:00:00'
 SLEEP_TIME = 10
