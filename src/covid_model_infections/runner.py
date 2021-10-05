@@ -49,13 +49,9 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pop_data = data.load_population(model_inputs_root)
     
     logger.info('Loading epi report data.')
-    em_data = data.load_em_scalars(rates_root)
-    ## DO THIS DIFFERENTLY ##
-    excess_mortality = em_data['scaled'].unique().item()
-    del em_data['scaled']
-    ## ## ## ## ## ## ## ## ##
+    em_scalar_data = data.load_em_scalars(rates_root)
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths', excess_mortality
+        model_inputs_root, hierarchy, 'deaths', em_scalar_data
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
         model_inputs_root, hierarchy, 'hospitalizations'
@@ -82,6 +78,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_rr = data.load_ifr_rr(rates_root)
     ifr_model_data = data.load_ifr_data(rates_root)
     cross_variant_immunity = data.load_cross_variant_immunity(rates_root)
+    variant_risk_ratio = data.load_variant_risk_ratio(rates_root)
     escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
     ihr = data.load_ihr(rates_root)
     ihr_model_data = data.load_ihr_data(rates_root)
@@ -340,6 +337,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
             data.write_ratio_draws,
             estimated_ratio=estimated_ratio,
             durations=measure_durations,
+            variant_risk_ratio=variant_risk_ratio,
             ratio_draws_dir=ratio_draws_dir,
         )
         with multiprocessing.Pool(MP_THREADS) as p:
@@ -347,10 +345,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
 
     logger.info('Writing serology data and EM scaling factor data.')
     em_path = output_root / 'em_data.csv'
-    em_data.to_csv(em_path, index=False)
-    # em_data['date'] = em_data['date'].astype(str)
+    em_scalar_data = (infections_draws[0]
+                      .reset_index()
+                      .loc[:, ['location_id', 'date']]
+                      .merge(em_scalar_data, how='left'))
+    em_scalar_data['em_scalar'] = em_scalar_data['em_scalar'].fillna(1)
+    em_scalar_data.to_csv(em_path, index=False)
+    # em_scalar_data['date'] = em_scalar_data['date'].astype(str)
     # em_path = output_root / 'em_data.parquet'
-    # em_data.to_parquet(em_path, engine='fastparquet', compression='gzip')
+    # em_scalar_data.to_parquet(em_path, engine='fastparquet', compression='gzip')
     sero_data['included'] = 1 - sero_data['is_outlier']
     sero_data = sero_data.rename(columns={'sero_sample_mean': 'value'})
     sero_data = sero_data.loc[:, ['included', 'value']]

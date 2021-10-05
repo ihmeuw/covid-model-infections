@@ -234,6 +234,14 @@ def load_cross_variant_immunity(rates_root: Path) -> List:
     return data
 
 
+def load_variant_risk_ratio(rates_root: Path) -> List:
+    data_path = rates_root / 'variant_risk_ratio.pkl'
+    with data_path.open('rb') as file:
+        data = pickle.load(file)
+    
+    return data
+
+
 def load_escape_variant_prevalence(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'variants.parquet'
     data = pd.read_parquet(data_path)
@@ -260,7 +268,6 @@ def load_test_data(rates_root: Path) -> pd.DataFrame:
 def load_em_scalars(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'excess_mortality.parquet'
     data = pd.read_parquet(data_path)
-    data['date'] = pd.to_datetime(data['date'])
 
     return data
 
@@ -274,15 +281,15 @@ def load_durations(rates_root: Path) -> List[Dict[str, int]]:
 
 
 def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,
-                      excess_mortality: bool = True,) -> Tuple[pd.Series, pd.Series, Dict]:
-    if input_measure == 'deaths' and not excess_mortality:
+                      em_scalar_data: pd.DataFrame = None,) -> Tuple[pd.Series, pd.Series, Dict]:
+    if input_measure == 'deaths':
         data_path = model_inputs_root / 'full_data_unscaled.csv'
     else:
         data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
-    data = data.rename(columns={'Confirmed':'cumulative_cases',
-                                'Hospitalizations':'cumulative_hospitalizations',
-                                'Deaths':'cumulative_deaths',})
+    data = data.rename(columns={'Confirmed': 'cumulative_cases',
+                                'Hospitalizations': 'cumulative_hospitalizations',
+                                'Deaths': 'cumulative_deaths',})
     data['date'] = pd.to_datetime(data['Date'])
     keep_cols = ['location_id', 'date', f'cumulative_{input_measure}']
     data = data.loc[:, keep_cols].dropna()
@@ -293,6 +300,15 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_mea
             .reset_index(drop=True))
 
     data, manipulation_metadata = evil_doings(data, hierarchy, input_measure)
+    
+    if input_measure == 'deaths':
+        data = data.merge(em_scalar_data, how='left')
+        missing_locations = data.loc[data['em_scalar'].isnull(), 'location_id'].astype(str).unique().tolist()
+        if missing_locations:
+            logger.warning(f"Missing scalars for the following locations: {', '.join(missing_locations)}")
+        data['em_scalar'] = data['em_scalar'].fillna(1)
+        data['cumulative_deaths'] *= data['em_scalar']
+        del data['em_scalar']
     
     data[f'daily_{input_measure}'] = (data
                                       .groupby('location_id')[f'cumulative_{input_measure}']
@@ -405,6 +421,7 @@ def write_infections_draws(data: pd.DataFrame,
 def write_ratio_draws(data_list: List[pd.Series],
                       estimated_ratio: str,
                       ratio_draws_dir: Path,
+                      variant_risk_ratio: List[float],
                       durations: List[int],):
     if estimated_ratio == 'ifr':
         if len(data_list) != 3:
@@ -425,6 +442,8 @@ def write_ratio_draws(data_list: List[pd.Series],
         data['ifr_hr_draw'] = data['ifr_draw'] * data_hr
     data['draw'] = draw
     data['duration'] = durations[draw]
+    if estimated_ratio in ['ifr', 'ihr']:
+        data['variant_risk_ratio'] = variant_risk_ratio[draw]
 
     out_path = ratio_draws_dir / f'{draw_col}.csv'
     data.reset_index().to_csv(out_path, index=False)
