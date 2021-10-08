@@ -66,6 +66,9 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
                     ratio_data = (child_data[measure]['daily'] / child_data[measure][metric]['ratio']).rename('ratio')
                     ratio_fe_data = (child_data[measure]['daily'] / child_data[measure][metric]['ratio_fe']).rename('ratio_fe')
                     metric_data.append(pd.concat([ratio_data, ratio_fe_data], axis=1).dropna())
+                elif metric == 'scalar':
+                    scalar_data = child_data[measure]['cumul'].max()  * child_data[measure]['scalar']
+                    metric_data.append(scalar_data)
                 elif isinstance(child_data[measure][metric], list) and metric != 'lags':
                     metric_data.append(pd.concat(child_data[measure][metric]).groupby(level=0).mean())
                 else:
@@ -74,7 +77,9 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
                 metric_data = metric_data[0]
             else:
                 metric_data = pd.concat(metric_data)
-                if metric_data.index.names[0] == 'draw':
+                if metric == 'scalar':
+                    metric_data = metric_data.groupby(level=0).sum()
+                elif metric_data.index.names[0] == 'draw':
                     if metric_data.index.names[1] != 'date':
                         raise ValueError('If draw in index, date should be second level.')
                     metric_data_count = metric_data.groupby(level=1).count()
@@ -99,6 +104,12 @@ def sum_data_from_child_dicts(children_data: Dict, measures: List[str]) -> Dict:
                 ratio_data = (measure_dict['daily'] / measure_dict['ratio']['ratio']).rename('ratio')
                 ratio_fe_data = (measure_dict['daily'] / measure_dict['ratio']['ratio_fe']).rename('ratio_fe')
                 measure_dict['ratio'] = pd.concat([ratio_data, ratio_fe_data], axis=1).dropna()
+        
+        if 'scalar' in metrics:
+            if measure_dict['cumul'].empty:
+                 measure_dict['scalar'] = (measure_dict['scalar'] * np.nan).dropna()
+            else:
+                measure_dict['scalar'] /= measure_dict['cumul'].max()
             
         if metrics:
             child_dict.update({measure: measure_dict})
@@ -201,7 +212,7 @@ def plot_aggregate(location_id: int,
 
     model.plotter.plotter(
         plot_dir, location_id, location_name,
-        inputs, 1, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
+        inputs, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
         outputs, infections_mean, infections_draws, population
     )
     

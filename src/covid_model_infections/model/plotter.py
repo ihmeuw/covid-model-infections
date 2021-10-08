@@ -31,7 +31,7 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 
 def plotter(plot_dir: Path, location_id: int, location_name: str,
-            input_data: Dict, mean_em_scalar: float,
+            input_data: Dict,
             sero_data: pd.DataFrame, ratio_model_inputs: Dict,
             cross_variant_immunity: List[int], escape_variant_prevalence: pd.Series,
             output_data: Dict, smooth_infections: pd.Series, output_draws: pd.DataFrame,
@@ -84,7 +84,7 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
         if measure in list(input_data.keys()):
             adj_ratio = smooth_infections.copy()
             adj_ratio.index += pd.Timedelta(days=int(np.mean(input_data[measure]['lags'])))
-            adj_ratio = (output_data[measure]['daily'] * mean_em_scalar) / adj_ratio
+            adj_ratio = (output_data[measure]['daily'] * input_data[measure]['scalar'].mean()) / adj_ratio
             adj_ratio = adj_ratio.dropna()
             ratio_data = pd.concat([input_data[measure]['ratio'].groupby(level=1).mean(),
                                     input_data[measure]['daily']], axis=1).dropna()['ratio']
@@ -156,20 +156,6 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
                (output_draws.dropna() / population) * 100, start_date, end_date, True)
     whitespace_bottom = fig.add_subplot(gs[11:12, 2])
     whitespace_bottom.axis('off')
-    
-    if len(input_data.keys()) == len(measures):
-        vert1 = 0.64
-        vert2 = 0.33
-    else:
-        vert1 = 0.63
-        vert2 = 0.34
-    horiz = 0.615
-    top = 0.955
-    left = 0.
-    right = 1.
-    bottom = 0.
-    linewidth = 2.
-    
 
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     plt.tight_layout()

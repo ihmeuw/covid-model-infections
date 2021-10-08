@@ -27,7 +27,7 @@ CEILING = 0.9
 
 
 def model_measure(measure: str, measure_type: str,
-                  input_data: pd.Series, em_scalar_data: pd.Series,
+                  input_data: pd.Series, scalar_data: pd.Series,
                   ratio: pd.Series, population: float,
                   n_draws: int, lags: List[int],
                   log: bool, knot_days: int,
@@ -100,23 +100,18 @@ def model_measure(measure: str, measure_type: str,
         smooth_data[0] += day0_value
     input_data = input_data.clip(FLOOR, np.inf)
     smooth_data = smooth_data.clip(FLOOR, np.inf)
-    
-    if measure in ['cases', 'hospitalizations']:
-        em_scalar_data = pd.Series([1] * n_draws, index=em_scalar_data.index, name=em_scalar_data.name)
-    elif measure != 'deaths':
-        raise ValueError('Measure not one of cases, hospitalizations, and deaths.')
   
     raw_infections = []
     smooth_infections = []
     for draw in range(n_draws):
         # raw_infections = pd.concat([input_data, ratio.loc[draw]], axis=1)
         # raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name])
-        _raw_infections = ((input_data * em_scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
+        _raw_infections = ((input_data * scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
         _raw_infections.index -= pd.Timedelta(days=lags[draw])
         raw_infections.append(_raw_infections)
         # smooth_infections = pd.concat([smooth_data, ratio.loc[draw]], axis=1)
         # smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
-        _smooth_infections = ((smooth_data * em_scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
+        _smooth_infections = ((smooth_data * scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
         _smooth_infections.index -= pd.Timedelta(days=lags[draw])
         smooth_infections.append(_smooth_infections)
 
@@ -254,19 +249,16 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     return draw
 
 
-def splice_ratios(measure: str,
-                  ratio_data: pd.Series,
+def splice_ratios(ratio_data: pd.Series,
                   smooth_data: pd.Series,
                   infections: pd.Series,
-                  em_scalar: float,
+                  scalar: float,
                   lag: int,
                   trans_period_past: int = 30,
                   trans_period_future: int = 30,) -> pd.Series:
     col_name = infections.name
     infections.index += pd.Timedelta(days=lag)
-    if measure in ['cases', 'hospitalizations']:
-        em_scalar = 1
-    new_ratio = ((smooth_data * em_scalar) / infections).dropna().rename('new_ratio')
+    new_ratio = ((smooth_data * scalar) / infections).dropna().rename('new_ratio')
     new_ratio = new_ratio[1:]  # don't start at day0, is problematic for delayed cumul series
     start_date = new_ratio.index.min()
     end_date = new_ratio.index.max()
@@ -285,44 +277,39 @@ def enforce_ratio_ceiling(output_measure: str,
                           input_measure: str,
                           obs_data: pd.Series,
                           infections_data_list: List[pd.Series],
-                          em_scalar_data: pd.Series,
+                          scalar_data: pd.Series,
                           lags: List[int],
-                          ceiling: float,):
-    if input_measure in ['cases', 'hospitalizations']:
-        em_scalar_data = pd.Series([1] * len(em_scalar_data), index=em_scalar_data.index, name=em_scalar_data.name)
-    elif input_measure != 'deaths':
-        raise ValueError('Measure not one of cases, hospitalizations, and deaths.')
-    
+                          ceiling: float,) -> List[pd.Series]:
     adj_infections_data_list = []
     for draw, (infections_data, lag) in enumerate(zip(infections_data_list, lags)):
-        infections_floor = (obs_data * em_scalar_data.loc[draw]) / ceiling
+        infections_floor = (obs_data * scalar_data.loc[draw]) / ceiling
         infections_floor.index -= pd.Timedelta(days=lag)
-        infections_scalar = (infections_floor / infections_data)[infections_data.index]
-        infections_scalar = infections_scalar.clip(1, np.inf)
+        infections_adj_factor = (infections_floor / infections_data)[infections_data.index]
+        infections_adj_factor = infections_adj_factor.clip(1, np.inf)
 
-        # backfill 1s, forward taper off of terminal scalar over a week to reduce noise
-        leading_nas = infections_scalar.ffill().isnull()
-        infections_scalar.loc[leading_nas] = 1
-        trailing_nas = infections_scalar.bfill().isnull()
+        # backfill 1s, forward taper off of terminal adjustment factor over a week to reduce noise
+        leading_nas = infections_adj_factor.ffill().isnull()
+        infections_adj_factor.loc[leading_nas] = 1
+        trailing_nas = infections_adj_factor.bfill().isnull()
         if trailing_nas.sum():
             # transition over either a week or until inf exceed last floor point
             n_days_below = ((infections_data.loc[trailing_nas] > infections_floor[-1]).cumsum() == 0).sum()
             n_transition_days = min(n_days_below, 7)
             if n_transition_days == 0:
-                infections_scalar.loc[trailing_nas] = 1
+                infections_adj_factor.loc[trailing_nas] = 1
             else:
-                terminal_scalar = infections_scalar.dropna()[-1]
-                transition_scalar = infections_scalar.dropna()[-14:].median()
-                delta = (terminal_scalar - transition_scalar) / n_transition_days
+                terminal_adj_factor = infections_adj_factor.dropna()[-1]
+                transition_adj_factor = infections_adj_factor.dropna()[-14:].median()
+                delta = (terminal_adj_factor - transition_adj_factor) / n_transition_days
                 transition = trailing_nas.cumsum().clip(0, n_transition_days).replace(0, np.nan).dropna()
                 transition *= -delta
-                transition += terminal_scalar
-                infections_scalar.loc[trailing_nas] = transition
+                transition += terminal_adj_factor
+                infections_adj_factor.loc[trailing_nas] = transition
 
-        needs_correction = infections_scalar.max() > 1
+        needs_correction = infections_adj_factor.max() > 1
         if needs_correction:
             logger.info(f'Adjusting infections from {output_measure} so they are not fewer than observed {input_measure}.')
-        infections_data *= infections_scalar
+        infections_data *= infections_adj_factor
         adj_infections_data_list.append(infections_data)
 
     return adj_infections_data_list
@@ -431,7 +418,7 @@ def run_model(location_id: int,
               mp: bool = True,):
     np.random.seed(15243 + location_id)
     logger.info('Loading data.')
-    input_data, em_scalar_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
+    input_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
     modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
@@ -440,7 +427,7 @@ def run_model(location_id: int,
     output_data = {measure: model_measure(measure,
                                           measure_type,
                                           measure_data[measure_type].copy(),
-                                          em_scalar_data.copy(),
+                                          measure_data['scalar'].copy(),
                                           measure_data['ratio']['ratio'].copy(),
                                           population, n_draws, measure_data['lags'],
                                           measure_log, measure_knot_days, num_submodels=1,
@@ -451,7 +438,7 @@ def run_model(location_id: int,
                                                    input_measure,
                                                    output_data[input_measure]['daily'][1:].copy(),
                                                    output_data[output_measure]['infections_daily'].copy(),
-                                                   em_scalar_data.copy(),
+                                                   input_data[input_measure]['scalar'].copy(),
                                                    input_data[input_measure]['lags'],
                                                    CEILINGS[input_measure],)
                              for output_measure in output_data.keys()]
@@ -548,13 +535,13 @@ def run_model(location_id: int,
     if draw_args['log']:
         output_draws -= LOG_OFFSET
         output_draws = output_draws.clip(FLOOR, np.inf)
-    mean_scalar = smooth_infections / output_draws.mean(axis=1)
-    mean_scalar = (mean_scalar
-                   .fillna(method='ffill')
-                   .fillna(method='bfill')
-                   .to_frame()
-                   .values)
-    output_draws *= mean_scalar
+    mean_corr_factor = smooth_infections / output_draws.mean(axis=1)
+    mean_corr_factor = (mean_corr_factor
+                        .fillna(method='ffill')
+                        .fillna(method='bfill')
+                        .to_frame()
+                        .values)
+    output_draws *= mean_corr_factor
     
     logger.info('Ensure we do not run out of susceptibles.')
     logger.warning('Droppping last three days of infections for stability.')
@@ -578,7 +565,7 @@ def run_model(location_id: int,
     plotter.plotter(
         Path(plot_dir),
         location_id, location_name,
-        input_data, em_scalar_data.mean(),
+        input_data,
         sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
         output_data.copy(), smooth_infections.copy(), output_draws.copy(), population
     )
@@ -603,11 +590,10 @@ def run_model(location_id: int,
     }
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     for measure in input_data.keys():
-        ratio_draws = [splice_ratios(measure=measure,
-                                     ratio_data=input_data[measure]['ratio']['ratio'].loc[n].copy(),
+        ratio_draws = [splice_ratios(ratio_data=input_data[measure]['ratio']['ratio'].loc[n].copy(),
                                      smooth_data=output_data[measure]['daily'].copy(),
                                      infections=output_draws_list[n].copy(),
-                                     em_scalar=em_scalar_data.loc[n],
+                                     scalar=input_data[measure]['scalar'].loc[n],
                                      lag=input_data[measure]['lags'][n],) for n in range(n_draws)]
         ratio_draws = pd.concat(ratio_draws, axis=1)
         ratio_draws['location_id'] = location_id

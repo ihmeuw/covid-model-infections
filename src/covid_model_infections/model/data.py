@@ -7,6 +7,7 @@ import pandas as pd
 
 
 def compile_input_data_object(location_id: int,
+                              em_scalar_data: pd.Series,
                               durations: List[Dict[str, int]],
                               daily_deaths: pd.Series, cumul_deaths: pd.Series, ifr: pd.Series,
                               daily_hospital: pd.Series, cumul_hospital: pd.Series, ihr: pd.Series,
@@ -19,6 +20,7 @@ def compile_input_data_object(location_id: int,
         location_model_data.update({'deaths':{'daily': daily_deaths.loc[location_id],
                                               'cumul': cumul_deaths.loc[location_id],
                                               'ratio': ifr.loc[location_id],
+                                              'scalar': em_scalar_data,
                                               'lags': [d['exposure_to_death'] for d in durations],},})
     # HOSPITAL ADMISSIONS
     if location_id in daily_hospital.reset_index()['location_id'].unique().tolist():
@@ -26,6 +28,9 @@ def compile_input_data_object(location_id: int,
         location_model_data.update({'hospitalizations':{'daily': daily_hospital.loc[location_id],
                                                         'cumul': cumul_hospital.loc[location_id],
                                                         'ratio': ihr.loc[location_id],
+                                                        'scalar': pd.Series([1] * len(em_scalar_data),
+                                                                            index=em_scalar_data.index,
+                                                                            name=em_scalar_data.name),
                                                         'lags': [d['exposure_to_admission'] for d in durations],},})
     # CASES
     if location_id in daily_cases.reset_index()['location_id'].unique().tolist():
@@ -33,6 +38,9 @@ def compile_input_data_object(location_id: int,
         location_model_data.update({'cases':{'daily': daily_cases.loc[location_id],
                                              'cumul': cumul_cases.loc[location_id],
                                              'ratio': idr.loc[location_id],
+                                             'scalar': pd.Series([1] * len(em_scalar_data),
+                                                                 index=em_scalar_data.index,
+                                                                 name=em_scalar_data.name),
                                              'lags': [d['exposure_to_case'] for d in durations],},})
         
     return location_model_data, modeled_location
@@ -46,19 +54,20 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     is_us = '102' in path_to_top_parent.split(',')
     logger.info(f'Model location: {location_name}')
     
+    em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
+    em_scalar_data = pd.read_parquet(em_scalar_path)
+    em_scalar_data = em_scalar_data.loc[location_id, 'em_scalar']
+    
     model_data_path = model_in_dir / 'model_data.pkl'
     with model_data_path.open('rb') as file:
         model_data = pickle.load(file)
     model_data, modeled_location = compile_input_data_object(location_id=location_id,
+                                                             em_scalar_data=em_scalar_data,
                                                              **model_data)
     
     pop_path = model_in_dir / 'pop_data.parquet'
     population = pd.read_parquet(pop_path)
     population = population.loc[location_id].item()
-    
-    em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
-    em_scalar_data = pd.read_parquet(em_scalar_path)
-    em_scalar_data = em_scalar_data.loc[location_id, 'em_scalar']
     
     vaccine_path = model_in_dir / 'vaccine_data.parquet'
     vaccine_data = pd.read_parquet(vaccine_path)
@@ -75,7 +84,7 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     else:
         escape_variant_prevalence = pd.Series()
 
-    return model_data, em_scalar_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
+    return model_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
            modeled_location, population, location_name, is_us
 
 
