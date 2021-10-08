@@ -56,6 +56,10 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     population = pd.read_parquet(pop_path)
     population = population.loc[location_id].item()
     
+    em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
+    em_scalar_data = pd.read_parquet(em_scalar_path)
+    em_scalar_data = em_scalar_data.loc[location_id, 'em_scalar']
+    
     vaccine_path = model_in_dir / 'vaccine_data.parquet'
     vaccine_data = pd.read_parquet(vaccine_path)
     vaccine_data = vaccine_data.loc[location_id]
@@ -71,7 +75,7 @@ def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float
     else:
         escape_variant_prevalence = pd.Series()
 
-    return model_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
+    return model_data, em_scalar_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
            modeled_location, population, location_name, is_us
 
 

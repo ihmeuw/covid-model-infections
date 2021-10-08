@@ -17,10 +17,6 @@ MP_THREADS = 25
 
 ## TODO:
 ##     - holdouts
-##     - modularize data object creation
-##     - maybe job holds
-##     - maybe delete refit_draws contents at the end, to save space
-
 
 def make_infections(app_metadata: cli_tools.Metadata,
                     model_inputs_root: Path,
@@ -31,49 +27,47 @@ def make_infections(app_metadata: cli_tools.Metadata,
                    ):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
-    
+
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
     model_out_dir = output_root / 'model_outputs'
-    refit_dir = model_out_dir / 'refit_draws'
     plot_dir = output_root / 'plots'
     infections_draws_dir = output_root / 'infections_draws'
     shell_tools.mkdir(model_in_dir)
     shell_tools.mkdir(model_out_dir)
-    shell_tools.mkdir(refit_dir)
     shell_tools.mkdir(plot_dir)
     shell_tools.mkdir(infections_draws_dir)
-    
+
     logger.info('Loading supplemental data.')
     hierarchy = data.load_hierarchy(model_inputs_root)
     pop_data = data.load_population(model_inputs_root)
-    
+
     logger.info('Loading epi report data.')
-    em_scalar_data = data.load_em_scalars(rates_root)
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths', em_scalar_data
+        model_inputs_root, hierarchy, 'deaths',
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'hospitalizations'
+        model_inputs_root, hierarchy, 'hospitalizations',
     )
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'cases'
+        model_inputs_root, hierarchy, 'cases',
     )
-    
+
     cumul_deaths, cumul_hospital, cumul_cases,\
     daily_deaths, daily_hospital, daily_cases = data.trim_leading_zeros(
         [cumul_deaths, cumul_hospital, cumul_cases],
         [daily_deaths, daily_hospital, daily_cases],
     )
-    
+
     app_metadata.update({'data_manipulation': {
         'deaths': deaths_manipulation_metadata,
         'hospitalizations': hospital_manipulation_metadata,
         'cases': cases_manipulation_metadata,
     }})
     measures = ['deaths', 'hospitalizations', 'cases']
-    
+
     logger.info('Loading estimated ratios and adding draw directories.')
+    em_scalar_data = data.load_em_scalars(rates_root)
     ifr, n_draws = data.load_ifr(rates_root)
     ifr_rr = data.load_ifr_rr(rates_root)
     ifr_model_data = data.load_ifr_data(rates_root)
@@ -85,10 +79,10 @@ def make_infections(app_metadata: cli_tools.Metadata,
     # Assumes IDR has estimated floor already applied
     idr = data.load_idr(rates_root, (0., 1.))
     idr_model_data = data.load_idr_data(rates_root)
-    
+
     logger.info('Loading durations for each draw.')
     durations = data.load_durations(rates_root)
-    
+
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(rates_root)
     test_data = data.load_test_data(rates_root)
@@ -161,7 +155,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     estimated_ratios = {'deaths': ('ifr', [d['exposure_to_death'] for d in durations], ifr.copy()),
                         'hospitalizations': ('ihr', [d['exposure_to_admission'] for d in durations], ihr.copy()),
                         'cases': ('idr', [d['exposure_to_case'] for d in durations], idr.copy()),}
-    
+
     logger.info('Writing intermediate files.')
     model_data_path = model_in_dir / 'model_data.pkl'
     with model_data_path.open('wb') as file:
@@ -176,6 +170,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     test_data.to_parquet(test_path)
     vaccine_path = model_in_dir / 'vaccine_data.parquet'
     vaccine_data.to_parquet(vaccine_path)
+    em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
+    em_scalar_data.to_parquet(em_scalar_path)
     ifr_model_data_path = model_in_dir / 'ifr_model_data.parquet'
     ifr_model_data.to_parquet(ifr_model_data_path)
     cross_variant_immunity_path = model_in_dir / 'cross_variant_immunity.pkl'
@@ -187,7 +183,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ihr_model_data.to_parquet(ihr_model_data_path)
     idr_model_data_path = model_in_dir / 'idr_model_data.parquet'
     idr_model_data.to_parquet(idr_model_data_path)
-    
+
     logger.info('Launching location-specific models.')
     job_args_map = {
         location_id: [model.runner.__file__,
@@ -195,20 +191,20 @@ def make_infections(app_metadata: cli_tools.Metadata,
         for location_id in location_ids
     }
     cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map)
-    
+
     logger.info('Compiling infection draws.')
     infections_draws = []
     for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_infections_draws.parquet')]:
         infections_draws.append(pd.read_parquet(draws_path))
     infections_draws = pd.concat(infections_draws)
     completed_modeled_location_ids = infections_draws.reset_index()['location_id'].unique().tolist()
-    
+
     logger.info('Identifying failed models.')
     failed_model_location_ids = list(set(location_ids) - set(completed_modeled_location_ids))
     app_metadata.update({'failed_model_location_ids': failed_model_location_ids})
     if failed_model_location_ids:
         logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
-    
+
     logger.info('Compiling other model data.')
     inputs = {}
     for inputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_input_data.pkl')]:
@@ -218,7 +214,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_output_data.pkl')]:
         with outputs_path.open('rb') as outputs_file:
             outputs.update(pickle.load(outputs_file))
-        
+
     logger.info('Aggregating inputs.')
     agg_inputs = aggregation.aggregate_md_data_dict(inputs.copy(), hierarchy, measures, 1)
 
@@ -227,7 +223,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
 
     logger.info('Aggregating final infecions draws.')
     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
-    
+
     logger.info('Plotting aggregates.')
     plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
     for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
@@ -259,7 +255,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     pdf_paths = [str(plot_dir / pdf_path) for pdf_path in pdf_paths]
     pdf_out_path = output_root / f'past_infections_{str(output_root).split("/")[-1]}.pdf'
     pdf_merger(pdf_paths, pdf_location_names, pdf_parent_names, pdf_levels, str(pdf_out_path))
-    
+
     logger.info('Processing mean deaths.')
     deaths = {k:v['deaths']['daily'] for k, v in outputs.items() if 'deaths' in list(outputs[k].keys())}
     deaths = [pd.concat([v, pd.DataFrame({'location_id':k}, index=v.index)], axis=1).reset_index() for k, v in deaths.items()]
@@ -268,28 +264,34 @@ def make_infections(app_metadata: cli_tools.Metadata,
               .set_index(['location_id', 'date'])
               .sort_index()
               .loc[:, 'deaths'])
-    
+
     logger.info('Writing SEIR inputs - infections draw files.')
     infections_draws_cols = infections_draws.columns
     infections_draws = pd.concat([infections_draws, deaths], axis=1)
     infections_draws = infections_draws.sort_index()
     deaths = infections_draws['deaths'].copy()
+    em_scalar_data = em_scalar_data.loc[completed_modeled_location_ids].reset_index()
+    em_scalar_data = (em_scalar_data
+                      .set_index(['draw', 'location_id'])
+                      .sort_index()
+                      .loc[:, 'em_scalar'])
     infections_draws = [infections_draws[infections_draws_col].copy() for infections_draws_col in infections_draws_cols]
-    infections_draws = [pd.concat([infections_draw, deaths], axis=1) for infections_draw in infections_draws]
+    infections_draws = [pd.concat([infections_draw, (deaths * em_scalar_data.loc[n]).rename('deaths')], axis=1) 
+                        for n, infections_draw in enumerate(infections_draws)]
     _inf_writer = functools.partial(
         data.write_infections_draws,
         infections_draws_dir=infections_draws_dir,
     )
     with multiprocessing.Pool(MP_THREADS) as p:
         infections_draws_paths = list(tqdm(p.imap(_inf_writer, infections_draws), total=n_draws, file=sys.stdout))
-        
+
     for measure, (estimated_ratio, measure_durations, ratio_prior_estimates) in estimated_ratios.items():
         logger.info(f'Compiling {estimated_ratio.upper()} draws.')
         ratio_draws = []
         for draws_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith(f'_{estimated_ratio}_draws.parquet')]:
             ratio_draws.append(pd.read_parquet(draws_path))
         ratio_draws = pd.concat(ratio_draws)
-        
+
         logger.info(f'Filling {estimated_ratio.upper()} with original model estimate where we do not have a posterior.')
         ratio_draws_cols = ratio_draws.columns
         ratio_prior_estimates = (ratio_prior_estimates
@@ -348,7 +350,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     em_scalar_data = (infections_draws[0]
                       .reset_index()
                       .loc[:, ['location_id', 'date']]
-                      .merge(em_scalar_data, how='left'))
+                      .merge(em_scalar_data.reset_index(), how='left'))
     em_scalar_data['em_scalar'] = em_scalar_data['em_scalar'].fillna(1)
     em_scalar_data.to_csv(em_path, index=False)
     # em_scalar_data['date'] = em_scalar_data['date'].astype(str)
@@ -363,5 +365,5 @@ def make_infections(app_metadata: cli_tools.Metadata,
     # sero_data['date'] = sero_data['date'].astype(str)
     # sero_path = output_root / 'sero_data.parquet'
     # sero_data.to_parquet(sero_path, engine='fastparquet', compression='gzip')
-        
+
     logger.info(f'Model run complete -- {str(output_root)}.')

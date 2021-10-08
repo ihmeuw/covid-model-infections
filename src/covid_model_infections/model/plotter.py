@@ -31,7 +31,7 @@ def get_dates(input_data: Dict, output_data: Dict) -> Tuple[pd.Timestamp, pd.Tim
 
 
 def plotter(plot_dir: Path, location_id: int, location_name: str,
-            input_data: Dict,
+            input_data: Dict, mean_em_scalar: float,
             sero_data: pd.DataFrame, ratio_model_inputs: Dict,
             cross_variant_immunity: List[int], escape_variant_prevalence: pd.Series,
             output_data: Dict, smooth_infections: pd.Series, output_draws: pd.DataFrame,
@@ -84,12 +84,12 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
         if measure in list(input_data.keys()):
             adj_ratio = smooth_infections.copy()
             adj_ratio.index += pd.Timedelta(days=int(np.mean(input_data[measure]['lags'])))
-            adj_ratio = output_data[measure]['daily'] / adj_ratio
+            adj_ratio = (output_data[measure]['daily'] * mean_em_scalar) / adj_ratio
             adj_ratio = adj_ratio.dropna()
             ratio_data = pd.concat([input_data[measure]['ratio'].groupby(level=1).mean(),
-                                    input_data[measure]['daily']], axis=1)['ratio'].dropna()
+                                    input_data[measure]['daily']], axis=1).dropna()['ratio']
             ratio_data_fe = pd.concat([input_data[measure]['ratio'].groupby(level=1).mean(),
-                                       input_data[measure]['daily']], axis=1)['ratio_fe'].dropna()
+                                       input_data[measure]['daily']], axis=1).dropna()['ratio_fe']
             ratio_plot_range = pd.concat([ratio_data, ratio_data_fe, ratio_model_inputs[measure]['ratio_mean']])
             ratio_plot_range = ratio_plot_range.replace((-np.inf, np.inf), np.nan).dropna()
             ratio_plot_range_min = ratio_plot_range.min()

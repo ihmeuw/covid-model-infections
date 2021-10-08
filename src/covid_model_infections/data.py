@@ -268,6 +268,10 @@ def load_test_data(rates_root: Path) -> pd.DataFrame:
 def load_em_scalars(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'excess_mortality.parquet'
     data = pd.read_parquet(data_path)
+    data = (data
+            .reset_index()
+            .set_index(['location_id', 'draw',])
+            .sort_index())
 
     return data
 
@@ -280,8 +284,7 @@ def load_durations(rates_root: Path) -> List[Dict[str, int]]:
     return data
 
 
-def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,
-                      em_scalar_data: pd.DataFrame = None,) -> Tuple[pd.Series, pd.Series, Dict]:
+def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,) -> Tuple[pd.Series, pd.Series, Dict]:
     if input_measure == 'deaths':
         data_path = model_inputs_root / 'full_data_unscaled.csv'
     else:
@@ -300,15 +303,6 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_mea
             .reset_index(drop=True))
 
     data, manipulation_metadata = evil_doings(data, hierarchy, input_measure)
-    
-    if input_measure == 'deaths':
-        data = data.merge(em_scalar_data, how='left')
-        missing_locations = data.loc[data['em_scalar'].isnull(), 'location_id'].astype(str).unique().tolist()
-        if missing_locations:
-            logger.warning(f"Missing scalars for the following locations: {', '.join(missing_locations)}")
-        data['em_scalar'] = data['em_scalar'].fillna(1)
-        data['cumulative_deaths'] *= data['em_scalar']
-        del data['em_scalar']
     
     data[f'daily_{input_measure}'] = (data
                                       .groupby('location_id')[f'cumulative_{input_measure}']

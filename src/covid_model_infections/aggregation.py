@@ -201,7 +201,7 @@ def plot_aggregate(location_id: int,
 
     model.plotter.plotter(
         plot_dir, location_id, location_name,
-        inputs, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
+        inputs, 1, sero_data, ratio_model_inputs, cross_variant_immunity, escape_variant_prevalence,
         outputs, infections_mean, infections_draws, population
     )
     
