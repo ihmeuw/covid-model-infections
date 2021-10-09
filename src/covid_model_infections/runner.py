@@ -221,7 +221,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Aggregating outputs.')
     agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures, 1)
 
-    logger.info('Aggregating final infecions draws.')
+    logger.info('Aggregating final infections draws.')
     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
 
     logger.info('Plotting aggregates.')
@@ -232,15 +232,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
             agg_inputs[plot_parent_id].copy(),
             agg_outputs[plot_parent_id].copy(),
             agg_infections_draws.loc[plot_parent_id].copy(),
-            hierarchy,
-            pop_data,
-            sero_data,
+            hierarchy.copy(),
+            pop_data.copy(),
+            sero_data.copy(),
             cross_variant_immunity,
-            escape_variant_prevalence,
-            ifr_model_data,
-            ihr_model_data,
-            idr_model_data,
-            plot_dir
+            escape_variant_prevalence.copy(),
+            ifr_model_data.copy(),
+            ihr_model_data.copy(),
+            idr_model_data.copy(),
+            plot_dir,
         )
 
     logger.info('Merging PDFs.')

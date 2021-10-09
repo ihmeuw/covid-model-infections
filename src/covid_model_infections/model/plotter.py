@@ -146,12 +146,16 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
                (cumul_infections_draws / population) * 100,
                start_date, end_date, False)
     
-    expand_dates = [date for date in pd.date_range(start_date, end_date) if not date in escape_variant_prevalence.index]
+    expand_dates = [date for date in pd.date_range('2019-11-01', end_date) 
+                    if not date in escape_variant_prevalence.index]
     if expand_dates:
         date_idx = pd.Index(expand_dates, name='date')
-        escape_variant_prevalence = pd.concat([pd.Series(np.nan, index=date_idx, name=escape_variant_prevalence.name),
-                                               escape_variant_prevalence])
-        escape_variant_prevalence = escape_variant_prevalence.fillna(method='bfill').fillna(method='ffill')
+        if isinstance(escape_variant_prevalence, pd.Series):
+            escape_variant_prevalence = pd.concat([pd.Series(np.nan, index=date_idx, name=escape_variant_prevalence.name),
+                                                   escape_variant_prevalence])
+            escape_variant_prevalence = escape_variant_prevalence.fillna(method='bfill').fillna(method='ffill')
+        elif escape_variant_prevalence.empty:
+            escape_variant_prevalence = pd.Series(np.nan, index=date_idx, name='escape_variant_prevalence')
     cumul_infected_measures = {mm: pd.concat(output_data[mm]['infections_daily'], axis=1).dropna().mean(axis=1)
                                for mm in model_measures}
     cumul_infected_measures = {mm: (calc_infected(mm_data,

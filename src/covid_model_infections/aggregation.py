@@ -183,10 +183,10 @@ def plot_aggregate(location_id: int,
                  .drop('location_id', axis=1)
                  .set_index('date'))
     
-    if location_id in escape_variant_prevalence.reset_index()['location_id'].to_list():
-        escape_variant_prevalence = escape_variant_prevalence.loc[location_id]
-    else:
-        escape_variant_prevalence = pd.DataFrame()
+#     if location_id in escape_variant_prevalence.reset_index()['location_id'].to_list():
+#         escape_variant_prevalence = escape_variant_prevalence.loc[location_id]
+#     else:
+    escape_variant_prevalence = pd.DataFrame()
     
     population = pop_data.loc[location_id].item()
     
