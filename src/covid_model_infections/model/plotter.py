@@ -36,7 +36,7 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
             cross_variant_immunity: List[int], escape_variant_prevalence: pd.Series,
             output_data: Dict, smooth_infections: pd.Series, output_draws: pd.DataFrame,
             population: float,
-            measures=['cases', 'hospitalizations', 'deaths']):
+            measures: List[str] = ['cases', 'hospitalizations', 'deaths']):
     start_date, end_date = get_dates(input_data, output_data)
     
     n_cols = 3
@@ -121,41 +121,69 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
             ratio_ax.axis('off')
     
     model_measures = [m for m in measures if m in list(output_data.keys())]
-    whitespace_top = fig.add_subplot(gs[0:1, 2])
-    whitespace_top.axis('off')
-    dailymodel_ax = fig.add_subplot(gs[1:5, 2])
+    #whitespace_top = fig.add_subplot(gs[0:1, 2])
+    #whitespace_top.axis('off')
+    gs[i*4:i*4+4, 0]
+    dailymodel_ax = fig.add_subplot(gs[0:4, 2])
     infection_daily_data = {mm: pd.concat(output_data[mm]['infections_daily'], axis=1).dropna().mean(axis=1)[1:] 
                             for mm in model_measures}
-    model_plot(dailymodel_ax, 'Infections', 'Daily', infection_daily_data, None,
+    model_plot(dailymodel_ax, 'Infections', 'Daily infections', infection_daily_data, None,
                smooth_infections[1:],
                output_draws.dropna()[1:], start_date, end_date, False)
-    whitespace_mid = fig.add_subplot(gs[5:7, 2])
-    whitespace_mid.axis('off')
+    #whitespace_mid = fig.add_subplot(gs[5:7, 2])
+    #whitespace_mid.axis('off')
     
-    smooth_infections = smooth_infections.cumsum()
-    logger.warning('Not showing infected; need to work out w/ new inputs.')
+    cumul_infections_measures = {mm: (pd.concat(output_data[mm]['infections_cumul'], axis=1).dropna().mean(axis=1) / population) * 100 
+                                 for mm in model_measures}
+    cumul_infections_draws = output_draws.cumsum().dropna()
+    cumul_infections_point = smooth_infections.cumsum().dropna()
+    
+    cumulinfmodel_ax = fig.add_subplot(gs[4:8, 2])
+    model_plot(cumulinfmodel_ax, None, 'Cumulative infections (%)',
+               cumul_infections_measures,
+               sero_data,
+               (cumul_infections_point / population) * 100,
+               (cumul_infections_draws / population) * 100,
+               start_date, end_date, False)
+    
+    expand_dates = [date for date in pd.date_range(start_date, end_date) if not date in escape_variant_prevalence.index]
+    if expand_dates:
+        date_idx = pd.Index(expand_dates, name='date')
+        escape_variant_prevalence = pd.concat([pd.Series(np.nan, index=date_idx, name=escape_variant_prevalence.name),
+                                               escape_variant_prevalence])
+        escape_variant_prevalence = escape_variant_prevalence.fillna(method='bfill').fillna(method='ffill')
+    cumul_infected_measures = {mm: pd.concat(output_data[mm]['infections_daily'], axis=1).dropna().mean(axis=1)
+                               for mm in model_measures}
+    cumul_infected_measures = {mm: (calc_infected(mm_data,
+                                                  escape_variant_prevalence.loc[mm_data.index].values,
+                                                  np.mean(cross_variant_immunity),
+                                                  population,).dropna() / population) * 100 
+                               for mm, mm_data in cumul_infected_measures.items()}
+    cumul_infected_draws = calc_infected(output_draws,
+                                         escape_variant_prevalence.loc[output_draws.index].to_frame().values,
+                                         np.array(cross_variant_immunity),
+                                         population,).dropna()
+    cumul_infected_point = calc_infected(smooth_infections,
+                                         escape_variant_prevalence.loc[smooth_infections.index].values,
+                                         np.mean(cross_variant_immunity),
+                                         population,).dropna()
+    del output_draws, smooth_infections
+    
 #     if not daily_reinfection_rr.empty:
-#         for n in range(len(output_draws.columns)):
-#             output_draws = output_draws.join(daily_reinfection_rr.loc[n], how='left')
-#             output_draws = output_draws.sort_index()
-#             output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(method='ffill')
-#             output_draws['inflation_factor'] = output_draws['inflation_factor'].fillna(1)
-#             output_draws[f'draw_{n}'] /= output_draws['inflation_factor']
-#             del output_draws['inflation_factor']
 #         sero_data = sero_data.join(daily_reinfection_rr, how='left')
 #         sero_data['inflation_factor'] = sero_data['inflation_factor'].fillna(1)
 #         sero_data['seroprev_mean_no_vacc_waning'] /= sero_data['inflation_factor']
 #         del sero_data['inflation_factor']
-    output_draws = output_draws.cumsum()
-    
-    cumulmodel_ax = fig.add_subplot(gs[7:11, 2])
-    infection_cumul_data = {mm: (pd.concat(output_data[mm]['infections_cumul'], axis=1).dropna().mean(axis=1) / population) * 100 
-                            for mm in model_measures}
-    model_plot(cumulmodel_ax, None, 'Cumulative (%)', infection_cumul_data, sero_data,
-               (smooth_infections / population) * 100,
-               (output_draws.dropna() / population) * 100, start_date, end_date, True)
-    whitespace_bottom = fig.add_subplot(gs[11:12, 2])
-    whitespace_bottom.axis('off')
+
+    cumulpropmodel_ax = fig.add_subplot(gs[8:12, 2])
+    model_plot(cumulpropmodel_ax, None, 'Cumulative infected (%)',
+               cumul_infected_measures,
+               None, # sero_data,
+               (cumul_infected_point / population) * 100,
+               (cumul_infected_draws / population) * 100,
+               start_date, end_date, True)
+    #whitespace_bottom = fig.add_subplot(gs[11:12, 2])
+    #whitespace_bottom.axis('off')
 
     fig.suptitle(f'{location_name} ({location_id})', fontsize=20)
     plt.tight_layout()
@@ -165,6 +193,16 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
         plt.close(fig)
     else:
         plt.show()
+        
+
+def calc_infected(daily_infections, escape_variant_prevalence, cross_variant_immunity, population):
+    non_ev_infections = daily_infections * (1 - escape_variant_prevalence)
+    ev_infections = daily_infections * escape_variant_prevalence
+    repeat_infections = (1 - cross_variant_immunity) * (non_ev_infections.cumsum() / population).clip(0, 1) * ev_infections
+    first_infections = daily_infections - repeat_infections
+    cumul_infected = first_infections.cumsum()
+
+    return cumul_infected
 
 
 def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_date, end_date, include_xticks=False):
@@ -190,7 +228,8 @@ def data_plot(ax, title, ylabel, raw_data, smooth_data, clight, cdark, start_dat
     ax.spines['bottom'].set_visible(False)
 
 
-def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data, clight, cdark, start_date, end_date, include_xticks=True):
+def ratio_plot(ax, ylims, ylabel, ratio_data, ratio_data_fe, adj_ratio, ratio_input_data,
+               clight, cdark, start_date, end_date, include_xticks=True):
     ax.plot(ratio_data, color=cdark, alpha=0.8)
     ax.plot(ratio_data_fe, linestyle='--', color=cdark, alpha=0.8)
     ax.plot(adj_ratio, color=clight, alpha=0.8)
