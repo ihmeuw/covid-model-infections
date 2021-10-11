@@ -9,6 +9,7 @@ from loguru import logger
 import multiprocessing
 import functools
 import itertools
+import hashlib
 
 import pandas as pd
 import numpy as np
@@ -123,16 +124,24 @@ def model_measure(measure: str, measure_type: str,
 
 
 def model_infections(inputs: pd.DataFrame,
+                     location_id: int,
                      log: bool, knot_days: int, diff: bool,
                      refit: bool, num_submodels: int,
                      weights: pd.DataFrame = None,
+                     draw_str: str = None,
                      **spline_kwargs) -> pd.Series:
-    if refit:
+    # done via multiprocessinng, so set seed by draw
+    if refit and draw_str is None:
         if isinstance(inputs, pd.DataFrame):
-            draw = int(inputs.columns.unique().item().split('_')[-1])
+            draw_str = inputs.columns.unique().item()
         else:
-            draw = int(inputs.name.split('_')[-1])
-        np.random.seed(draw)
+            draw_str = inputs.name
+    elif draw_str is None:
+        raise ValueError('Draw string needs to be specified if not refit.')
+    if not draw_str.startswith('draw'):
+        raise ValueError(f'Invalid `draw_str`: {draw_str}.')
+    random_seed = get_random_seed(f'{location_id}_{draw_str}')
+    np.random.seed(random_seed)
     
     n_knots = determine_n_knots(inputs, knot_days)
     
@@ -207,7 +216,21 @@ def model_infections(inputs: pd.DataFrame,
     return outputs
 
 
-def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd.DataFrame,
+def get_random_seed(key: str):
+    seed = int(hashlib.sha1(key.encode('utf8')).hexdigest(), 16) % 4294967295
+    
+    return seed
+
+
+def get_random_state(key: str):
+    seed = get_random_seed(key)
+    random_state = np.random.RandomState(seed=seed)
+    
+    return random_state
+
+
+def sample_infections_residuals(key: str,
+                                smooth_infections: pd.Series, raw_infections: pd.DataFrame,
                                 rmse_radius: int = 120,):
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log=True)
     
@@ -240,8 +263,9 @@ def sample_infections_residuals(smooth_infections: pd.Series, raw_infections: pd
     smooth_infections['sigma'] = smooth_infections['sigma'].fillna(method='ffill')
     
     # logger.info('Sampling residuals.')
-    draw = np.random.normal(smooth_infections['infections'].values, smooth_infections['sigma'].values,
-                            len(smooth_infections))
+    random_state = get_random_state(key)
+    draw = random_state.normal(smooth_infections['infections'].values, smooth_infections['sigma'].values,
+                                   len(smooth_infections))
     draw = pd.Series((dep_trans_out(draw) - LOG_OFFSET).clip(FLOOR, np.inf),
                      name='noisy_infections',
                      index=smooth_infections.index)
@@ -262,8 +286,10 @@ def splice_ratios(ratio_data: pd.Series,
     new_ratio = new_ratio[1:]  # don't start at day0, is problematic for delayed cumul series
     start_date = new_ratio.index.min()
     end_date = new_ratio.index.max()
-    pre = new_ratio[:trans_period_past * 2].mean()
-    post = new_ratio[-trans_period_future * 2:].mean()
+    pre = new_ratio[:trans_period_past * 2].dropna()
+    pre = (pre * infections).dropna().sum() / infections.loc[pre.index].sum()
+    post = new_ratio[-trans_period_future * 2:].dropna()
+    post = (post * infections).dropna().sum() / infections.loc[post.index].sum()
     new_ratio = pd.concat([ratio_data, new_ratio], axis=1)
     new_ratio.loc[new_ratio.index < start_date - pd.Timedelta(days=trans_period_past), 'new_ratio'] = pre  # new_ratio[ratio_data.name]
     new_ratio.loc[new_ratio.index > end_date + pd.Timedelta(days=trans_period_future), 'new_ratio'] = post  # new_ratio[ratio_data.name]
@@ -336,7 +362,8 @@ def get_rate_transformations(log: bool):
 
 
 def triangulate_infections(infections_inputs: Dict, output_data: Dict,
-                           infection_log: bool, infection_knot_days: int,):
+                           infection_log: bool, infection_knot_days: int,
+                           location_id: int,):
     measure = infections_inputs['measure']
     measure_variance = infections_inputs['measure_variance']
     infections_inputs = infections_inputs['infections_inputs'].copy()
@@ -350,7 +377,9 @@ def triangulate_infections(infections_inputs: Dict, output_data: Dict,
                                     for k, v in output_data.items()],
                                    axis=1).sort_index()
     infections_weights = np.sqrt(infections_weights)
-    smooth_infections = model_infections(inputs=infections_inputs, weights=infections_weights,
+    smooth_infections = model_infections(location_id=location_id, draw_str=f'draw_{n}',
+                                         inputs=infections_inputs,
+                                         weights=infections_weights,
                                          log=infection_log, knot_days=infection_knot_days,
                                          diff=True, refit=False, num_submodels=NUM_SUBMODELS,)
     raw_infections = pd.concat([v['infections_daily_raw'][n][1:] for k, v in output_data.items() if k == measure],
@@ -364,7 +393,7 @@ def triangulate_infections(infections_inputs: Dict, output_data: Dict,
     #                   .rename('infections'))
     # raw_infections = pd.concat([raw_infections, smooth_infections.rename('smoothed')], axis=1)
     # raw_infections = raw_infections['infections'].fillna(raw_infections['smoothed']).to_frame()
-    input_draw = sample_infections_residuals(smooth_infections, raw_infections,)
+    input_draw = sample_infections_residuals(f'draw_{n}', smooth_infections, raw_infections,)
     
     return smooth_infections, raw_infections, input_draw
 
@@ -416,12 +445,13 @@ def run_model(location_id: int,
               measure_log: bool = True, measure_knot_days: int = 7,
               infection_log: bool = True, infection_knot_days: int = 28,
               mp: bool = True,):
-    np.random.seed(15243 + location_id)
     logger.info('Loading data.')
     input_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
     modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
+    loc_seed = get_random_seed(location_name)
+    np.random.seed(loc_seed)
     
     logger.info('Running measure-specific smoothing splines.')
     output_data = {measure: model_measure(measure,
@@ -451,13 +481,15 @@ def run_model(location_id: int,
                          for n, ii in enumerate(infections_inputs)]
     
     logger.info('Determining weighting scheme.')
+    m_random_state = get_random_state(f'measures_{location_id}')
     measures = list(output_data.keys())
     if is_us and 'hospitalizations' in measures:
         measures += ['hospitalizations']
-        measures = [str(measure) for measure in np.random.choice(measures, n_draws)]
+        measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
     else:
-        measures = [str(measure) for measure in np.random.choice(measures, n_draws)]
-    measure_variances = np.random.uniform(0.1, 0.9, n_draws)
+        measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
+    mv_random_state = get_random_state(f'measure_variances_{location_id}')
+    measure_variances = mv_random_state.uniform(0.1, 0.9, n_draws).tolist()
     weights = pd.DataFrame({'measure': measures, 'avg_variance': measure_variances, 'n': 1,})
     logger.info(f"Weights: \n:{weights.groupby('measure').agg({'n': pd.Series.count, 'avg_variance': pd.Series.mean})}")
     del weights
@@ -474,6 +506,7 @@ def run_model(location_id: int,
             triangulate_infections,
             output_data=output_data,
             infection_log=infection_log, infection_knot_days=infection_knot_days,
+            location_id=location_id,
         )
         with multiprocessing.Pool(int(os.environ['OMP_NUM_THREADS'])) as p:
             si_ri_id = list(tqdm(p.imap(_triangulate_infections, infections_inputs),
@@ -485,6 +518,7 @@ def run_model(location_id: int,
                 ii,
                 output_data=output_data,
                 infection_log=infection_log, infection_knot_days=infection_knot_days,
+                location_id=location_id,
             ))
 
     smooth_infections = [i[0] for i in si_ri_id]
@@ -499,6 +533,7 @@ def run_model(location_id: int,
     input_draws = [i.rename(f'draw_{n}').to_frame() for n, i in enumerate(input_draws)]
     
     draw_args = {
+        'location_id':location_id,
         'log': infection_log,
         'knot_days': infection_knot_days,
         'num_submodels': NUM_SUBMODELS,
