@@ -12,6 +12,7 @@ from covid_shared import shell_tools, cli_tools
 
 from covid_model_infections import data, cluster, model, aggregation
 from covid_model_infections.pdf_merger import pdf_merger
+from covid_model_infections.utils import SUB_LOCATIONS
 
 MP_THREADS = 25
 
@@ -223,8 +224,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
 
     logger.info('Aggregating final infections draws.')
     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
+    
+    logger.info('Getting regional average.')
+    ## ... ##
 
-    logger.info('Plotting aggregates.')
+    logger.info('Plotting aggregates and regional average locations.')
     plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
     for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
         aggregation.plot_aggregate(

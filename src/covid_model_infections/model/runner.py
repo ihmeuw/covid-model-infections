@@ -20,7 +20,7 @@ from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import CEILINGS
 from covid_model_infections.cluster import TYPE_SPECS
 
-LOG_OFFSET = 1
+LOG_OFFSET = 100
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 NUM_SUBMODELS = 7
@@ -56,8 +56,8 @@ def model_measure(measure: str, measure_type: str,
     
     n_knots = determine_n_knots(input_data, knot_days)
     
-    spline_options = {'spline_knots_type':'domain',
-                      'spline_degree':3 + (measure_type=='cumul'),}
+    spline_options = {'spline_knots_type': 'domain',
+                      'spline_degree': 3 + (measure_type=='cumul'),}
     
     if measure_type == 'cumul':
         spline_options.update({'prior_spline_monotonicity':'increasing',})

@@ -254,6 +254,17 @@ def load_escape_variant_prevalence(rates_root: Path) -> pd.DataFrame:
     return data
 
 
+def load_reinfection_inflation_factor(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'reinfection_inflation_factor.parquet'
+    data = pd.read_parquet(data_path)
+    data = (data
+            .set_index(['location_id', 'date'])
+            .sort_index()
+            .loc[:, ['inflation_factor']])
+    
+    return data
+
+
 def load_test_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'testing.parquet'
     data = pd.read_parquet(data_path)
