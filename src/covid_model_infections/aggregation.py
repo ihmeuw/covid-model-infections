@@ -1,5 +1,5 @@
 import sys
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from pathlib import Path
 from tqdm import tqdm
 from functools import partial
@@ -153,8 +153,10 @@ def create_parent_draws(parent_draws: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("Multi-index differs from expected (['location_id', 'date']).")
     parent_draws_count = parent_draws.groupby(level=1).count().iloc[:,0]
     keep_idx = parent_draws_count[parent_draws_count == n_child_locations].index
+    nulls = parent_draws.isnull().groupby(level=1).sum() > 0
     parent_draws = parent_draws.groupby(level=1).sum()
     parent_draws = parent_draws.cumsum()
+    parent_draws[nulls] = np.nan
     parent_draws = parent_draws.loc[keep_idx]
     parent_draws = parent_draws.diff().fillna(parent_draws)
     parent_draws['location_id'] = parent_id
@@ -164,6 +166,70 @@ def create_parent_draws(parent_draws: pd.DataFrame) -> pd.DataFrame:
                     .sort_index())
     
     return parent_draws
+
+
+def fill_w_region(sub_location: int, infections_draws: pd.DataFrame,
+                  hierarchy: pd.DataFrame, pop_data: pd.DataFrame) -> pd.DataFrame:
+    region_id = int(hierarchy.loc[hierarchy['location_id'] == sub_location, 'path_to_top_parent'].str.split(',').item()[2])
+    region_countries = hierarchy.loc[(hierarchy['region_id'] == region_id) & (hierarchy['level'] == 3), 'location_id'].to_list()
+    
+    infections_draws = infections_draws.reset_index()
+    infections_draws = infections_draws.loc[infections_draws['location_id'].isin(region_countries)]
+    infections_draws = infections_draws.set_index(['location_id', 'date'])
+    rc_populations = infections_draws.join(pop_data)[['population']].values
+    infections_draws /= rc_populations
+    
+    n_locations = infections_draws.reset_index()['location_id'].unique().size
+    if infections_draws.index.names != ['location_id', 'date']:
+        raise ValueError("Multi-index differs from expected (['location_id', 'date']).")
+    loc_date_count = infections_draws.groupby(level=1).count().iloc[:,0]
+    keep_idx = loc_date_count[loc_date_count == n_locations].index
+    #nulls = infections_draws.isnull().groupby(level=1).sum() > 0
+    infections_draws = infections_draws.groupby(level=1).mean()
+    #infections_draws[nulls] = np.nan
+    infections_draws = infections_draws.loc[keep_idx]
+    infections_draws *= pop_data.loc[sub_location].item()
+    infections_draws['location_id'] = sub_location
+    infections_draws = (infections_draws
+                        .reset_index()
+                        .set_index(['location_id', 'date'])
+                        .sort_index())
+    
+    return infections_draws
+
+
+def get_sub_loc_deaths(sub_location: int, n_draws: int,
+                       sub_infections_draws: pd.DataFrame, ifr: pd.DataFrame,
+                       durations: List[Dict], cumul_deaths: pd.Series,) -> Tuple[pd.DataFrame, pd.Series]:
+    loc_deaths = []
+    loc_scalar = []
+    for draw in range(n_draws):
+        _ifr = ifr.loc[sub_location, draw]['ratio']
+        _deaths = sub_infections_draws.loc[sub_location, f'draw_{draw}'].reset_index()
+        _deaths['date'] += pd.Timedelta(days=durations[draw]['exposure_to_death'])
+        _deaths = _deaths.set_index('date').loc[:, f'draw_{draw}']
+        _deaths = (_deaths * _ifr).dropna().rename(f'draw_{draw}')
+        trim_days = durations[draw]['exposure_to_death'] - durations[draw]['exposure_to_case']
+        _deaths = _deaths[:-trim_days]
+        if sub_location in cumul_deaths.reset_index()['location_id'].unique():
+            reported = cumul_deaths.loc[sub_location].max()
+        else:
+            reported = 1
+        loc_scalar.append(_deaths.sum() / reported)
+        loc_deaths.append(_deaths)
+    loc_deaths = pd.concat(loc_deaths, axis=1).dropna()
+    loc_deaths['location_id'] = sub_location
+    loc_deaths = (loc_deaths
+                  .reset_index()
+                  .set_index(['location_id', 'date'])
+                  .sort_index())
+    loc_scalar = pd.DataFrame({'draw': list(range(n_draws)), 'location_id': sub_location, 'em_scalar': loc_scalar,})
+    loc_scalar = (loc_scalar
+                  .set_index(['draw', 'location_id'])
+                  .sort_index()
+                  .loc[:, 'em_scalar'])
+    
+    return loc_deaths, loc_scalar
 
 
 def plot_aggregate(location_id: int,

@@ -189,7 +189,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     job_args_map = {
         location_id: [model.runner.__file__,
                       location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
-        for location_id in location_ids
+        for location_id in location_ids if location_id not in SUB_LOCATIONS
     }
     cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map)
 
@@ -204,17 +204,19 @@ def make_infections(app_metadata: cli_tools.Metadata,
     failed_model_location_ids = list(set(location_ids) - set(completed_modeled_location_ids))
     app_metadata.update({'failed_model_location_ids': failed_model_location_ids})
     if failed_model_location_ids:
-        logger.debug(f'Models failed for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
+        logger.debug(f'Models failed/missing for the following location_ids: {", ".join([str(l) for l in failed_model_location_ids])}')
 
     logger.info('Compiling other model data.')
     inputs = {}
     for inputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_input_data.pkl')]:
         with inputs_path.open('rb') as inputs_file:
             inputs.update(pickle.load(inputs_file))
+    inputs = {l: inputs[l] for l in completed_modeled_location_ids}
     outputs = {}
     for outputs_path in [result_path for result_path in model_out_dir.iterdir() if str(result_path).endswith('_output_data.pkl')]:
         with outputs_path.open('rb') as outputs_file:
             outputs.update(pickle.load(outputs_file))
+    outputs = {l: outputs[l] for l in completed_modeled_location_ids}
 
     logger.info('Aggregating inputs.')
     agg_inputs = aggregation.aggregate_md_data_dict(inputs.copy(), hierarchy, measures, 1)
@@ -225,9 +227,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Aggregating final infections draws.')
     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
     
-    logger.info('Getting regional average.')
-    ## ... ##
-
+    logger.info(f"Getting regional average for the following locations {', '.join([str(sl) for sl in SUB_LOCATIONS])}.")
+    sub_infections_draws = pd.concat([aggregation.fill_w_region(sub_location, infections_draws.append(agg_infections_draws).copy(),
+                                                                hierarchy.copy(), pop_data.copy()) 
+                                      for sub_location in SUB_LOCATIONS])
+    
     logger.info('Plotting aggregates and regional average locations.')
     plot_parent_ids = agg_infections_draws.reset_index()['location_id'].unique().tolist()
     for plot_parent_id in tqdm(plot_parent_ids, total=len(plot_parent_ids), file=sys.stdout):
@@ -282,6 +286,26 @@ def make_infections(app_metadata: cli_tools.Metadata,
     infections_draws = [infections_draws[infections_draws_col].copy() for infections_draws_col in infections_draws_cols]
     infections_draws = [pd.concat([infections_draw, (deaths * em_scalar_data.loc[n]).rename('deaths')], axis=1) 
                         for n, infections_draw in enumerate(infections_draws)]
+    
+    _get_sub_loc_deaths = functools.partial(
+        aggregation.get_sub_loc_deaths,
+        n_draws=n_draws,
+        sub_infections_draws=sub_infections_draws.copy(),
+        ifr=ifr.copy(),
+        durations=durations.copy(),
+        cumul_deaths=cumul_deaths.copy(),
+    )
+    with multiprocessing.Pool(MP_THREADS) as p:
+        sub_deaths_scalar = list(tqdm(p.imap(_get_sub_loc_deaths, SUB_LOCATIONS), total=len(SUB_LOCATIONS), file=sys.stdout))
+    sub_deaths = pd.concat([sds[0] for sds in sub_deaths_scalar]).sort_index()
+    sub_em_scalar_data = pd.concat([sds[1] for sds in sub_deaths_scalar]).sort_index()
+    del sub_deaths_scalar
+    sub_infections_draws = [pd.concat([sub_infections_draws[infections_draws_col].copy(),
+                                       sub_deaths[infections_draws_col].rename('deaths')], axis=1) 
+                             for infections_draws_col in infections_draws_cols]
+    infections_draws = [pd.concat([i_d, s_i_d]).sort_index() for i_d, s_i_d in zip(infections_draws, sub_infections_draws)]
+    em_scalar_data = pd.concat([em_scalar_data, sub_em_scalar_data]).sort_index()
+    
     _inf_writer = functools.partial(
         data.write_infections_draws,
         infections_draws_dir=infections_draws_dir,
