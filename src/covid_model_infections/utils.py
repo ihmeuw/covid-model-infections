@@ -15,3 +15,7 @@ SUB_LOCATIONS = [
     133,  # Venezuela (Bolivarian Republic of)
     189,  # United Republic of Tanzania
 ]
+
+TRIM_LOCATIONS = [
+    # ...
+]

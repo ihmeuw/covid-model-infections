@@ -17,7 +17,7 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import CEILINGS
+from covid_model_infections.utils import CEILINGS, TRIM_LOCATIONS
 from covid_model_infections.cluster import TYPE_SPECS
 
 INFECTIONS_LOG_OFFSET = 50
@@ -578,9 +578,10 @@ def run_model(location_id: int,
                         .values)
     output_draws *= mean_corr_factor
     
-    logger.info('Ensure we do not run out of susceptibles.')
-    logger.warning('Droppping last three days of infections for stability.')
-    output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
+    logger.info('Ensure we do not run out of susceptibles (doing two iterations since it is a feedback loop).')
+    if location_id in TRIM_LOCATIONS:
+        logger.warning('Droppping last three days of infections for stability.')
+        output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
     _od1 = []
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
         _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
@@ -592,8 +593,6 @@ def run_model(location_id: int,
                             escape_variant_prevalence.copy(), vaccine_data.copy(),))
     output_draws = pd.concat(_od2, axis=1)
     del _od1, _od2
-#     output_draws = pd.concat(_od1, axis=1)
-#     del _od1
 
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     output_draws_list = [enforce_ratio_ceiling('posterior infections',
