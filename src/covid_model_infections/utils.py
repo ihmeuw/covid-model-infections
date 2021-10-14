@@ -7,8 +7,8 @@ CEILINGS = {
 
 SUB_LOCATIONS = [
     7,    # Democratic People's Republic of Korea
-    12,   # Lao People's Democratic Republic
-    15,   # Myanmar
+    # 12,   # Lao People's Democratic Republic
+    # 15,   # Myanmar
     39,   # Tajikistan
     40,   # Turkmenistan
     131,  # Nicaragua

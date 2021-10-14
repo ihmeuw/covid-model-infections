@@ -20,7 +20,7 @@ from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import CEILINGS
 from covid_model_infections.cluster import TYPE_SPECS
 
-LOG_OFFSET = 100
+INFECTIONS_LOG_OFFSET = 50
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 NUM_SUBMODELS = 7
@@ -76,7 +76,7 @@ def model_measure(measure: str, measure_type: str,
     logger.info('Generating smooth past curve.')
     input_data = input_data.clip(FLOOR, np.inf)
     if log:
-        input_data += LOG_OFFSET
+        input_data += INFECTIONS_LOG_OFFSET
     _, smooth_data, _ = mr_spline.estimate_time_series(
         data=input_data.reset_index(),
         dep_var=measure,
@@ -91,8 +91,8 @@ def model_measure(measure: str, measure_type: str,
     
     logger.info('Converting to infections.')
     if log:
-        input_data -= LOG_OFFSET
-        smooth_data -= LOG_OFFSET
+        input_data -= INFECTIONS_LOG_OFFSET
+        smooth_data -= INFECTIONS_LOG_OFFSET
     if measure_type == 'cumul':
         input_data = input_data.diff().fillna(input_data)
         smooth_data = smooth_data.diff().fillna(smooth_data)
@@ -156,7 +156,7 @@ def model_infections(inputs: pd.DataFrame,
     spline_options = {'spline_knots_type':'domain',
                       'spline_degree':3 - diff,}
     if log:
-        inputs += LOG_OFFSET
+        inputs += INFECTIONS_LOG_OFFSET
         # prior_spline_maxder_gaussian = np.array([[0, np.inf]] * (n_knots - 1))
         # prior_spline_maxder_gaussian[-1] = [0, 1e-2]
         # spline_options.update({'prior_spline_maxder_gaussian':prior_spline_maxder_gaussian.T,})
@@ -210,7 +210,7 @@ def model_infections(inputs: pd.DataFrame,
     
     if not refit:
         if log:
-            outputs -= LOG_OFFSET
+            outputs -= INFECTIONS_LOG_OFFSET
         outputs = outputs.clip(FLOOR, np.inf)
     
     return outputs
@@ -235,8 +235,8 @@ def sample_infections_residuals(key: str,
     dep_trans_in, _, dep_trans_out = get_rate_transformations(log=True)
     
     # logger.info('Calculating residuals.')
-    smooth_infections = dep_trans_in(smooth_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)    
-    residuals = dep_trans_in(raw_infections.copy().clip(FLOOR, np.inf) + LOG_OFFSET)
+    smooth_infections = dep_trans_in(smooth_infections.copy().clip(FLOOR, np.inf) + INFECTIONS_LOG_OFFSET)
+    residuals = dep_trans_in(raw_infections.copy().clip(FLOOR, np.inf) + INFECTIONS_LOG_OFFSET)
     
     residuals = smooth_infections.to_frame() - residuals
     residuals = mr_spline.reshape_data_long(residuals.reset_index(), 'infections')
@@ -266,7 +266,7 @@ def sample_infections_residuals(key: str,
     random_state = get_random_state(key)
     draw = random_state.normal(smooth_infections['infections'].values, smooth_infections['sigma'].values,
                                    len(smooth_infections))
-    draw = pd.Series((dep_trans_out(draw) - LOG_OFFSET).clip(FLOOR, np.inf),
+    draw = pd.Series((dep_trans_out(draw) - INFECTIONS_LOG_OFFSET).clip(FLOOR, np.inf),
                      name='noisy_infections',
                      index=smooth_infections.index)
     
@@ -568,7 +568,7 @@ def run_model(location_id: int,
 #         output_draws -= variance_offset
     output_draws = dep_trans_out(output_draws)
     if draw_args['log']:
-        output_draws -= LOG_OFFSET
+        output_draws -= INFECTIONS_LOG_OFFSET
         output_draws = output_draws.clip(FLOOR, np.inf)
     mean_corr_factor = smooth_infections / output_draws.mean(axis=1)
     mean_corr_factor = (mean_corr_factor
@@ -594,6 +594,19 @@ def run_model(location_id: int,
     del _od1, _od2
 #     output_draws = pd.concat(_od1, axis=1)
 #     del _od1
+
+    output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
+    output_draws_list = [enforce_ratio_ceiling('posterior infections',
+                                               input_measure,
+                                               output_data[input_measure]['daily'][1:].copy(),
+                                               output_draws_list.copy(),
+                                               input_data[input_measure]['scalar'].copy(),
+                                               input_data[input_measure]['lags'],
+                                               CEILINGS[input_measure],)
+                         for input_measure in input_data.keys()]
+    output_draws_list = [pd.concat([od[n] for od in output_draws_list], axis=1).max(axis=1).rename(f'draw_{n}')
+                         for n in range(n_draws)]
+    output_draws = pd.concat(output_draws_list, axis=1)
     
     logger.info('Plot data.')
     sero_data, ratio_model_inputs = data.load_extra_plot_inputs(location_id, Path(model_in_dir))
