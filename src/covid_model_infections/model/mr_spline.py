@@ -124,20 +124,29 @@ def model_intercept(data: pd.DataFrame,
                     weight_data: pd.DataFrame = None,
                     dep_var_se: str = None,
                     dep_trans_in: Callable[[pd.Series], pd.Series] = lambda x: x,
+                    dep_se_trans_in: Callable[[pd.Series], pd.Series] = lambda x: x,
                     dep_trans_out: Callable[[pd.Series], pd.Series] = lambda x: x,
                     verbose: bool = True):
     data = data.copy()
     data[dep_var] = dep_trans_in(data[dep_var])
     prediction = dep_trans_in(prediction)
     data = reshape_data_long(data, dep_var)
+    if weight_data is not None:
+        weight_data = reshape_data_long(weight_data, dep_var_se)
+        if (data['date'] != weight_data['date']).any():
+            raise ValueError('Dates in `data` and `weight_data` not identical.')
+        data['se'] = dep_se_trans_in(weight_data[dep_var_se])
+    else:
+        data['se'] = 1.
     data = data.set_index('date').sort_index()
-    data = data[dep_var] - prediction
+    data[dep_var] = data[dep_var] - prediction
     data = data.reset_index().dropna()
     data['intercept'] = 1
     
     mr_data = MRData()
     mr_data.load_df(data, 
         col_obs=dep_var,
+        col_obs_se='se',
         col_covs=['intercept'],
         col_study_id='date',)
     intercept_model = LinearCovModel('intercept', use_re=False,)
