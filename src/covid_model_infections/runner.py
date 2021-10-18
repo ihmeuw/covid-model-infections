@@ -24,8 +24,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     rates_root: Path,
                     output_root: Path,
                     holdout_days: int,
-                    # n_draws: int,
-                   ):
+                    n_draws: int,):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
 
@@ -67,22 +66,24 @@ def make_infections(app_metadata: cli_tools.Metadata,
     }})
     measures = ['deaths', 'hospitalizations', 'cases']
 
-    logger.info('Loading estimated ratios and adding draw directories.')
-    em_scalar_data = data.load_em_scalars(rates_root)
-    ifr, n_draws = data.load_ifr(rates_root)
-    ifr_rr = data.load_ifr_rr(rates_root)
+    logger.info('Loading estimated ratios.')
+    ifr = data.load_ifr(rates_root, n_draws,)
+    ifr_rr = data.load_ifr_rr(rates_root, n_draws,)
     ifr_model_data = data.load_ifr_data(rates_root)
-    cross_variant_immunity = data.load_cross_variant_immunity(rates_root)
-    variant_risk_ratio = data.load_variant_risk_ratio(rates_root)
+    cross_variant_immunity = data.load_cross_variant_immunity(rates_root, n_draws,)
+    variant_risk_ratio = data.load_variant_risk_ratio(rates_root, n_draws,)
     escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
-    ihr = data.load_ihr(rates_root)
-    ihr_model_data = data.load_ihr_data(rates_root)
+    ihr = data.load_ihr(rates_root, n_draws,)
+    ihr_model_data = data.load_ihr_data(rates_root, n_draws,)
     # Assumes IDR has estimated floor already applied
-    idr = data.load_idr(rates_root, (0., 1.))
+    idr = data.load_idr(rates_root, n_draws, (0., 1.),)
     idr_model_data = data.load_idr_data(rates_root)
+    
+    logger.info('Loading scalars.')
+    em_scalar_data = data.load_em_scalars(rates_root, n_draws,)
 
     logger.info('Loading durations for each draw.')
-    durations = data.load_durations(rates_root)
+    durations = data.load_durations(rates_root, n_draws,)
 
     logger.info('Loading extra data for plotting.')
     sero_data = data.load_sero_data(rates_root)
