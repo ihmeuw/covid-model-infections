@@ -72,9 +72,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     ifr_model_data = data.load_ifr_data(rates_root)
     cross_variant_immunity = data.load_cross_variant_immunity(rates_root, n_draws,)
     variant_risk_ratio = data.load_variant_risk_ratio(rates_root, n_draws,)
-    escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
     ihr = data.load_ihr(rates_root, n_draws,)
-    ihr_model_data = data.load_ihr_data(rates_root, n_draws,)
+    ihr_model_data = data.load_ihr_data(rates_root)
     # Assumes IDR has estimated floor already applied
     idr = data.load_idr(rates_root, n_draws, (0., 1.),)
     idr_model_data = data.load_idr_data(rates_root)
@@ -85,10 +84,11 @@ def make_infections(app_metadata: cli_tools.Metadata,
     logger.info('Loading durations for each draw.')
     durations = data.load_durations(rates_root, n_draws,)
 
-    logger.info('Loading extra data for plotting.')
+    logger.info('Loading additional rates model outputs.')
     sero_data = data.load_sero_data(rates_root)
     test_data = data.load_test_data(rates_root)
     vaccine_data = data.load_vaccine_data(rates_root)
+    escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
 
     logger.info('Filling missing locations and creating model input data structure.')
     most_detailed = hierarchy['most_detailed'] == 1

@@ -107,7 +107,7 @@ def draw_check(n_draws: int, n_draws_in_data: int,):
 def load_ifr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
     data_path = rates_root / 'ifr_draws.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ifr': 'ratio',
                                 'ifr_fe': 'ratio_fe'})
     
@@ -129,7 +129,7 @@ def load_ifr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
 def load_ifr_rr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
     data_path = rates_root / 'ifr_rr_draws.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     
     n_draws_in_data = data['draw'].max() + 1    
     draw_check(n_draws, n_draws_in_data,)
@@ -149,7 +149,7 @@ def load_ifr_rr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
 def load_ifr_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'ifr_model_data.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ifr_mean': 'ratio_mean',
                                 'ifr_std': 'ratio_std',})
     data = (data
@@ -163,7 +163,7 @@ def load_ifr_data(rates_root: Path) -> pd.DataFrame:
 def load_vaccine_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'vaccine_coverage.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = (data
             .loc[:, ['location_id', 'date', 'cumulative_all_effective',]]
             .set_index(['location_id', 'date'])
@@ -175,7 +175,7 @@ def load_vaccine_data(rates_root: Path) -> pd.DataFrame:
 def load_ihr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
     data_path = rates_root / 'ihr_draws.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ihr': 'ratio',
                                 'ihr_fe': 'ratio_fe'})
     
@@ -197,7 +197,7 @@ def load_ihr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
 def load_ihr_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'ihr_model_data.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'ihr_mean': 'ratio_mean',
                                 'ihr_std': 'ratio_std',})
     data = (data
@@ -212,7 +212,7 @@ def load_ihr_data(rates_root: Path) -> pd.DataFrame:
 def load_idr(rates_root: Path, n_draws: int, limits: Tuple[float, float],) -> pd.DataFrame:
     data_path = rates_root / 'idr_draws.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'idr': 'ratio',
                                 'idr_fe': 'ratio_fe'})
     
@@ -235,7 +235,7 @@ def load_idr(rates_root: Path, n_draws: int, limits: Tuple[float, float],) -> pd
 def load_idr_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'idr_model_data.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = data.rename(columns={'idr_mean': 'ratio_mean',
                                 'idr_std': 'ratio_std',})
     data = (data
@@ -269,6 +269,8 @@ def load_cross_variant_immunity(rates_root: Path, n_draws: int,) -> List:
     with data_path.open('rb') as file:
         data = pickle.load(file)
     
+    n_draws_in_data = len(data)
+    draw_check(n_draws, n_draws_in_data,)
     data = data[:n_draws]
     
     return data
@@ -279,6 +281,8 @@ def load_variant_risk_ratio(rates_root: Path, n_draws: int,) -> List:
     with data_path.open('rb') as file:
         data = pickle.load(file)
     
+    n_draws_in_data = len(data)
+    draw_check(n_draws, n_draws_in_data,)
     data = data[:n_draws]
     
     return data
@@ -287,7 +291,7 @@ def load_variant_risk_ratio(rates_root: Path, n_draws: int,) -> List:
 def load_escape_variant_prevalence(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'variants.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -299,6 +303,7 @@ def load_escape_variant_prevalence(rates_root: Path) -> pd.DataFrame:
 def load_reinfection_inflation_factor(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'reinfection_inflation_factor.parquet'
     data = pd.read_parquet(data_path)
+    data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index()
@@ -310,7 +315,7 @@ def load_reinfection_inflation_factor(rates_root: Path) -> pd.DataFrame:
 def load_test_data(rates_root: Path) -> pd.DataFrame:
     data_path = rates_root / 'testing.parquet'
     data = pd.read_parquet(data_path)
-    #data['date'] = pd.to_datetime(data['date'])
+    data['date'] = pd.to_datetime(data['date'])
     data = (data
             .set_index(['location_id', 'date'])
             .sort_index())
@@ -342,6 +347,8 @@ def load_durations(rates_root: Path, n_draws: int,) -> List[Dict[str, int]]:
     with data_path.open('rb') as file:
         data = pickle.load(file)
     
+    n_draws_in_data = len(data)
+    draw_check(n_draws, n_draws_in_data,)
     data = data[:n_draws]
         
     return data

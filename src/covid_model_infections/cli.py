@@ -28,14 +28,14 @@ from covid_model_infections import runner
               show_default=True,
               help=('Directory containing versioned results structure (will create structure '
                     'if not already present).'))
-@click.option('--n-holdout-days',
-              type=click.INT,
-              default=0,
-              help='Number of days of data to drop.')
-@click.option('--n-draws',
+@click.option('-n', '--n-draws',
               type=click.INT,
               default=100,
               help='Number of posterior samples.')
+@click.option('-h', '--n-holdout-days',
+              type=click.INT,
+              default=0,
+              help='Number of days of data to drop.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,
               help='Marks the new outputs as best in addition to marking them as latest.')
@@ -46,7 +46,7 @@ from covid_model_infections import runner
 def run_infections(run_metadata,
                    model_inputs_version,
                    rates_version,
-                   output_root, n_holdout_days, n_draws,
+                   output_root, n_draws, n_holdout_days,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
     """Run infections model."""

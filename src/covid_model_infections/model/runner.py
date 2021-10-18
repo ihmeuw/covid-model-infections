@@ -582,6 +582,8 @@ def run_model(location_id: int,
     if location_id in TRIM_LOCATIONS:
         logger.warning('Droppping last three days of infections for stability.')
         output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
+    else:
+        output_draws = enumerate([output_draws[dc].dropna() for dc in output_draws.columns])
     _od1 = []
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
         _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
