@@ -13,15 +13,10 @@ from loguru import logger
 PROJECT = 'proj_covid_prod'
 QUEUE = 'd.q'
 TYPE_SPECS = {
-    'covid_mean_inf_loc': {'F_MEM': '5.0G',
-                           'F_THREAD': '3',
-                           'OMP_NUM_THREADS': '3'},
-    'covid_refit_draw': {'F_MEM': '5.0G',
-                         'F_THREAD': '6',
-                         'OMP_NUM_THREADS': '6'},
-    'covid_compile': {'F_MEM': '5.0G',
+    'covid_loc_inf': {'F_MEM': '8.0G',
                       'F_THREAD': '3',
-                      'OMP_NUM_THREADS': '3'},
+                      'OMP_NUM_THREADS': '3',
+                      'MKL_NUM_THREADS': '3',},
 }
 H_RUNTIME = '06:00:00'
 SLEEP_TIME = 10
