@@ -98,11 +98,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
 
 def draw_check(n_draws: int, n_draws_in_data: int,) -> bool:
     if n_draws > n_draws_in_data:
-        downsample = True
         raise ValueError(f'User specified {n_draws} draws; only {n_draws_in_data} draws available in data.')
     elif n_draws < n_draws_in_data:
         logger.warning(f'User specified {n_draws} draws; {n_draws_in_data} draws available in data. '
                        f'Crudely taking first {n_draws} draws from rates.')
+        downsample = True
     else:
         downsample = False
     
