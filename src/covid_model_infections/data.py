@@ -96,12 +96,17 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
     return data, manipulation_metadata
 
 
-def draw_check(n_draws: int, n_draws_in_data: int,):
+def draw_check(n_draws: int, n_draws_in_data: int,) -> bool:
     if n_draws > n_draws_in_data:
+        downsample = True
         raise ValueError(f'User specified {n_draws} draws; only {n_draws_in_data} draws available in data.')
     elif n_draws < n_draws_in_data:
         logger.warning(f'User specified {n_draws} draws; {n_draws_in_data} draws available in data. '
                        f'Crudely taking first {n_draws} draws from rates.')
+    else:
+        downsample = False
+    
+    return downsample
 
 
 def load_ifr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
@@ -112,11 +117,12 @@ def load_ifr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
                                 'ifr_fe': 'ratio_fe'})
     
     n_draws_in_data = data['draw'].max() + 1    
-    draw_check(n_draws, n_draws_in_data,)
-    data = (data
-            .set_index('draw')
-            .loc[list(range(n_draws))]
-            .reset_index())
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = (data
+                .set_index('draw')
+                .loc[list(range(n_draws))]
+                .reset_index())
     
     data = (data
             .set_index(['location_id', 'draw', 'date'])
@@ -132,11 +138,12 @@ def load_ifr_rr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
     data['date'] = pd.to_datetime(data['date'])
     
     n_draws_in_data = data['draw'].max() + 1    
-    draw_check(n_draws, n_draws_in_data,)
-    data = (data
-            .set_index('draw')
-            .loc[list(range(n_draws))]
-            .reset_index())
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = (data
+                .set_index('draw')
+                .loc[list(range(n_draws))]
+                .reset_index())
     
     data = (data
             .set_index(['location_id', 'draw', 'date'])
@@ -180,11 +187,12 @@ def load_ihr(rates_root: Path, n_draws: int,) -> pd.DataFrame:
                                 'ihr_fe': 'ratio_fe'})
     
     n_draws_in_data = data['draw'].max() + 1    
-    draw_check(n_draws, n_draws_in_data,)
-    data = (data
-            .set_index('draw')
-            .loc[list(range(n_draws))]
-            .reset_index())
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = (data
+                .set_index('draw')
+                .loc[list(range(n_draws))]
+                .reset_index())
     
     data = (data
             .set_index(['location_id', 'draw', 'date'])
@@ -217,11 +225,12 @@ def load_idr(rates_root: Path, n_draws: int, limits: Tuple[float, float],) -> pd
                                 'idr_fe': 'ratio_fe'})
     
     n_draws_in_data = data['draw'].max() + 1    
-    draw_check(n_draws, n_draws_in_data,)
-    data = (data
-            .set_index('draw')
-            .loc[list(range(n_draws))]
-            .reset_index())
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = (data
+                .set_index('draw')
+                .loc[list(range(n_draws))]
+                .reset_index())
     
     data = (data
             .set_index(['location_id', 'draw', 'date'])
@@ -270,8 +279,9 @@ def load_cross_variant_immunity(rates_root: Path, n_draws: int,) -> List:
         data = pickle.load(file)
     
     n_draws_in_data = len(data)
-    draw_check(n_draws, n_draws_in_data,)
-    data = data[:n_draws]
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = data[:n_draws]
     
     return data
 
@@ -282,8 +292,9 @@ def load_variant_risk_ratio(rates_root: Path, n_draws: int,) -> List:
         data = pickle.load(file)
     
     n_draws_in_data = len(data)
-    draw_check(n_draws, n_draws_in_data,)
-    data = data[:n_draws]
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = data[:n_draws]
     
     return data
 
@@ -329,11 +340,12 @@ def load_em_scalars(rates_root: Path, n_draws: int,) -> pd.DataFrame:
     data = data.reset_index()
     
     n_draws_in_data = data['draw'].max() + 1    
-    draw_check(n_draws, n_draws_in_data,)
-    data = (data
-            .set_index('draw')
-            .loc[list(range(n_draws))]
-            .reset_index())
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = (data
+                .set_index('draw')
+                .loc[list(range(n_draws))]
+                .reset_index())
     
     data = (data
             .set_index(['location_id', 'draw',])
@@ -348,8 +360,9 @@ def load_durations(rates_root: Path, n_draws: int,) -> List[Dict[str, int]]:
         data = pickle.load(file)
     
     n_draws_in_data = len(data)
-    draw_check(n_draws, n_draws_in_data,)
-    data = data[:n_draws]
+    downsample = draw_check(n_draws, n_draws_in_data,)
+    if downsample:
+        data = data[:n_draws]
         
     return data
 
