@@ -36,6 +36,12 @@ from covid_model_infections import runner
               type=click.INT,
               default=0,
               help='Number of days of data to drop.')
+@click.option('--fh',
+              is_flag=True,
+              help='Whether to run Fred Hutch small area hierarchy or not.')
+@click.option('--gbd',
+              is_flag=True,
+              help='Whether to run GBD hierarchy or not.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,
               help='Marks the new outputs as best in addition to marking them as latest.')
@@ -47,10 +53,16 @@ def run_infections(run_metadata,
                    model_inputs_version,
                    rates_version,
                    output_root, n_draws, n_holdout_days,
+                   fh, gbd,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
     """Run infections model."""
     cli_tools.configure_logging_to_terminal(verbose)
+    
+    if fh and gbd:
+        raise ValueError('Cannot specify Fred Hutch hierarchy AND GBD hierarchy - '
+                         'must be one or the other (or nethier).')
+    
     model_inputs_root = cli_tools.get_last_stage_directory(model_inputs_version,
                                                            last_stage_root=paths.MODEL_INPUTS_ROOT)
     rates_root = cli_tools.get_last_stage_directory(rates_version,
@@ -68,7 +80,7 @@ def run_infections(run_metadata,
     app_metadata, _ = main(model_inputs_root,
                            rates_root,
                            run_directory, n_holdout_days, n_draws,
-                          )
+                           fh, gbd,)
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
                                  mark_dir_as_best, production_tag)

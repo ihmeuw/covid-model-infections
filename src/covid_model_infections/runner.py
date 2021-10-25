@@ -24,9 +24,14 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     rates_root: Path,
                     output_root: Path,
                     holdout_days: int,
-                    n_draws: int,):
+                    n_draws: int,
+                    fh: bool,
+                    gbd: bool,):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
+    
+    if fh:
+        raise ValueError('Fred Hutch not implemented.')
 
     logger.info('Creating directories.')
     model_in_dir = output_root / 'model_inputs'
@@ -39,7 +44,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     shell_tools.mkdir(infections_draws_dir)
 
     logger.info('Loading supplemental data.')
-    hierarchy = data.load_hierarchy(model_inputs_root)
+    hierarchy = data.load_hierarchy(model_inputs_root, gbd,)
     pop_data = data.load_population(model_inputs_root)
 
     logger.info('Loading epi report data.')
@@ -78,7 +83,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     idr = data.load_idr(rates_root, n_draws, (0., 1.),)
     idr_model_data = data.load_idr_data(rates_root)
     
-    logger.info('Loading scalars.')
+    logger.info('Loading total Covid scalars.')
     em_scalar_data = data.load_em_scalars(rates_root, n_draws,)
 
     logger.info('Loading durations for each draw.')
@@ -99,6 +104,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     baseline_ihr_locations = ihr.reset_index()['location_id'].unique().tolist()
     baseline_idr_locations = idr.reset_index()['location_id'].unique().tolist()
     baseline_evp_locations = escape_variant_prevalence.reset_index()['location_id'].unique().tolist()
+    baseline_scalar_locations = em_scalar_data.reset_index()['location_id'].unique().tolist()
     for location_id, path_to_top_parent, location_name in zip(location_ids, path_to_top_parents, location_names):
         # DEATHS
         if location_id not in baseline_ifr_locations:
@@ -143,6 +149,17 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     logger.info(f'Using parent escape variant prevalence for {location_name}.')
                     escape_variant_prevalence = escape_variant_prevalence.append(
                         pd.concat({location_id: escape_variant_prevalence.loc[int(parent_id)]}, names=['location_id'])
+                    )
+                    break
+                else:
+                    pass
+        # TOTAL COVID SCALAR
+        if location_id not in baseline_scalar_locations:
+            for parent_id in reversed(path_to_top_parent.split(',')[:-1]):
+                if int(parent_id) in baseline_scalar_locations:
+                    logger.info(f'Using parent total Covid scalar for {location_name}.')
+                    em_scalar_data = em_scalar_data.append(
+                        pd.concat({location_id: em_scalar_data.loc[int(parent_id)]}, names=['location_id'])
                     )
                     break
                 else:
@@ -229,7 +246,8 @@ def make_infections(app_metadata: cli_tools.Metadata,
     agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
     
     logger.info(f"Getting regional average for the following locations {', '.join([str(sl) for sl in SUB_LOCATIONS])}.")
-    sub_infections_draws = pd.concat([aggregation.fill_w_region(sub_location, infections_draws.append(agg_infections_draws).copy(),
+    sub_infections_draws = pd.concat([aggregation.fill_w_region(sub_location,
+                                                                infections_draws.append(agg_infections_draws).copy(),
                                                                 hierarchy.copy(), pop_data.copy()) 
                                       for sub_location in SUB_LOCATIONS])
     
