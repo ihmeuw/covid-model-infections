@@ -46,13 +46,14 @@ def compile_input_data_object(location_id: int,
     return location_model_data, modeled_location
 
 
-def load_model_inputs(location_id: int, model_in_dir: Path) -> Tuple[Dict, float]:
+def load_model_inputs(location_id: int, model_in_dir: Path, verbose: bool = True) -> Tuple[Dict, float]:
     hierarchy_path = model_in_dir / 'hierarchy.parquet'
     hierarchy = pd.read_parquet(hierarchy_path)
     location_name = hierarchy.loc[hierarchy['location_id'] == location_id, 'location_name'].item()
     path_to_top_parent = hierarchy.loc[hierarchy['location_id'] == location_id, 'path_to_top_parent'].item()
     is_us = '102' in path_to_top_parent.split(',')
-    logger.info(f'Model location: {location_name}')
+    if verbose:
+        logger.info(f'Model location: {location_name}')
     
     em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
     em_scalar_data = pd.read_parquet(em_scalar_path)
