@@ -436,8 +436,11 @@ def trim_leading_zeros(cumul_data: List[pd.Series],
     return trimmed_data
 
 
-def load_hierarchy(model_inputs_root:Path) -> pd.DataFrame:
-    data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+def load_hierarchy(model_inputs_root:Path, gbd: bool,) -> pd.DataFrame:
+    if gbd:
+        data_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
+    else:
+        data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
 #     logger.warning('Using ZAF subnats...')
