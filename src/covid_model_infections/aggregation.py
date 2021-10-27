@@ -200,7 +200,12 @@ def fill_w_region(sub_location: int, infections_draws: pd.DataFrame,
 
 def get_sub_loc_deaths(sub_location: int, n_draws: int,
                        sub_infections_draws: pd.DataFrame, ifr: pd.DataFrame,
-                       durations: List[Dict], cumul_deaths: pd.Series,) -> Tuple[pd.DataFrame, pd.Series]:
+                       durations: List[Dict], reported_deaths: pd.Series,) -> Tuple[pd.DataFrame, pd.Series]:
+    if sub_location in reported_deaths.reset_index()['location_id'].to_list():
+        reported_deaths = reported_deaths.loc[sub_location]
+    else:
+        reported_deaths = 1
+        
     loc_deaths = []
     loc_scalar = []
     for draw in range(n_draws):
@@ -211,11 +216,7 @@ def get_sub_loc_deaths(sub_location: int, n_draws: int,
         _deaths = (_deaths * _ifr).dropna().rename(f'draw_{draw}')
         trim_days = durations[draw]['exposure_to_death'] - durations[draw]['exposure_to_case']
         _deaths = _deaths[:-trim_days]
-        if sub_location in cumul_deaths.reset_index()['location_id'].unique():
-            reported = cumul_deaths.loc[sub_location].max()
-        else:
-            reported = 1
-        loc_scalar.append(_deaths.sum() / reported)
+        loc_scalar.append(_deaths.sum() / reported_deaths)
         loc_deaths.append(_deaths)
     loc_deaths = pd.concat(loc_deaths, axis=1).dropna()
     loc_deaths['location_id'] = sub_location
