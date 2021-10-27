@@ -446,7 +446,7 @@ def run_model(location_id: int,
               infection_log: bool = True, infection_knot_days: int = 28,
               mp: bool = True,):
     logger.info('Loading data.')
-    input_data, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
+    input_data, pred_rates, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
     modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
@@ -635,7 +635,7 @@ def run_model(location_id: int,
 
     logger.info('Creating and writing ratios.')
     ratio_measure_map = {
-        'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr'
+        'cases':'idr', 'hospitalizations':'ihr', 'deaths':'ifr',
     }
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     for measure in input_data.keys():
@@ -652,8 +652,34 @@ def run_model(location_id: int,
                        .sort_index())
         ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.parquet'
         ratio_draws.to_parquet(ratio_path)
+    for measure in [m for m in ratio_measure_map.keys() if m not in list(input_data.keys())]:
+        ratio_draws = pred_rates[ratio_measure_map[measure]][['ratio']]
+        ratio_draws['location_id'] = location_id
+        ratio_draws = ratio_draws.reset_index()
+        ratio_draws = pd.pivot_table(ratio_draws, index=['location_id', 'date'], columns='draw', values='ratio')
+        ratio_draws.columns = [f'draw_{d}' for d in range(n_draws)]
+        ratio_path = Path(model_out_dir) / f'{location_id}_{ratio_measure_map[measure]}_draws.parquet'
+        ratio_draws.to_parquet(ratio_path)
+    ifr_rr = pred_rates['ifr_rr']
+    ifr_rr['location_id'] = location_id
+    ifr_rr = (ifr_rr
+               .reset_index()
+               .set_index(['location_id', 'draw', 'date'])
+               .sort_index())
+    ifr_rr_path = Path(model_out_dir) / f'{location_id}_ifr_rr_draws.parquet'
+    ifr_rr.to_parquet(ifr_rr_path)
     
-    logger.info('Writing output draws.')
+    logger.info('Writing total Covid scalars.')
+    if 'deaths' in list(input_data.keys()):
+        em_scalar_data = input_data['deaths']['scalar'].reset_index()
+        em_scalar_data['location_id'] = location_id
+        em_scalar_data = (em_scalar_data
+                          .set_index(['location_id', 'draw'])
+                          .sort_index())
+        em_scalar_path = Path(model_out_dir) / f'{location_id}_em_scalar_data.parquet'
+        em_scalar_data.to_parquet(em_scalar_path)
+    
+    logger.info('Writing output infections draws.')
     output_draws = pd.concat({location_id: output_draws.sort_index()}, names=['location_id'])
     draw_path = Path(model_out_dir) / f'{location_id}_infections_draws.parquet'
     output_draws.to_parquet(draw_path)

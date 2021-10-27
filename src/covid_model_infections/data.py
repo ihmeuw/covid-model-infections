@@ -7,12 +7,80 @@ import pandas as pd
 import numpy as np
 
 
-def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str) -> Tuple[pd.DataFrame, Dict]:
+def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
+                fh: bool,) -> Tuple[pd.DataFrame, Dict]:
     manipulation_metadata = {}
+    
+    if fh:
+        # is_post_Jun8 = data['date'] > pd.Timestamp('2021-06-08')
+        # fl_hierarchy = hierarchy.loc[hierarchy['path_to_top_parent'].apply(lambda x: '532' in x.split(',')),
+        #                              'location_id'].to_list()
+        # is_fl_hierarchy = data['location_id'].isin(fl_hierarchy)
+        # missed_qc = [44633, 725, 807, 794, 1127, 1450, 1714, 2053, 2320, 2555, 2924, 2915, 3042,
+        #              2018, 3346, 3358, 3543, 60913,]
+        # is_missed_qc = data['location_id'].isin(missed_qc)
+        # data = data.loc[~(is_post_Jun8 & (is_fl_hierarchy | is_missed_qc))].reset_index(drop=True)
+        # manipulation_metadata['florida_counties'] = f'dropped {input_measure} post June 8th'
+        # manipulation_metadata['missed_qc_counties'] = f'dropped {input_measure} post June 8th'
+        
+        is_md = hierarchy['most_detailed'] == 1
+        is_col_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '125' in x.split(','))
+        # is_pr_hierarchy = hierarchy['path_to_top_parent'].apply(lambda x: '385' in x.split(','))
+        col_hierarchy = hierarchy.loc[is_md & is_col_hierarchy]
+        # pr_hierarchy = hierarchy.loc[is_md & is_pr_hierarchy]
+        fh_col_ids = col_hierarchy['location_id'].to_list()
+        # fh_pr_ids = pr_hierarchy['location_id'].to_list()
+        fh_col_labels = col_hierarchy['location_ascii_name'].str.replace('[^a-zA-Z ]', '').str.replace(' ', '_').str.lower().to_list()
+        # fh_pr_labels = pr_hierarchy['location_ascii_name'].str.replace('[^a-zA-Z ]', '').str.replace(' ', '_').str.lower().to_list()
+        fh_col_subnats = list(zip(fh_col_ids, fh_col_labels))
+        # fh_pr_subnats = list(zip(fh_pr_ids, fh_pr_labels))
+    else:
+        fh_col_subnats = []
+        # fh_pr_subnats = []
+    
     if input_measure == 'cases':
-        pass
+        for location_id, location_label in fh_col_subnats:
+            is_fh_col_subnat = data['location_id'] == location_id
+            last_date = data.loc[is_fh_col_subnat, 'date'].max()
+            last_date_sub_2w = last_date - pd.Timedelta(days=14)
+            is_last_2w = data['date'] > last_date_sub_2w
+            data = data.loc[~(is_fh_col_subnat & is_last_2w)].reset_index(drop=True)
+            manipulation_metadata[location_label] = 'dropped last 14 days of cases'
 
     elif input_measure == 'hospitalizations':
+        ## crazy county-level data
+        county_hosp_drop = [(3397, 'fairfax_county'),
+                            (725, 'pulaski_county'),
+                            (3042, 'knox_county'),
+                            (775, 'placer_county'),
+                            (933, 'orange_county'),
+                            # (891, 'dc_counties'),
+                            # (2807, 'lane_county'),
+                            # (3173, 'dallas_county'),
+                            # (3604, 'kanawha_county'),
+                            # (2998, 'union_county'),
+                            # (1085, 'ben_hill_county'),
+                            (807, 'san_bernadino'),
+                            (837, 'denver'),
+                            (1312, 'hendricks'),
+                            (1694, 'ouachita'),
+                            (2343, 'rockingham'),
+                            (2555, 'robeson'),
+                            (2782, 'umatilla'),
+                            (828, 'boulder'),
+                            (879, 'broomfield'),
+                            (939, 'pinellas'),
+                            (1127, 'benewah'),
+                            (1493, 'wyandotte'),
+                            (2255, 'garden'),
+                            (2303, 'phelps'),
+                            (2684, 'warren'),
+                            (2931, 'charleston'),]
+        for location_id, location_label in county_hosp_drop:
+            is_county = data['location_id'] == location_id
+            data = data.loc[~is_county].reset_index(drop=True)
+            manipulation_metadata[location_label] = 'dropped all hospitalizations'
+        
         ## hosp/IHR == admissions too low
         is_argentina = data['location_id'] == 97
         data = data.loc[~is_argentina].reset_index(drop=True)
@@ -89,6 +157,14 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str)
         is_pre_march = data['date'] < pd.Timestamp('2020-03-01')
         data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
         manipulation_metadata['ohio'] = 'dropped death before March 1'
+        
+        for location_id, location_label in fh_col_subnats:
+            is_fh_col_subnat = data['location_id'] == location_id
+            last_date = data.loc[is_fh_col_subnat, 'date'].max()
+            last_date_sub_2w = last_date - pd.Timedelta(days=14)
+            is_last_2w = data['date'] > last_date_sub_2w
+            data = data.loc[~(is_fh_col_subnat & is_last_2w)].reset_index(drop=True)
+            manipulation_metadata[location_label] = 'dropped last 14 days of deaths'
     
     else:
         raise ValueError(f'Input measure {input_measure} does not have a protocol for exclusions.')
@@ -367,11 +443,15 @@ def load_durations(rates_root: Path, n_draws: int,) -> List[Dict[str, int]]:
     return data
 
 
-def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_measure: str,) -> Tuple[pd.Series, pd.Series, Dict]:
-    if input_measure == 'deaths':
-        data_path = model_inputs_root / 'full_data_unscaled.csv'
+def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
+                      input_measure: str, fh: bool,) -> Tuple[pd.Series, pd.Series, Dict]:
+    if fh:
+        data_path = model_inputs_root / 'full_data_fh_subnationals_unscaled.csv'
     else:
-        data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+        if input_measure == 'deaths':
+            data_path = model_inputs_root / 'full_data_unscaled.csv'
+        else:
+            data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Confirmed': 'cumulative_cases',
                                 'Hospitalizations': 'cumulative_hospitalizations',
@@ -385,7 +465,7 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame, input_mea
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
 
-    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure)
+    data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh,)
     
     data[f'daily_{input_measure}'] = (data
                                       .groupby('location_id')[f'cumulative_{input_measure}']
@@ -436,9 +516,11 @@ def trim_leading_zeros(cumul_data: List[pd.Series],
     return trimmed_data
 
 
-def load_hierarchy(model_inputs_root:Path, gbd: bool,) -> pd.DataFrame:
+def load_hierarchy(model_inputs_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
     if gbd:
         data_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
+    elif fh:
+        data_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
     else:
         data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
