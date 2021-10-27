@@ -94,6 +94,7 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
 
     logger.info('Compiling model input data and writing intermediate files.')
     model_data = {
+        'fh': fh, 'gbd': gbd,
         'durations': durations,
         'daily_deaths': daily_deaths, 'cumul_deaths': cumul_deaths, 'ifr': ifr, 'ifr_rr': ifr_rr,
         'daily_hospital': daily_hospital, 'cumul_hospital': cumul_hospital, 'ihr': ihr,

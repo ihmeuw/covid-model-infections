@@ -39,7 +39,8 @@ def compile_input_data_object(location_id: int, hierarchy: pd.DataFrame,
                               durations: List[Dict[str, int]],
                               daily_deaths: pd.Series, cumul_deaths: pd.Series, ifr: pd.Series, ifr_rr: pd.Series,
                               daily_hospital: pd.Series, cumul_hospital: pd.Series, ihr: pd.Series,
-                              daily_cases: pd.Series, cumul_cases: pd.Series, idr: pd.Series,):
+                              daily_cases: pd.Series, cumul_cases: pd.Series, idr: pd.Series,
+                              **kwargs,):
     location_model_data = {}
     modeled_location = False
     
@@ -112,16 +113,18 @@ def load_model_inputs(location_id: int, model_in_dir: Path, verbose: bool = True
     all_populations = pd.read_parquet(pop_path)
     population = all_populations.loc[location_id].item()
     
-    em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
-    em_scalar_data = pd.read_parquet(em_scalar_path)
-    em_scalar_data = parent_inheritance(
-        location_id, hierarchy, em_scalar_data, 'total covid scalar',
-    )
-    em_scalar_data = em_scalar_data.loc[location_id, 'em_scalar']
-    
     model_data_path = model_in_dir / 'model_data.pkl'
     with model_data_path.open('rb') as file:
         model_data = pickle.load(file)
+    
+    em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
+    em_scalar_data = pd.read_parquet(em_scalar_path)
+    if model_data['fh']:
+        em_scalar_data = parent_inheritance(
+            location_id, hierarchy, em_scalar_data, 'total covid scalar',
+        )
+    em_scalar_data = em_scalar_data.loc[location_id, 'em_scalar']
+    
     model_data, pred_rates, modeled_location = compile_input_data_object(
         location_id=location_id, hierarchy=hierarchy, em_scalar_data=em_scalar_data,
         **model_data
