@@ -20,6 +20,7 @@ from covid_model_infections.model import data, mr_spline, plotter
 from covid_model_infections.utils import CEILINGS, TRIM_LOCATIONS
 from covid_model_infections.cluster import TYPE_SPECS
 
+MEASURE_LOG_OFFSET = 1
 INFECTIONS_LOG_OFFSET = 50
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
@@ -76,7 +77,7 @@ def model_measure(measure: str, measure_type: str,
     logger.info('Generating smooth past curve.')
     input_data = input_data.clip(FLOOR, np.inf)
     if log:
-        input_data += INFECTIONS_LOG_OFFSET
+        input_data += MEASURE_LOG_OFFSET
     _, smooth_data, _ = mr_spline.estimate_time_series(
         data=input_data.reset_index(),
         dep_var=measure,
@@ -91,8 +92,8 @@ def model_measure(measure: str, measure_type: str,
     
     logger.info('Converting to infections.')
     if log:
-        input_data -= INFECTIONS_LOG_OFFSET
-        smooth_data -= INFECTIONS_LOG_OFFSET
+        input_data -= MEASURE_LOG_OFFSET
+        smooth_data -= MEASURE_LOG_OFFSET
     if measure_type == 'cumul':
         input_data = input_data.diff().fillna(input_data)
         smooth_data = smooth_data.diff().fillna(smooth_data)
