@@ -75,7 +75,8 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
                             (2255, 'garden'),
                             (2303, 'phelps'),
                             (2684, 'warren'),
-                            (2931, 'charleston'),]
+                            (2931, 'charleston'),
+                            (2476, 'vance'),]
         for location_id, location_label in county_hosp_drop:
             is_county = data['location_id'] == location_id
             data = data.loc[~is_county].reset_index(drop=True)
