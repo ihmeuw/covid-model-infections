@@ -129,7 +129,7 @@ def plotter(plot_dir: Path, location_id: int, location_name: str,
     infection_daily_data = {mm: pd.concat(output_data[mm]['infections_daily'], axis=1).dropna().mean(axis=1)[1:] 
                             for mm in model_measures}
     model_plot(dailymodel_ax, 'Infections', 'Daily infections', infection_daily_data, None,
-               smooth_infections[1:],
+               smooth_infections.dropna()[1:],
                output_draws.dropna()[1:], start_date, end_date, False)
     #whitespace_mid = fig.add_subplot(gs[5:7, 2])
     #whitespace_mid.axis('off')
