@@ -94,6 +94,8 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
     escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
 
     logger.info('Compiling model input data and writing intermediate files.')
+    if no_deaths:
+        logger.warning('Not using deaths to estimate infections.')
     model_data = {
         'no_deaths': no_deaths,
         'durations': durations,

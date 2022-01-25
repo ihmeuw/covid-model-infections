@@ -106,6 +106,8 @@ def model_measure(measure: str, measure_type: str,
   
     raw_infections = []
     smooth_infections = []
+    if measure == 'deaths' and no_deaths:
+        logger.warning('Setting deaths-based infections to NA.')
     for draw in range(n_draws):
         # raw_infections = pd.concat([input_data, ratio.loc[draw]], axis=1)
         # raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name])
@@ -492,11 +494,14 @@ def run_model(location_id: int,
     measures = list(output_data.keys())
     if is_us and 'hospitalizations' in measures:
         measures += ['hospitalizations']
-        measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
+    if no_deaths:
+        measures = [m for m in measures if m != 'deaths']
+    if len(measures) > 1:
+        mv_random_state = get_random_state(f'measure_variances_{location_id}')
+        measure_variances = mv_random_state.uniform(0.1, 0.9, n_draws).tolist()
     else:
-        measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
-    mv_random_state = get_random_state(f'measure_variances_{location_id}')
-    measure_variances = mv_random_state.uniform(0.1, 0.9, n_draws).tolist()
+        measure_variances = np.ones(n_draws).tolist()
+    measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
     weights = pd.DataFrame({'measure': measures, 'avg_variance': measure_variances, 'n': 1,})
     logger.info(f"Weights: \n:{weights.groupby('measure').agg({'n': pd.Series.count, 'avg_variance': pd.Series.mean})}")
     del weights
