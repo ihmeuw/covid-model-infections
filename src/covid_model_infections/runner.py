@@ -41,7 +41,8 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
                        model_in_dir: Path,
                        n_draws: int,
                        fh: bool,
-                       gbd: bool,):
+                       gbd: bool,
+                       no_deaths: bool,):
     logger.info('Loading supplemental data.')
     hierarchy = data.load_hierarchy(model_inputs_root, fh, gbd,)
     pop_data = data.load_population(model_inputs_root)
@@ -94,7 +95,7 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
 
     logger.info('Compiling model input data and writing intermediate files.')
     model_data = {
-        'fh': fh, 'gbd': gbd,
+        'no_deaths': no_deaths,
         'durations': durations,
         'daily_deaths': daily_deaths, 'cumul_deaths': cumul_deaths, 'ifr': ifr, 'ifr_rr': ifr_rr,
         'daily_hospital': daily_hospital, 'cumul_hospital': cumul_hospital, 'ihr': ihr,
@@ -428,14 +429,15 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     holdout_days: int,
                     n_draws: int,
                     fh: bool,
-                    gbd: bool,):
+                    gbd: bool,
+                    no_deaths: bool,):
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
     
     model_in_dir, model_out_dir, plot_dir, infections_draws_dir = build_directories(output_root)
 
     app_metadata, hierarchy, estimated_ratios, variant_risk_ratio, agg_plot_inputs, durations, reported_deaths = prepare_input_data(
-        app_metadata, model_inputs_root, rates_root, model_in_dir, n_draws, fh, gbd,
+        app_metadata, model_inputs_root, rates_root, model_in_dir, n_draws, fh, gbd, no_deaths,
     )
 
     run_location_models(

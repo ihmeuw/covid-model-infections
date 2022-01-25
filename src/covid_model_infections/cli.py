@@ -42,6 +42,9 @@ from covid_model_infections import runner
 @click.option('--gbd',
               is_flag=True,
               help='Whether to run GBD hierarchy or not.')
+@click.option('--no-deaths',
+              is_flag=True,
+              help='Whether to exclude deaths from the process of estimating infections.')
 @click.option('-b', '--mark-best', 'mark_dir_as_best',
               is_flag=True,
               help='Marks the new outputs as best in addition to marking them as latest.')
@@ -54,6 +57,7 @@ def run_infections(run_metadata,
                    rates_version,
                    output_root, n_draws, n_holdout_days,
                    fh, gbd,
+                   no_deaths,
                    mark_dir_as_best, production_tag,
                    verbose, with_debugger):
     """Run infections model."""
@@ -80,7 +84,8 @@ def run_infections(run_metadata,
     app_metadata, _ = main(model_inputs_root,
                            rates_root,
                            run_directory, n_holdout_days, n_draws,
-                           fh, gbd,)
+                           fh, gbd,
+                           no_deaths,)
 
     cli_tools.finish_application(run_metadata, app_metadata, run_directory,
                                  mark_dir_as_best, production_tag)

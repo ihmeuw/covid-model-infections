@@ -35,7 +35,8 @@ def model_measure(measure: str, measure_type: str,
                   log: bool, knot_days: int,
                   num_submodels: int,
                   split_l_interval: bool,
-                  split_r_interval: bool,) -> Dict:
+                  split_r_interval: bool,
+                  no_deaths: bool,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
@@ -110,11 +111,15 @@ def model_measure(measure: str, measure_type: str,
         # raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name])
         _raw_infections = ((input_data * scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
         _raw_infections.index -= pd.Timedelta(days=lags[draw])
+        if measure == 'deaths' and no_deaths:
+            _raw_infections *= np.nan
         raw_infections.append(_raw_infections)
         # smooth_infections = pd.concat([smooth_data, ratio.loc[draw]], axis=1)
         # smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
         _smooth_infections = ((smooth_data * scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
         _smooth_infections.index -= pd.Timedelta(days=lags[draw])
+        if measure == 'deaths' and no_deaths:
+            _smooth_infections *= np.nan
         smooth_infections.append(_smooth_infections)
 
     return {'daily': smooth_data, 'cumul': smooth_data.cumsum(),
@@ -448,7 +453,7 @@ def run_model(location_id: int,
               mp: bool = True,):
     logger.info('Loading data.')
     input_data, pred_rates, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
-    modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
+    modeled_location, population, location_name, is_us, no_deaths = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
     loc_seed = get_random_seed(location_name)
@@ -462,7 +467,8 @@ def run_model(location_id: int,
                                           measure_data['ratio']['ratio'].copy(),
                                           population, n_draws, measure_data['lags'],
                                           measure_log, measure_knot_days, num_submodels=1,
-                                          split_l_interval=False, split_r_interval=False,)
+                                          split_l_interval=False, split_r_interval=False,
+                                          no_deaths=no_deaths,)
                    for measure, measure_data in input_data.items()}
     for input_measure in input_data.keys():
         infections_inputs = [enforce_ratio_ceiling(output_measure,
