@@ -13,7 +13,7 @@ from loguru import logger
 PROJECT = 'proj_covid_prod'
 QUEUE = 'all.q'
 TYPE_SPECS = {
-    'covid_loc_inf': {'F_MEM': '16.0G',
+    'covid_loc_inf': {'F_MEM': '12.0G',
                       'F_THREAD': '3',
                       'OMP_NUM_THREADS': '3',
                       'MKL_NUM_THREADS': '3',},
