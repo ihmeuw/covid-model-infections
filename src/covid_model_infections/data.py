@@ -616,25 +616,3 @@ def write_ratio_draws(data_list: List[pd.Series],
     # data.to_parquet(out_path, engine='fastparquet', compression='gzip')
     
     return out_path
-
-
-# def store_df(data: pd.DataFrame, path: Path, filename: str, fmt: str,):
-#     if fmt == 'csv':
-#         full_path = path / f'{filename}.csv'
-#         data.to_csv(full_path)
-#     elif fmt == 'parquet':
-#         full_path = path / f'{filename}.parquet'
-#         data.to_parquet(full_path, engine='fastparquet', compression='gzip')
-#     else:
-#         raise ValueError(f'Invalid file format specified: {fmt}')
-
-
-# def load_df(path: Path, filename: str, fmt: str,):
-#     if fmt == 'csv':
-#         full_path = path / f'{filename}.csv'
-#         data = pd.read_csv(full_path)
-#     elif fmt == 'parquet':
-#         full_path = path / f'{filename}.parquet'
-#         data = pd.read_parquet(full_path, engine='fastparquet')
-#     else:
-#         raise ValueError(f'Invalid file format specified: {fmt}')

@@ -212,7 +212,6 @@ def collect_results(app_metadata: cli_tools.Metadata,
 
 def aggregate_and_plot(hierarchy: pd.DataFrame,
                        fh: bool,
-                       gbd: bool,
                        inputs: Dict,
                        outputs: Dict,
                        infections_draws: pd.DataFrame,
@@ -233,12 +232,7 @@ def aggregate_and_plot(hierarchy: pd.DataFrame,
     agg_outputs = aggregation.aggregate_md_data_dict(outputs.copy(), hierarchy, measures, 1)
 
     logger.info('Aggregating final infections draws.')
-    if gbd:
-        agg_infections_draws = aggregation.aggregate_md_draws(
-            infections_draws.copy(), hierarchy.loc[hierarchy['level'] >= 3], MP_THREADS
-        )
-    else:
-        agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
+    agg_infections_draws = aggregation.aggregate_md_draws(infections_draws.copy(), hierarchy, MP_THREADS)
     
     if not fh:
         logger.info(f"Getting regional average for the following locations {', '.join([str(sl) for sl in SUB_LOCATIONS])}.")
@@ -457,7 +451,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     )
     
     sub_infections_draws = aggregate_and_plot(
-        hierarchy, fh, gbd, inputs, outputs, infections_draws, plot_dir, output_root, **agg_plot_inputs,
+        hierarchy, fh, inputs, outputs, infections_draws, plot_dir, output_root, **agg_plot_inputs,
     )
 
     write_seir_inputs(
