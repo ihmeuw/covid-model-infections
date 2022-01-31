@@ -19,3 +19,8 @@ SUB_LOCATIONS = [
 TRIM_LOCATIONS = [
     # ...
 ]
+
+DEPLETION_LOCATIONS = [
+    4863,  # Mizoram
+    53617,  # Gilgit-Baltistan
+]

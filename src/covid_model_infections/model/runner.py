@@ -17,7 +17,11 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import CEILINGS, TRIM_LOCATIONS
+from covid_model_infections.utils import (
+    CEILINGS,
+    TRIM_LOCATIONS,
+    DEPLETION_LOCATIONS
+)
 from covid_model_infections.cluster import TYPE_SPECS
 
 MEASURE_LOG_OFFSET = 1
@@ -25,7 +29,7 @@ INFECTIONS_LOG_OFFSET = 50
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 NUM_SUBMODELS = 7
-CEILING = 0.9
+NON_SUSCEPTIBLE_CEILING = 0.9
 
 
 def model_measure(measure: str, measure_type: str,
@@ -411,7 +415,7 @@ def squeeze(daily_infections: pd.Series,
             cross_variant_immunity: float,
             escape_variant_prevalence: pd.Series,
             vaccine_coverage: pd.DataFrame,
-            ceiling: float = CEILING,) -> pd.Series:
+            ceiling: float,) -> pd.Series:
     escape_variant_prevalence = (pd.concat([daily_infections,
                                             escape_variant_prevalence], axis=1))
     escape_variant_prevalence = escape_variant_prevalence.fillna(0)
@@ -596,17 +600,30 @@ def run_model(location_id: int,
         output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
     else:
         output_draws = enumerate([output_draws[dc].dropna() for dc in output_draws.columns])
+    if location_id in DEPLETION_LOCATIONS:
+        logger.warning('Depleting susceptible pool in SEIR - lowering non-susceptible proportion ceiling.')
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING * 0.9
+    else:
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING
     _od1 = []
     for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
         _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),))
+                            escape_variant_prevalence.copy(), vaccine_data.copy(),
+                            non_susceptible_ceiling,))
     _od2 = []
     _od1 = enumerate(_od1)
     for n, output_draw in tqdm(_od1, total=n_draws, file=sys.stdout):
         _od2.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),))
-    output_draws = pd.concat(_od2, axis=1)
-    del _od1, _od2
+                            escape_variant_prevalence.copy(), vaccine_data.copy(),
+                            non_susceptible_ceiling,))
+    _od3 = []
+    _od2 = enumerate(_od2)
+    for n, output_draw in tqdm(_od2, total=n_draws, file=sys.stdout):
+        _od3.append(squeeze(output_draw, population, cross_variant_immunity[n],
+                            escape_variant_prevalence.copy(), vaccine_data.copy(),
+                            non_susceptible_ceiling,))
+    output_draws = pd.concat(_od3, axis=1)
+    del _od1, _od2, _od3
 
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     output_draws_list = [enforce_ratio_ceiling('posterior infections',
