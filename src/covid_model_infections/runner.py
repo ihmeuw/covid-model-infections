@@ -141,7 +141,8 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
     return app_metadata, hierarchy, estimated_ratios, variant_risk_ratio, agg_plot_inputs, durations, reported_deaths
 
 
-def run_location_models(hierarchy: pd.DataFrame,
+def run_location_models(gbd: bool,
+                        hierarchy: pd.DataFrame,
                         n_draws: int,
                         model_in_dir: Path,
                         model_out_dir: Path,
@@ -155,7 +156,10 @@ def run_location_models(hierarchy: pd.DataFrame,
                       location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
         for location_id in location_ids if location_id not in SUB_LOCATIONS
     }
-    cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map)
+    if gbd:
+        cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map, 'gbd')
+    else:
+        cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map, 'standard')
     
     
 def collect_results(app_metadata: cli_tools.Metadata,
@@ -443,7 +447,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     )
 
     run_location_models(
-        hierarchy, n_draws, model_in_dir, model_out_dir, plot_dir, output_root,
+        gbd, hierarchy, n_draws, model_in_dir, model_out_dir, plot_dir, output_root,
     )
     
     app_metadata, infections_draws, inputs, outputs, em_scalar_data, deaths = collect_results(

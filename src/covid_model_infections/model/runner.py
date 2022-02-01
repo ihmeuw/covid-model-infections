@@ -22,7 +22,7 @@ from covid_model_infections.utils import (
     TRIM_LOCATIONS,
     DEPLETION_LOCATIONS
 )
-from covid_model_infections.cluster import TYPE_SPECS
+from covid_model_infections.cluster import RESOURCES
 
 MEASURE_LOG_OFFSET = 1
 INFECTIONS_LOG_OFFSET = 50
@@ -717,8 +717,8 @@ def run_model(location_id: int,
 if __name__ == '__main__':
     configure_logging_to_terminal(verbose=2)
 
-    os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_loc_inf']['OMP_NUM_THREADS']
-    os.environ['MKL_NUM_THREADS'] = TYPE_SPECS['covid_loc_inf']['MKL_NUM_THREADS']
+    os.environ['OMP_NUM_THREADS'] = RESOURCES['OMP_NUM_THREADS']
+    os.environ['MKL_NUM_THREADS'] = RESOURCES['MKL_NUM_THREADS']
     
     run_model(location_id=int(sys.argv[1]),
               n_draws=int(sys.argv[2]),
