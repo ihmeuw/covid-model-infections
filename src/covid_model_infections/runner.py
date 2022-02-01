@@ -437,6 +437,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
                     fh: bool,
                     gbd: bool,
                     no_deaths: bool,):
+    logger.info(f'Model run initiated -- {str(output_root)}.')
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
     
