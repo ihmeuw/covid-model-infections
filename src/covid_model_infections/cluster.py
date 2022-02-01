@@ -80,7 +80,7 @@ def do_qsub(session, job_type: str, job_name: str, output_root: Path, script_arg
     job_template.nativeSpecification = (f'-V '  # Export all environment variables
                                         f'-b y '  # Command is a binary (python)
                                         f'-P {PROJECT} '
-                                        f'-q {QUEUE} '
+                                        f'-q {QUEUE[process_key]} '
                                         f"-l fmem={RESOURCES[process_key]['fmem']} "
                                         f"-l fthread={RESOURCES[process_key]['fthread']} "
                                         f'-l h_rt={H_RUNTIME} '
