@@ -467,7 +467,7 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
             .reset_index(drop=True))
     
     logger.debug(f'EXCLUDING ALL {input_measure.upper()} DATA AFTER 11/31/2021.')
-    data = data.loc[data['date'] >= pd.Timestamp('2021-11-31')]
+    data = data.loc[data['date'] < pd.Timestamp('2021-12-01')]
     
     data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh,)
     
