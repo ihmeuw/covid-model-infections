@@ -36,7 +36,6 @@ def build_directories(output_root: Path):
     
     
 def prepare_input_data(app_metadata: cli_tools.Metadata,
-                       model_inputs_root: Path,
                        rates_root: Path,
                        model_in_dir: Path,
                        n_draws: int,
@@ -44,18 +43,18 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
                        gbd: bool,
                        no_deaths: bool,):
     logger.info('Loading supplemental data.')
-    hierarchy = data.load_hierarchy(model_inputs_root, fh, gbd,)
-    pop_data = data.load_population(model_inputs_root)
+    hierarchy = data.load_hierarchy(rates_root, fh, gbd,)
+    pop_data = data.load_population(rates_root)
 
     logger.info('Loading epi report data.')
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths', fh,
+        rates_root, hierarchy, 'deaths', fh,
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'hospitalizations', fh,
+        rates_root, hierarchy, 'hospitalizations', fh,
     )
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'cases', fh,
+        rates_root, hierarchy, 'cases', fh,
     )
 
     cumul_deaths, cumul_hospital, cumul_cases,\
@@ -429,7 +428,6 @@ def write_seir_inputs(model_out_dir: Path,
 
 
 def make_infections(app_metadata: cli_tools.Metadata,
-                    model_inputs_root: Path,
                     rates_root: Path,
                     output_root: Path,
                     holdout_days: int,
@@ -444,7 +442,7 @@ def make_infections(app_metadata: cli_tools.Metadata,
     model_in_dir, model_out_dir, plot_dir, infections_draws_dir = build_directories(output_root)
 
     app_metadata, hierarchy, estimated_ratios, variant_risk_ratio, agg_plot_inputs, durations, reported_deaths = prepare_input_data(
-        app_metadata, model_inputs_root, rates_root, model_in_dir, n_draws, fh, gbd, no_deaths,
+        app_metadata, rates_root, model_in_dir, n_draws, fh, gbd, no_deaths,
     )
 
     run_location_models(

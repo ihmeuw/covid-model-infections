@@ -444,15 +444,15 @@ def load_durations(rates_root: Path, n_draws: int,) -> List[Dict[str, int]]:
     return data
 
 
-def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
+def load_model_inputs(rates_root:Path, hierarchy: pd.DataFrame,
                       input_measure: str, fh: bool,) -> Tuple[pd.Series, pd.Series, Dict]:
     if fh:
-        data_path = model_inputs_root / 'full_data_fh_subnationals_unscaled.csv'
+        data_path = rates_root / 'model_inputs' / 'full_data_fh_subnationals_unscaled.csv'
     else:
         if input_measure == 'deaths':
-            data_path = model_inputs_root / 'full_data_unscaled.csv'
+            data_path = rates_root / 'model_inputs' / 'full_data_unscaled.csv'
         else:
-            data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+            data_path = rates_root / 'model_inputs' / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Confirmed': 'cumulative_cases',
                                 'Hospitalizations': 'cumulative_hospitalizations',
@@ -520,18 +520,18 @@ def trim_leading_zeros(cumul_data: List[pd.Series],
     return trimmed_data
 
 
-def load_hierarchy(model_inputs_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
+def load_hierarchy(rates_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
     if gbd:
-        data_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
+        data_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
     elif fh:
-        data_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
+        data_path = rates_root / 'model_inputs' / 'locations' / 'fh_small_area_hierarchy.csv'
     else:
-        data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+        data_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
 #     logger.warning('Using ZAF subnats...')
-#     gbd_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
-#     covid_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+#     gbd_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
+#     covid_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
 
 #     # get ZAF only from GBD for now
 #     covid = pd.read_csv(covid_path)
@@ -553,8 +553,8 @@ def load_hierarchy(model_inputs_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame
     return data
 
 
-def load_population(model_inputs_root: Path) -> pd.DataFrame:
-    data_path = model_inputs_root / 'output_measures' / 'population' / 'all_populations.csv'
+def load_population(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'model_inputs' / 'output_measures' / 'population' / 'all_populations.csv'
     data = pd.read_csv(data_path)
     is_2019 = data['year_id'] == 2019
     is_bothsex = data['sex_id'] == 3

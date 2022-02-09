@@ -12,11 +12,6 @@ from covid_model_infections import runner
 
 @click.command()
 @cli_tools.pass_run_metadata()
-@click.option('-m', '--model-inputs-version',
-              type=click.Path(file_okay=False),
-              default=paths.BEST_LINK,
-              help=('Which version of the inputs data to gather and format. '
-                    'May be a full path or relative to the standard inputs root.'))
 @click.option('-r', '--rates-version',
               type=click.Path(file_okay=False),
               default=paths.BEST_LINK,
@@ -53,7 +48,6 @@ from covid_model_infections import runner
               help='Tags this run as a production run.')
 @cli_tools.add_verbose_and_with_debugger
 def run_infections(run_metadata,
-                   model_inputs_version,
                    rates_version,
                    output_root, n_draws, n_holdout_days,
                    fh, gbd,
@@ -67,11 +61,8 @@ def run_infections(run_metadata,
         raise ValueError('Cannot specify Fred Hutch hierarchy AND GBD hierarchy - '
                          'must be one or the other (or nethier).')
     
-    model_inputs_root = cli_tools.get_last_stage_directory(model_inputs_version,
-                                                           last_stage_root=paths.MODEL_INPUTS_ROOT)
     rates_root = cli_tools.get_last_stage_directory(rates_version,
                                                     last_stage_root=paths.HISTORICAL_MODEL_ROOT)
-    run_metadata.update_from_path('model_inputs_metadata', model_inputs_root / paths.METADATA_FILE_NAME)
     run_metadata.update_from_path('rates_metadata', rates_root / paths.METADATA_FILE_NAME)
 
     output_root = Path(output_root).resolve()
@@ -81,8 +72,7 @@ def run_infections(run_metadata,
     cli_tools.configure_logging_to_files(run_directory)
 
     main = cli_tools.monitor_application(runner.make_infections, logger, with_debugger)
-    app_metadata, _ = main(model_inputs_root,
-                           rates_root,
+    app_metadata, _ = main(rates_root,
                            run_directory, n_holdout_days, n_draws,
                            fh, gbd,
                            no_deaths,)
