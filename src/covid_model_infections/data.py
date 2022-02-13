@@ -466,7 +466,7 @@ def load_model_inputs(rates_root:Path, hierarchy: pd.DataFrame,
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
     
-    logger.debug(f'EXCLUDING ALL {input_measure.upper()} DATA AFTER 11/31/2021.')
+    logger.debug(f'EXCLUDING ALL {input_measure.upper()} DATA AFTER 11/30/2021.')
     data = data.loc[data['date'] < pd.Timestamp('2021-12-01')]
     
     data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh,)
