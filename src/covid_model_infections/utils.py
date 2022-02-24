@@ -18,7 +18,26 @@ TRIM_LOCATIONS = [
     # ...
 ]
 
-DEPLETION_LOCATIONS = [
-    4863,  # Mizoram
-    53617,  # Gilgit-Baltistan
-]
+DEPLETION_LOCATIONS = {
+    'moderate': [
+        36,     # Kazakhstan
+        59,     # Latvia
+        60,     # Lithuania
+        62,     # Russian Federation
+        182,    # Malawi
+        193,    # Botswana
+        194,    # Lesotho
+        195,    # Namibia
+        4758,   # Goiás
+        4865,   # Goa
+        4857,   # Kerala
+        4861,   # Manipur
+        4862,   # Meghalaya
+    ],
+    'severe': [
+        38,     # Mongolia
+        186,    # Seychelles
+        4863,   # Mizoram
+        53617,  # Gilgit-Baltistan
+    ],
+}

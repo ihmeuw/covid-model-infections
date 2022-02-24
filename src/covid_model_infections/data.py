@@ -82,11 +82,12 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
             data = data.loc[~is_county].reset_index(drop=True)
             manipulation_metadata[location_label] = 'dropped all hospitalizations'
         
-        ## hosp/IHR == admissions too low
-        is_argentina = data['location_id'] == 97
-        data = data.loc[~is_argentina].reset_index(drop=True)
-        manipulation_metadata['argentina'] = 'dropped all hospitalizations'
-                
+        ## false point in January (from deaths in imputation)
+        is_ohio = data['location_id'] == 558
+        is_pre_march = data['date'] < pd.Timestamp('2020-02-18')
+        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped admission before Feb 18'
+        
         ## is just march-june 2020
         is_vietnam = data['location_id'] == 20
         data = data.loc[~is_vietnam].reset_index(drop=True)
@@ -111,43 +112,32 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
         data = data.loc[~is_ecdc].reset_index(drop=True)
         manipulation_metadata['ecdc_countries'] = 'dropped all hospitalizations'
         
-        ## CLOSE, but seems a little low... check w/ new data
+        ## is a bit high... check w/ new sero data
         is_goa = data['location_id'] == 4850
         data = data.loc[~is_goa].reset_index(drop=True)
         manipulation_metadata['goa'] = 'dropped all hospitalizations'
 
-        ## too late, starts March 2021
+        ## too low (also starts March 2021)
         is_haiti = data['location_id'] == 114
         data = data.loc[~is_haiti].reset_index(drop=True)
         manipulation_metadata['haiti'] = 'dropped all hospitalizations'
-
-        ## late, starts Jan/Feb 2021 (and is a little low, should check w/ new data)
-        is_jordan = data['location_id'] == 144
-        data = data.loc[~is_jordan].reset_index(drop=True)
-        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
         
         ## too low then too high? odd series
         is_andorra = data['location_id'] == 74
         data = data.loc[~is_andorra].reset_index(drop=True)
         manipulation_metadata['andorra'] = 'dropped all hospitalizations'
         
-        ## false point in January (from deaths in imputation)
-        is_ohio = data['location_id'] == 558
-        is_pre_march = data['date'] < pd.Timestamp('2020-02-18')
-        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
-        manipulation_metadata['ohio'] = 'dropped death before Feb 18'
-        
-        ## late, starts in Feb 2021 (also probably too low)
+        ## too low (also starts in Feb 2021)
         is_guinea_bissau = data['location_id'] == 209
         data = data.loc[~is_guinea_bissau].reset_index(drop=True)
         manipulation_metadata['guinea_bissau'] = 'dropped all hospitalizations'
         
-        ## late, starts in June 2021 (also too low)
+        ## is less than a month of data
         is_zimbabwe = data['location_id'] == 198
         data = data.loc[~is_zimbabwe].reset_index(drop=True)
         manipulation_metadata['zimbabwe'] = 'dropped all hospitalizations'
         
-        ## too low
+        ## only Jan-July 2021; also probably too low
         is_malawi = data['location_id'] == 182
         data = data.loc[~is_malawi].reset_index(drop=True)
         manipulation_metadata['malawi'] = 'dropped all hospitalizations'

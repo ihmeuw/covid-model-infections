@@ -29,7 +29,8 @@ INFECTIONS_LOG_OFFSET = 50
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 NUM_SUBMODELS = 7
-NON_SUSCEPTIBLE_CEILING = 0.9
+NON_SUSCEPTIBLE_CEILING = 0.99
+N_SQUEEZE = 4
 
 
 def model_measure(measure: str, measure_type: str,
@@ -594,37 +595,34 @@ def run_model(location_id: int,
                         .values)
     output_draws *= mean_corr_factor
     
-    logger.info('Ensure we do not run out of susceptibles (doing two iterations since it is a feedback loop).')
+    logger.info('Ensure we do not run out of susceptibles '
+                f'(doing {N_SQUEEZE} iterations since it is a feedback loop).')
     if location_id in TRIM_LOCATIONS:
         logger.warning('Droppping last three days of infections for stability.')
-        output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
+        output_draws = [output_draws[dc].dropna()[:-3] for dc in output_draws.columns]
     else:
-        output_draws = enumerate([output_draws[dc].dropna() for dc in output_draws.columns])
-    if location_id in DEPLETION_LOCATIONS:
-        logger.warning('Depleting susceptible pool in SEIR - lowering non-susceptible proportion ceiling.')
-        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING * 0.9
+        output_draws = [output_draws[dc].dropna() for dc in output_draws.columns]
+    if location_id in DEPLETION_LOCATIONS['moderate']:
+        logger.warning('Depleting susceptible pool in SEIR - lowering non-susceptible proportion ceiling to 95% of standard.')
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING * 0.95
+    elif location_id in DEPLETION_LOCATIONS['severe']:
+        logger.warning('Depleting susceptible pool in SEIR - lowering non-susceptible proportion ceiling to 85% of standard.')
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING * 0.85
     else:
         non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING
-    _od1 = []
-    for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
-        _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),
-                            non_susceptible_ceiling,))
-    _od2 = []
-    _od1 = enumerate(_od1)
-    for n, output_draw in tqdm(_od1, total=n_draws, file=sys.stdout):
-        _od2.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),
-                            non_susceptible_ceiling,))
-    _od3 = []
-    _od2 = enumerate(_od2)
-    for n, output_draw in tqdm(_od2, total=n_draws, file=sys.stdout):
-        _od3.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),
-                            non_susceptible_ceiling,))
-    output_draws = pd.concat(_od3, axis=1)
-    del _od1, _od2, _od3
+    _n_squeeze = 0
+    while _n_squeeze < N_SQUEEZE:
+        _od = []
+        for n, output_draw in tqdm(enumerate(output_draws), total=n_draws, file=sys.stdout):
+            _od.append(squeeze(output_draw, population, cross_variant_immunity[n],
+                               escape_variant_prevalence.copy(), vaccine_data.copy(),
+                               non_susceptible_ceiling,))
+        output_draws = _od
+        del _od
+        _n_squeeze += 1
+    output_draws = pd.concat(output_draws, axis=1)
 
+    logger.info('Enforce posterior ratio ceiling.')
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     output_draws_list = [enforce_ratio_ceiling('posterior infections',
                                                input_measure,
