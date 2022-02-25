@@ -127,6 +127,11 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
         data = data.loc[~is_andorra].reset_index(drop=True)
         manipulation_metadata['andorra'] = 'dropped all hospitalizations'
         
+        ## too low, revisit w/ new sero
+        is_ethiopia = data['location_id'] == 179
+        data = data.loc[~is_ethiopia].reset_index(drop=True)
+        manipulation_metadata['ethiopia'] = 'dropped all hospitalizations'
+        
         ## only Jan-July 2021; also probably too low
         is_malawi = data['location_id'] == 182
         data = data.loc[~is_malawi].reset_index(drop=True)
