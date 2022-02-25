@@ -30,12 +30,14 @@ DEPLETION_LOCATIONS = {
         195,    # Namibia
         4758,   # Goiás
         4865,   # Goa
+        4855,   # Jharkhand
         4857,   # Kerala
         4861,   # Manipur
         4862,   # Meghalaya
     ],
     'severe': [
         38,     # Mongolia
+        90,     # Norway
         186,    # Seychelles
         4863,   # Mizoram
         53617,  # Gilgit-Baltistan
