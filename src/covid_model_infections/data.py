@@ -456,8 +456,12 @@ def load_model_inputs(rates_root:Path, hierarchy: pd.DataFrame,
     else:
         if input_measure == 'deaths':
             data_path = rates_root / 'model_inputs' / 'full_data_unscaled.csv'
-        else:
+        elif input_measure == 'cases':
+            data_path = rates_root / 'model_inputs' / 'full_data_unscaled.csv'
+        elif input_measure == 'hospitalizations':
             data_path = rates_root / 'model_inputs' / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+        else:
+            raise ValueError('Invalid input measure.')
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Confirmed': 'cumulative_cases',
                                 'Hospitalizations': 'cumulative_hospitalizations',
@@ -534,6 +538,15 @@ def load_hierarchy(rates_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
         data_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
+    
+    if not gbd and not fh:
+        logger.warning('Manually adapting hierarchy for Other Union Territories')
+        n_children = data.loc[data['parent_id'] == 44538].shape[0]
+        data = data.loc[data['parent_id'] != 44538]
+        data.loc[data['location_id'] == 44538, 'most_detailed'] = 1
+        sort_order = data.loc[data['location_id'] == 44538, 'sort_order'].item()
+        data.loc[data['sort_order'] > sort_order, 'sort_order'] -= n_children
+
 #     logger.warning('Using ZAF subnats...')
 #     gbd_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
 #     covid_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
