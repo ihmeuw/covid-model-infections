@@ -16,8 +16,8 @@ QUEUE = {
     'gbd': 'all.q',
 }
 RESOURCES = {
-    'standard': {'fmem': '10.0G', 'fthread': '3',},
-    'gbd': {'fmem': '16.0G', 'fthread': '3',},
+    'standard': {'fmem': '12.0G', 'fthread': '3',},
+    'gbd': {'fmem': '18.0G', 'fthread': '3',},
     'OMP_NUM_THREADS': '3',
     'MKL_NUM_THREADS': '3',
 }
