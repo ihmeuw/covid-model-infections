@@ -130,8 +130,11 @@ def subset_to_parent_md_draws(md_draws: pd.DataFrame, parent_id: int, hierarchy:
     
 def aggregate_md_draws(md_draws: pd.DataFrame, hierarchy: pd.DataFrame, mp_threads: int) -> pd.DataFrame:
     parent_ids = hierarchy.loc[hierarchy['most_detailed'] != 1, 'location_id'].to_list()
-    
     parent_draws_list = [subset_to_parent_md_draws(md_draws, parent_id, hierarchy) for parent_id in parent_ids]
+    
+    empty_parent_draws = [parent_draws.empty for parent_draws in parent_draws_list]
+    parent_ids = [parent_id for parent_id, is_empty in zip(parent_ids, empty_parent_draws) if not is_empty]
+    parent_draws_list = [parent_draws for parent_draws, is_empty in zip(parent_draws_list, empty_parent_draws) if not is_empty]
     
     if mp_threads > 1:
         with Pool(mp_threads - 1) as p:

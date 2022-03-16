@@ -7,8 +7,6 @@ CEILINGS = {
 
 SUB_LOCATIONS = [
     7,    # Democratic People's Republic of Korea
-    # 12,   # Lao People's Democratic Republic
-    # 15,   # Myanmar
     39,   # Tajikistan
     40,   # Turkmenistan
     131,  # Nicaragua
@@ -19,3 +17,29 @@ SUB_LOCATIONS = [
 TRIM_LOCATIONS = [
     # ...
 ]
+
+DEPLETION_LOCATIONS = {
+    'moderate': [
+        36,     # Kazakhstan
+        59,     # Latvia
+        60,     # Lithuania
+        62,     # Russian Federation
+        182,    # Malawi
+        193,    # Botswana
+        194,    # Lesotho
+        195,    # Namibia
+        4758,   # Goiás
+        4865,   # Goa
+        4855,   # Jharkhand
+        4857,   # Kerala
+        4861,   # Manipur
+        4862,   # Meghalaya
+    ],
+    'severe': [
+        38,     # Mongolia
+        90,     # Norway
+        186,    # Seychelles
+        4863,   # Mizoram
+        53617,  # Gilgit-Baltistan
+    ],
+}
