@@ -36,25 +36,25 @@ def build_directories(output_root: Path):
     
     
 def prepare_input_data(app_metadata: cli_tools.Metadata,
-                       model_inputs_root: Path,
                        rates_root: Path,
                        model_in_dir: Path,
                        n_draws: int,
                        fh: bool,
-                       gbd: bool,):
+                       gbd: bool,
+                       no_deaths: bool,):
     logger.info('Loading supplemental data.')
-    hierarchy = data.load_hierarchy(model_inputs_root, fh, gbd,)
-    pop_data = data.load_population(model_inputs_root)
+    hierarchy = data.load_hierarchy(rates_root, fh, gbd,)
+    pop_data = data.load_population(rates_root)
 
     logger.info('Loading epi report data.')
     cumul_deaths, daily_deaths, deaths_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'deaths', fh,
+        rates_root, hierarchy, 'deaths', fh,
     )
     cumul_hospital, daily_hospital, hospital_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'hospitalizations', fh,
+        rates_root, hierarchy, 'hospitalizations', fh,
     )
     cumul_cases, daily_cases, cases_manipulation_metadata = data.load_model_inputs(
-        model_inputs_root, hierarchy, 'cases', fh,
+        rates_root, hierarchy, 'cases', fh,
     )
 
     cumul_deaths, cumul_hospital, cumul_cases,\
@@ -93,8 +93,10 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
     escape_variant_prevalence = data.load_escape_variant_prevalence(rates_root)
 
     logger.info('Compiling model input data and writing intermediate files.')
+    if no_deaths:
+        logger.warning('Not using deaths to estimate infections.')
     model_data = {
-        'fh': fh, 'gbd': gbd,
+        'no_deaths': no_deaths,
         'durations': durations,
         'daily_deaths': daily_deaths, 'cumul_deaths': cumul_deaths, 'ifr': ifr, 'ifr_rr': ifr_rr,
         'daily_hospital': daily_hospital, 'cumul_hospital': cumul_hospital, 'ihr': ihr,
@@ -138,7 +140,8 @@ def prepare_input_data(app_metadata: cli_tools.Metadata,
     return app_metadata, hierarchy, estimated_ratios, variant_risk_ratio, agg_plot_inputs, durations, reported_deaths
 
 
-def run_location_models(hierarchy: pd.DataFrame,
+def run_location_models(gbd: bool,
+                        hierarchy: pd.DataFrame,
                         n_draws: int,
                         model_in_dir: Path,
                         model_out_dir: Path,
@@ -152,7 +155,10 @@ def run_location_models(hierarchy: pd.DataFrame,
                       location_id, n_draws, str(model_in_dir), str(model_out_dir), str(plot_dir),]
         for location_id in location_ids if location_id not in SUB_LOCATIONS
     }
-    cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map)
+    if gbd:
+        cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map, 'gbd')
+    else:
+        cluster.run_cluster_jobs('covid_loc_inf', output_root, job_args_map, 'standard')
     
     
 def collect_results(app_metadata: cli_tools.Metadata,
@@ -422,24 +428,25 @@ def write_seir_inputs(model_out_dir: Path,
 
 
 def make_infections(app_metadata: cli_tools.Metadata,
-                    model_inputs_root: Path,
                     rates_root: Path,
                     output_root: Path,
                     holdout_days: int,
                     n_draws: int,
                     fh: bool,
-                    gbd: bool,):
+                    gbd: bool,
+                    no_deaths: bool,):
+    logger.info(f'Model run initiated -- {str(output_root)}.')
     if holdout_days > 0:
         raise ValueError('Holdout not yet implemented.')
     
     model_in_dir, model_out_dir, plot_dir, infections_draws_dir = build_directories(output_root)
 
     app_metadata, hierarchy, estimated_ratios, variant_risk_ratio, agg_plot_inputs, durations, reported_deaths = prepare_input_data(
-        app_metadata, model_inputs_root, rates_root, model_in_dir, n_draws, fh, gbd,
+        app_metadata, rates_root, model_in_dir, n_draws, fh, gbd, no_deaths,
     )
 
     run_location_models(
-        hierarchy, n_draws, model_in_dir, model_out_dir, plot_dir, output_root,
+        gbd, hierarchy, n_draws, model_in_dir, model_out_dir, plot_dir, output_root,
     )
     
     app_metadata, infections_draws, inputs, outputs, em_scalar_data, deaths = collect_results(

@@ -17,15 +17,20 @@ import numpy as np
 from covid_shared.cli_tools.logging import configure_logging_to_terminal
 
 from covid_model_infections.model import data, mr_spline, plotter
-from covid_model_infections.utils import CEILINGS, TRIM_LOCATIONS
-from covid_model_infections.cluster import TYPE_SPECS
+from covid_model_infections.utils import (
+    CEILINGS,
+    TRIM_LOCATIONS,
+    DEPLETION_LOCATIONS
+)
+from covid_model_infections.cluster import RESOURCES
 
 MEASURE_LOG_OFFSET = 1
 INFECTIONS_LOG_OFFSET = 50
 FLOOR = 1e-4
 CONSTRAINT_POINTS = 40
 NUM_SUBMODELS = 7
-CEILING = 0.9
+NON_SUSCEPTIBLE_CEILING = 0.99
+N_SQUEEZE = 4
 
 
 def model_measure(measure: str, measure_type: str,
@@ -35,7 +40,8 @@ def model_measure(measure: str, measure_type: str,
                   log: bool, knot_days: int,
                   num_submodels: int,
                   split_l_interval: bool,
-                  split_r_interval: bool,) -> Dict:
+                  split_r_interval: bool,
+                  no_deaths: bool,) -> Dict:
     logger.info(f'{measure.capitalize()}:')
     input_data = input_data.rename(measure)
     
@@ -105,16 +111,22 @@ def model_measure(measure: str, measure_type: str,
   
     raw_infections = []
     smooth_infections = []
+    if measure == 'deaths' and no_deaths:
+        logger.warning('Setting deaths-based infections to NA.')
     for draw in range(n_draws):
         # raw_infections = pd.concat([input_data, ratio.loc[draw]], axis=1)
         # raw_infections = (raw_infections[input_data.name] / raw_infections[ratio.name])
         _raw_infections = ((input_data * scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
         _raw_infections.index -= pd.Timedelta(days=lags[draw])
+        if measure == 'deaths' and no_deaths:
+            _raw_infections *= np.nan
         raw_infections.append(_raw_infections)
         # smooth_infections = pd.concat([smooth_data, ratio.loc[draw]], axis=1)
         # smooth_infections = (smooth_infections[smooth_data.name] / smooth_infections[ratio.name]).rename('infections').dropna()
         _smooth_infections = ((smooth_data * scalar_data.loc[draw]) / ratio.loc[draw]).rename('infections').dropna()
         _smooth_infections.index -= pd.Timedelta(days=lags[draw])
+        if measure == 'deaths' and no_deaths:
+            _smooth_infections *= np.nan
         smooth_infections.append(_smooth_infections)
 
     return {'daily': smooth_data, 'cumul': smooth_data.cumsum(),
@@ -404,7 +416,7 @@ def squeeze(daily_infections: pd.Series,
             cross_variant_immunity: float,
             escape_variant_prevalence: pd.Series,
             vaccine_coverage: pd.DataFrame,
-            ceiling: float = CEILING,) -> pd.Series:
+            ceiling: float,) -> pd.Series:
     escape_variant_prevalence = (pd.concat([daily_infections,
                                             escape_variant_prevalence], axis=1))
     escape_variant_prevalence = escape_variant_prevalence.fillna(0)
@@ -448,7 +460,7 @@ def run_model(location_id: int,
               mp: bool = True,):
     logger.info('Loading data.')
     input_data, pred_rates, vaccine_data, cross_variant_immunity, escape_variant_prevalence, \
-    modeled_location, population, location_name, is_us = data.load_model_inputs(location_id, Path(model_in_dir))
+    modeled_location, population, location_name, is_us, no_deaths = data.load_model_inputs(location_id, Path(model_in_dir))
     if not modeled_location:
         raise ValueError(f'Location does not have sufficient data to model ({location_id}).')
     loc_seed = get_random_seed(location_name)
@@ -462,7 +474,8 @@ def run_model(location_id: int,
                                           measure_data['ratio']['ratio'].copy(),
                                           population, n_draws, measure_data['lags'],
                                           measure_log, measure_knot_days, num_submodels=1,
-                                          split_l_interval=False, split_r_interval=False,)
+                                          split_l_interval=False, split_r_interval=False,
+                                          no_deaths=no_deaths,)
                    for measure, measure_data in input_data.items()}
     for input_measure in input_data.keys():
         infections_inputs = [enforce_ratio_ceiling(output_measure,
@@ -486,11 +499,14 @@ def run_model(location_id: int,
     measures = list(output_data.keys())
     if is_us and 'hospitalizations' in measures:
         measures += ['hospitalizations']
-        measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
+    if no_deaths:
+        measures = [m for m in measures if m != 'deaths']
+    if len(measures) > 1:
+        mv_random_state = get_random_state(f'measure_variances_{location_id}')
+        measure_variances = mv_random_state.uniform(0.1, 0.9, n_draws).tolist()
     else:
-        measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
-    mv_random_state = get_random_state(f'measure_variances_{location_id}')
-    measure_variances = mv_random_state.uniform(0.1, 0.9, n_draws).tolist()
+        measure_variances = np.ones(n_draws).tolist()
+    measures = [str(measure) for measure in m_random_state.choice(measures, n_draws)]
     weights = pd.DataFrame({'measure': measures, 'avg_variance': measure_variances, 'n': 1,})
     logger.info(f"Weights: \n:{weights.groupby('measure').agg({'n': pd.Series.count, 'avg_variance': pd.Series.mean})}")
     del weights
@@ -579,24 +595,34 @@ def run_model(location_id: int,
                         .values)
     output_draws *= mean_corr_factor
     
-    logger.info('Ensure we do not run out of susceptibles (doing two iterations since it is a feedback loop).')
+    logger.info('Ensure we do not run out of susceptibles '
+                f'(doing {N_SQUEEZE} iterations since it is a feedback loop).')
     if location_id in TRIM_LOCATIONS:
         logger.warning('Droppping last three days of infections for stability.')
-        output_draws = enumerate([output_draws[dc].dropna()[:-3] for dc in output_draws.columns])
+        output_draws = [output_draws[dc].dropna()[:-3] for dc in output_draws.columns]
     else:
-        output_draws = enumerate([output_draws[dc].dropna() for dc in output_draws.columns])
-    _od1 = []
-    for n, output_draw in tqdm(output_draws, total=n_draws, file=sys.stdout):
-        _od1.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),))
-    _od2 = []
-    _od1 = enumerate(_od1)
-    for n, output_draw in tqdm(_od1, total=n_draws, file=sys.stdout):
-        _od2.append(squeeze(output_draw, population, cross_variant_immunity[n],
-                            escape_variant_prevalence.copy(), vaccine_data.copy(),))
-    output_draws = pd.concat(_od2, axis=1)
-    del _od1, _od2
+        output_draws = [output_draws[dc].dropna() for dc in output_draws.columns]
+    if location_id in DEPLETION_LOCATIONS['moderate']:
+        logger.warning('Depleting susceptible pool in SEIR - lowering non-susceptible proportion ceiling to 95% of standard.')
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING * 0.95
+    elif location_id in DEPLETION_LOCATIONS['severe']:
+        logger.warning('Depleting susceptible pool in SEIR - lowering non-susceptible proportion ceiling to 85% of standard.')
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING * 0.85
+    else:
+        non_susceptible_ceiling = NON_SUSCEPTIBLE_CEILING
+    _n_squeeze = 0
+    while _n_squeeze < N_SQUEEZE:
+        _od = []
+        for n, output_draw in tqdm(enumerate(output_draws), total=n_draws, file=sys.stdout):
+            _od.append(squeeze(output_draw, population, cross_variant_immunity[n],
+                               escape_variant_prevalence.copy(), vaccine_data.copy(),
+                               non_susceptible_ceiling,))
+        output_draws = _od
+        del _od
+        _n_squeeze += 1
+    output_draws = pd.concat(output_draws, axis=1)
 
+    logger.info('Enforce posterior ratio ceiling.')
     output_draws_list = [output_draws[c].copy() for c in output_draws.columns]
     output_draws_list = [enforce_ratio_ceiling('posterior infections',
                                                input_measure,
@@ -689,8 +715,8 @@ def run_model(location_id: int,
 if __name__ == '__main__':
     configure_logging_to_terminal(verbose=2)
 
-    os.environ['OMP_NUM_THREADS'] = TYPE_SPECS['covid_loc_inf']['OMP_NUM_THREADS']
-    os.environ['MKL_NUM_THREADS'] = TYPE_SPECS['covid_loc_inf']['MKL_NUM_THREADS']
+    os.environ['OMP_NUM_THREADS'] = RESOURCES['OMP_NUM_THREADS']
+    os.environ['MKL_NUM_THREADS'] = RESOURCES['MKL_NUM_THREADS']
     
     run_model(location_id=int(sys.argv[1]),
               n_draws=int(sys.argv[2]),

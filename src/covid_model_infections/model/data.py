@@ -117,12 +117,13 @@ def load_model_inputs(location_id: int, model_in_dir: Path, verbose: bool = True
     with model_data_path.open('rb') as file:
         model_data = pickle.load(file)
     
+    no_deaths = model_data['no_deaths']
+    
     em_scalar_path = model_in_dir / 'em_scalar_data.parquet'
     em_scalar_data = pd.read_parquet(em_scalar_path)
-    if model_data['fh']:
-        em_scalar_data = parent_inheritance(
-            location_id, hierarchy, em_scalar_data, 'total covid scalar',
-        )
+    em_scalar_data = parent_inheritance(
+        location_id, hierarchy, em_scalar_data, 'total covid scalar',
+    )
     em_scalar_data = em_scalar_data.loc[location_id, 'em_scalar']
     
     model_data, pred_rates, modeled_location = compile_input_data_object(
@@ -153,9 +154,10 @@ def load_model_inputs(location_id: int, model_in_dir: Path, verbose: bool = True
         escape_variant_prevalence = escape_variant_prevalence.loc[location_id, 'escape_variant_prevalence']
     else:
         escape_variant_prevalence = pd.Series()
-
+    
     return model_data, pred_rates, vaccine_data, cross_variant_immunity, \
-           escape_variant_prevalence, modeled_location, population, location_name, is_us
+           escape_variant_prevalence, modeled_location, population, location_name, \
+           is_us, no_deaths
 
 
 def load_extra_plot_inputs(location_id: int, model_in_dir: Path):

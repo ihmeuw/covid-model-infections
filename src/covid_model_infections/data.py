@@ -82,11 +82,12 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
             data = data.loc[~is_county].reset_index(drop=True)
             manipulation_metadata[location_label] = 'dropped all hospitalizations'
         
-        ## hosp/IHR == admissions too low
-        is_argentina = data['location_id'] == 97
-        data = data.loc[~is_argentina].reset_index(drop=True)
-        manipulation_metadata['argentina'] = 'dropped all hospitalizations'
-                
+        ## false point in January (from deaths in imputation)
+        is_ohio = data['location_id'] == 558
+        is_pre_march = data['date'] < pd.Timestamp('2020-02-18')
+        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
+        manipulation_metadata['ohio'] = 'dropped admission before Feb 18'
+        
         ## is just march-june 2020
         is_vietnam = data['location_id'] == 20
         data = data.loc[~is_vietnam].reset_index(drop=True)
@@ -111,46 +112,50 @@ def evil_doings(data: pd.DataFrame, hierarchy: pd.DataFrame, input_measure: str,
         data = data.loc[~is_ecdc].reset_index(drop=True)
         manipulation_metadata['ecdc_countries'] = 'dropped all hospitalizations'
         
-        ## CLOSE, but seems a little low... check w/ new data
+        ## is a bit high... check w/ new sero data
         is_goa = data['location_id'] == 4850
         data = data.loc[~is_goa].reset_index(drop=True)
         manipulation_metadata['goa'] = 'dropped all hospitalizations'
 
-        ## too late, starts March 2021
+        ## too low (also starts March 2021)
         is_haiti = data['location_id'] == 114
         data = data.loc[~is_haiti].reset_index(drop=True)
         manipulation_metadata['haiti'] = 'dropped all hospitalizations'
-
-        ## late, starts Jan/Feb 2021 (and is a little low, should check w/ new data)
-        is_jordan = data['location_id'] == 144
-        data = data.loc[~is_jordan].reset_index(drop=True)
-        manipulation_metadata['jordan'] = 'dropped all hospitalizations'
         
         ## too low then too high? odd series
         is_andorra = data['location_id'] == 74
         data = data.loc[~is_andorra].reset_index(drop=True)
         manipulation_metadata['andorra'] = 'dropped all hospitalizations'
         
-        ## false point in January (from deaths in imputation)
-        is_ohio = data['location_id'] == 558
-        is_pre_march = data['date'] < pd.Timestamp('2020-02-18')
-        data = data.loc[~(is_ohio & is_pre_march)].reset_index(drop=True)
-        manipulation_metadata['ohio'] = 'dropped death before Feb 18'
+        ## too low, revisit w/ new sero
+        is_ethiopia = data['location_id'] == 179
+        data = data.loc[~is_ethiopia].reset_index(drop=True)
+        manipulation_metadata['ethiopia'] = 'dropped all hospitalizations'
         
-        ## late, starts in Feb 2021 (also probably too low)
-        is_guinea_bissau = data['location_id'] == 209
-        data = data.loc[~is_guinea_bissau].reset_index(drop=True)
-        manipulation_metadata['guinea_bissau'] = 'dropped all hospitalizations'
+        ## only Jan-July 2021; also probably too low
+        is_malawi = data['location_id'] == 182
+        data = data.loc[~is_malawi].reset_index(drop=True)
+        manipulation_metadata['malawi'] = 'dropped all hospitalizations'
         
-        ## late, starts in June 2021 (also too low)
+        ## too low, revisit w/ new sero
+        is_mozambique = data['location_id'] == 184
+        data = data.loc[~is_mozambique].reset_index(drop=True)
+        manipulation_metadata['mozambique'] = 'dropped all hospitalizations'
+        
+        ## too low (also starts in May 2021), revisit w/ new sero
+        is_zambia = data['location_id'] == 191
+        data = data.loc[~is_zambia].reset_index(drop=True)
+        manipulation_metadata['zambia'] = 'dropped all hospitalizations'
+        
+        ## is less than a month of data
         is_zimbabwe = data['location_id'] == 198
         data = data.loc[~is_zimbabwe].reset_index(drop=True)
         manipulation_metadata['zimbabwe'] = 'dropped all hospitalizations'
         
-        ## too low
-        is_malawi = data['location_id'] == 182
-        data = data.loc[~is_malawi].reset_index(drop=True)
-        manipulation_metadata['malawi'] = 'dropped all hospitalizations'
+        ## too low (also starts in Feb 2021)
+        is_guinea_bissau = data['location_id'] == 209
+        data = data.loc[~is_guinea_bissau].reset_index(drop=True)
+        manipulation_metadata['guinea_bissau'] = 'dropped all hospitalizations'
 
     elif input_measure == 'deaths':
         ## false point in January
@@ -444,15 +449,19 @@ def load_durations(rates_root: Path, n_draws: int,) -> List[Dict[str, int]]:
     return data
 
 
-def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
+def load_model_inputs(rates_root:Path, hierarchy: pd.DataFrame,
                       input_measure: str, fh: bool,) -> Tuple[pd.Series, pd.Series, Dict]:
     if fh:
-        data_path = model_inputs_root / 'full_data_fh_subnationals_unscaled.csv'
+        data_path = rates_root / 'model_inputs' / 'full_data_fh_subnationals_unscaled.csv'
     else:
         if input_measure == 'deaths':
-            data_path = model_inputs_root / 'full_data_unscaled.csv'
+            data_path = rates_root / 'model_inputs' / 'full_data_unscaled.csv'
+        elif input_measure == 'cases':
+            data_path = rates_root / 'model_inputs' / 'full_data_unscaled.csv'
+        elif input_measure == 'hospitalizations':
+            data_path = rates_root / 'model_inputs' / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
         else:
-            data_path = model_inputs_root / 'use_at_your_own_risk' / 'full_data_extra_hospital.csv'
+            raise ValueError('Invalid input measure.')
     data = pd.read_csv(data_path)
     data = data.rename(columns={'Confirmed': 'cumulative_cases',
                                 'Hospitalizations': 'cumulative_hospitalizations',
@@ -465,7 +474,10 @@ def load_model_inputs(model_inputs_root:Path, hierarchy: pd.DataFrame,
     data = (data.groupby('location_id', as_index=False)
             .apply(lambda x: fill_dates(x, [f'cumulative_{input_measure}']))
             .reset_index(drop=True))
-
+    
+    logger.debug(f'EXCLUDING ALL {input_measure.upper()} DATA AFTER 11/30/2021.')
+    data = data.loc[data['date'] < pd.Timestamp('2021-12-01')]
+    
     data, manipulation_metadata = evil_doings(data, hierarchy, input_measure, fh,)
     
     data[f'daily_{input_measure}'] = (data
@@ -517,18 +529,27 @@ def trim_leading_zeros(cumul_data: List[pd.Series],
     return trimmed_data
 
 
-def load_hierarchy(model_inputs_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
+def load_hierarchy(rates_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
     if gbd:
-        data_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
+        data_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
     elif fh:
-        data_path = model_inputs_root / 'locations' / 'fh_small_area_hierarchy.csv'
+        data_path = rates_root / 'model_inputs' / 'locations' / 'fh_small_area_hierarchy.csv'
     else:
-        data_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+        data_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
     data = pd.read_csv(data_path)
     data = data.sort_values('sort_order').reset_index(drop=True)
+    
+    if not gbd and not fh:
+        logger.warning('Manually adapting hierarchy for Other Union Territories')
+        n_children = data.loc[data['parent_id'] == 44538].shape[0]
+        data = data.loc[data['parent_id'] != 44538]
+        data.loc[data['location_id'] == 44538, 'most_detailed'] = 1
+        sort_order = data.loc[data['location_id'] == 44538, 'sort_order'].item()
+        data.loc[data['sort_order'] > sort_order, 'sort_order'] -= n_children
+
 #     logger.warning('Using ZAF subnats...')
-#     gbd_path = model_inputs_root / 'locations' / 'gbd_analysis_hierarchy.csv'
-#     covid_path = model_inputs_root / 'locations' / 'modeling_hierarchy.csv'
+#     gbd_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
+#     covid_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
 
 #     # get ZAF only from GBD for now
 #     covid = pd.read_csv(covid_path)
@@ -550,8 +571,8 @@ def load_hierarchy(model_inputs_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame
     return data
 
 
-def load_population(model_inputs_root: Path) -> pd.DataFrame:
-    data_path = model_inputs_root / 'output_measures' / 'population' / 'all_populations.csv'
+def load_population(rates_root: Path) -> pd.DataFrame:
+    data_path = rates_root / 'model_inputs' / 'output_measures' / 'population' / 'all_populations.csv'
     data = pd.read_csv(data_path)
     is_2019 = data['year_id'] == 2019
     is_bothsex = data['sex_id'] == 3
@@ -616,25 +637,3 @@ def write_ratio_draws(data_list: List[pd.Series],
     # data.to_parquet(out_path, engine='fastparquet', compression='gzip')
     
     return out_path
-
-
-# def store_df(data: pd.DataFrame, path: Path, filename: str, fmt: str,):
-#     if fmt == 'csv':
-#         full_path = path / f'{filename}.csv'
-#         data.to_csv(full_path)
-#     elif fmt == 'parquet':
-#         full_path = path / f'{filename}.parquet'
-#         data.to_parquet(full_path, engine='fastparquet', compression='gzip')
-#     else:
-#         raise ValueError(f'Invalid file format specified: {fmt}')
-
-
-# def load_df(path: Path, filename: str, fmt: str,):
-#     if fmt == 'csv':
-#         full_path = path / f'{filename}.csv'
-#         data = pd.read_csv(full_path)
-#     elif fmt == 'parquet':
-#         full_path = path / f'{filename}.parquet'
-#         data = pd.read_parquet(full_path, engine='fastparquet')
-#     else:
-#         raise ValueError(f'Invalid file format specified: {fmt}')
