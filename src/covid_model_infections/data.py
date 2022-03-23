@@ -532,42 +532,39 @@ def trim_leading_zeros(cumul_data: List[pd.Series],
 def load_hierarchy(rates_root:Path, fh: bool, gbd: bool,) -> pd.DataFrame:
     if gbd:
         data_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
+        data = pd.read_csv(data_path)
+        data = data.sort_values('sort_order').reset_index(drop=True)
     elif fh:
         data_path = rates_root / 'model_inputs' / 'locations' / 'fh_small_area_hierarchy.csv'
+        data = pd.read_csv(data_path)
+        data = data.sort_values('sort_order').reset_index(drop=True)
     else:
-        data_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
-    data = pd.read_csv(data_path)
-    data = data.sort_values('sort_order').reset_index(drop=True)
+        # data_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
+        # data = pd.read_csv(data_path)
+        # data = data.sort_values('sort_order').reset_index(drop=True)
+        ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
+        logger.warning('Using ZAF subnats...')
+        gbd_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
+        covid_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
+
+        # get ZAF only from GBD for now
+        covid = pd.read_csv(covid_path)
+        covid_is_zaf = covid['path_to_top_parent'].apply(lambda x: '196' in x.split(','))
+        if not covid_is_zaf.sum() == 1:
+            raise ValueError('Already have ZAF subnats in Covid hierarchy.')
+        sort_order = covid.loc[covid_is_zaf, 'sort_order'].item()
+        covid = covid.loc[~covid_is_zaf]
+
+        gbd = pd.read_csv(gbd_path)
+        gbd_is_zaf = gbd['path_to_top_parent'].apply(lambda x: '196' in x.split(','))
+        gbd = gbd.loc[gbd_is_zaf].reset_index(drop=True)
+        gbd['sort_order'] = sort_order + gbd.index
+
+        covid.loc[covid['sort_order'] > sort_order, 'sort_order'] += len(gbd) - 1
+
+        data = pd.concat([covid, gbd]).sort_values('sort_order').reset_index(drop=True)
+        ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ## ##
     
-    if not gbd and not fh:
-        logger.warning('Manually adapting hierarchy for Other Union Territories')
-        n_children = data.loc[data['parent_id'] == 44538].shape[0]
-        data = data.loc[data['parent_id'] != 44538]
-        data.loc[data['location_id'] == 44538, 'most_detailed'] = 1
-        sort_order = data.loc[data['location_id'] == 44538, 'sort_order'].item()
-        data.loc[data['sort_order'] > sort_order, 'sort_order'] -= n_children
-
-#     logger.warning('Using ZAF subnats...')
-#     gbd_path = rates_root / 'model_inputs' / 'locations' / 'gbd_analysis_hierarchy.csv'
-#     covid_path = rates_root / 'model_inputs' / 'locations' / 'modeling_hierarchy.csv'
-
-#     # get ZAF only from GBD for now
-#     covid = pd.read_csv(covid_path)
-#     covid_is_zaf = covid['path_to_top_parent'].apply(lambda x: '196' in x.split(','))
-#     if not covid_is_zaf.sum() == 1:
-#         raise ValueError('Already have ZAF subnats in Covid hierarchy.')
-#     sort_order = covid.loc[covid_is_zaf, 'sort_order'].item()
-#     covid = covid.loc[~covid_is_zaf]
-
-#     gbd = pd.read_csv(gbd_path)
-#     gbd_is_zaf = gbd['path_to_top_parent'].apply(lambda x: '196' in x.split(','))
-#     gbd = gbd.loc[gbd_is_zaf].reset_index(drop=True)
-#     gbd['sort_order'] = sort_order + gbd.index
-
-#     covid.loc[covid['sort_order'] > sort_order, 'sort_order'] += len(gbd) - 1
-
-#     data = pd.concat([covid, gbd]).sort_values('sort_order').reset_index(drop=True)
-
     return data
 
 

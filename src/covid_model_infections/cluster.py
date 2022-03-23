@@ -12,7 +12,7 @@ from loguru import logger
 
 PROJECT = 'proj_covid_prod'
 QUEUE = {
-    'standard': 'd.q',
+    'standard': 'all.q',
     'gbd': 'all.q',
 }
 RESOURCES = {
